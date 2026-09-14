@@ -114,6 +114,14 @@ function registerIpc(): void {
   ipcMain.handle('repo:components', () => current().components())
   ipcMain.handle('repo:data', () => current().data())
   ipcMain.handle('repo:images', () => current().images())
+  ipcMain.handle('repo:importFile', (_e, src: string, dir: string) =>
+    current().importFile(src, dir)
+  )
+  ipcMain.handle('repo:create', (_e, rel: string, text: string) => current().create(rel, text))
+  ipcMain.handle('repo:mkdir', (_e, rel: string) => current().mkdir(rel))
+  ipcMain.handle('repo:rename', (_e, from: string, to: string) => current().rename(from, to))
+  ipcMain.handle('repo:trash', (_e, rel: string) => shell.trashItem(current().absolute(rel)))
+  ipcMain.handle('repo:newest', (_e, dir: string) => current().newest(dir))
   ipcMain.handle('repo:importImage', async (_e, dir: string) => {
     const result = await dialog.showOpenDialog({
       title: 'Add image',

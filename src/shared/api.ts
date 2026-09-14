@@ -21,6 +21,12 @@ export interface Api {
     data: () => Promise<DataLists>
     images: () => Promise<string[]>
     importImage: (dir: string) => Promise<string | null>
+    importFile: (src: string, dir: string) => Promise<string>
+    create: (rel: string, text: string) => Promise<void>
+    mkdir: (rel: string) => Promise<void>
+    rename: (from: string, to: string) => Promise<void>
+    trash: (rel: string) => Promise<void>
+    newest: (dir: string) => Promise<string | null>
     onOpened: (cb: () => void) => Unsubscribe
     onChanged: (cb: (paths: string[]) => void) => Unsubscribe
   }
@@ -43,6 +49,9 @@ export interface Api {
     kill: () => void
     onData: (cb: (data: string) => void) => Unsubscribe
     onExit: (cb: (code: number) => void) => Unsubscribe
+  }
+  files: {
+    pathFor: (file: File) => string
   }
   onMenu: (cb: (command: MenuCommand) => void) => Unsubscribe
   openExternal: (url: string) => void

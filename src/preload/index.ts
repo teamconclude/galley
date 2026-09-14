@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import type { Api, Unsubscribe } from '../shared/api'
 
 function on<T extends unknown[]>(channel: string, cb: (...args: T) => void): Unsubscribe {
@@ -19,6 +19,12 @@ const api: Api = {
     data: () => ipcRenderer.invoke('repo:data'),
     images: () => ipcRenderer.invoke('repo:images'),
     importImage: (dir) => ipcRenderer.invoke('repo:importImage', dir),
+    importFile: (src, dir) => ipcRenderer.invoke('repo:importFile', src, dir),
+    create: (rel, text) => ipcRenderer.invoke('repo:create', rel, text),
+    mkdir: (rel) => ipcRenderer.invoke('repo:mkdir', rel),
+    rename: (from, to) => ipcRenderer.invoke('repo:rename', from, to),
+    trash: (rel) => ipcRenderer.invoke('repo:trash', rel),
+    newest: (dir) => ipcRenderer.invoke('repo:newest', dir),
     onOpened: (cb) => on('repo:opened', cb),
     onChanged: (cb) => on('repo:changed', cb)
   },
@@ -41,6 +47,9 @@ const api: Api = {
     kill: () => ipcRenderer.send('terminal:kill'),
     onData: (cb) => on('terminal:data', cb),
     onExit: (cb) => on('terminal:exit', cb)
+  },
+  files: {
+    pathFor: (file) => webUtils.getPathForFile(file)
   },
   onMenu: (cb) => on('menu', cb),
   openExternal: (url) => ipcRenderer.send('open-external', url)

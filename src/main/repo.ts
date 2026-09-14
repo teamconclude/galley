@@ -141,21 +141,63 @@ export class Repo {
     return this.imageCache
   }
 
-  // Copies an image into static/<dir> under a lowercase, unique name and returns its URL path.
-  async importImage(src: string, dir: string): Promise<string> {
-    const folder = this.absolute(join('static', dir))
+  // Copies a file into <dir> under a lowercase, unique name and returns its path.
+  async importFile(src: string, dir: string): Promise<string> {
+    const folder = this.absolute(dir)
     await fs.mkdir(folder, { recursive: true })
     const ext = extname(src).toLowerCase()
     const base =
       basename(src, extname(src))
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '') || 'image'
+        .replace(/^-|-$/g, '') || 'file'
     let name = base + ext
     for (let i = 2; existsSync(join(folder, name)); i++) name = `${base}-${i}${ext}`
     await fs.copyFile(src, join(folder, name))
-    this.imageCache = null
+    if (dir.startsWith('static/images')) this.imageCache = null
     return `${dir}/${name}`
+  }
+
+  // Same, for an image addressed by its URL path under static/.
+  async importImage(src: string, dir: string): Promise<string> {
+    const rel = await this.importFile(src, join('static', dir))
+    return '/' + rel.replace(/^static\//, '')
+  }
+
+  async create(rel: string, text: string): Promise<void> {
+    if (existsSync(this.absolute(rel))) throw new Error(`${rel} already exists`)
+    await fs.writeFile(this.absolute(rel), text, { flag: 'wx' })
+  }
+
+  async mkdir(rel: string): Promise<void> {
+    await fs.mkdir(this.absolute(rel), { recursive: true })
+  }
+
+  async rename(from: string, to: string): Promise<void> {
+    if (existsSync(this.absolute(to))) throw new Error(`${to} already exists`)
+    await fs.rename(this.absolute(from), this.absolute(to))
+  }
+
+  // The newest page in a directory, by frontmatter date, else by modification time.
+  async newest(dirRel: string): Promise<string | null> {
+    const dir = this.absolute(dirRel)
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+    const pages = entries.filter(
+      (e) => e.isFile() && e.name.endsWith('.md') && !/^_?index\.md$/.test(e.name)
+    )
+    let best: { date: string | null; mtime: number; text: string } | null = null
+    for (const page of pages) {
+      const file = join(dir, page.name)
+      const text = await fs.readFile(file, 'utf8')
+      const date = text.match(/^date:\s*['"]?(\d{4}-\d{2}-\d{2}[^'"\n]*)/m)?.[1] ?? null
+      const mtime = (await fs.stat(file)).mtimeMs
+      const newer =
+        !best ||
+        (date !== null && (best.date === null || date > best.date)) ||
+        (date === null && best.date === null && mtime > best.mtime)
+      if (newer) best = { date, mtime, text }
+    }
+    return best?.text ?? null
   }
 
   private async refreshPages(): Promise<void> {

@@ -165,8 +165,23 @@ export function ImageControl({ path, value }: ControlProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const text = asText(value)
   const set = (v: string): void => edit((doc) => setValue(doc, path, v))
+  const folder = text.startsWith('/images/') ? text.slice(0, text.lastIndexOf('/')) : '/images'
+  const drop = async (e: React.DragEvent): Promise<void> => {
+    const file = [...e.dataTransfer.files].find((f) =>
+      /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(f.name)
+    )
+    if (!file) return
+    e.preventDefault()
+    const rel = await window.api.repo.importFile(window.api.files.pathFor(file), `static${folder}`)
+    set('/' + rel.replace(/^static\//, ''))
+  }
   return (
-    <div className="image-control">
+    <div
+      className="image-control"
+      title={`Drop an image here to copy it into static${folder}`}
+      onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
+      onDrop={(e) => void drop(e)}
+    >
       {text.startsWith('/images/') && (
         <img className="image-preview" src={`galley://repo/static${text}`} alt="" />
       )}

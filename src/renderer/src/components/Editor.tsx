@@ -13,19 +13,25 @@ interface Props {
   value: string
   onChange: (value: string) => void
   onSave?: () => void
+  // Copies dropped images into the site and returns their URL paths.
+  importImages?: (files: File[]) => Promise<string[]>
 }
 
 const markdownFile = /\.(md|markdown)$/i
+const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 // Remount (change the React key) to open a different file.
-export default function Editor({ filename, value, onChange, onSave }: Props): React.JSX.Element {
+export default function Editor(props: Props): React.JSX.Element {
+  const { filename, value, onChange, onSave, importImages } = props
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
+  const importImagesRef = useRef(importImages)
   useEffect(() => {
     onChangeRef.current = onChange
     onSaveRef.current = onSave
+    importImagesRef.current = importImages
   })
 
   useEffect(() => {
@@ -50,7 +56,8 @@ export default function Editor({ filename, value, onChange, onSave }: Props): Re
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString())
           }),
-          isMarkdown ? trackFocus() : []
+          isMarkdown ? trackFocus() : [],
+          importImages ? dropImages(importImagesRef) : []
         ]
       }),
       parent: host.current!
@@ -95,6 +102,34 @@ function trackFocus(): Extension {
       if (update.selectionSet || update.docChanged) editorChanged(update.view)
     })
   ]
+}
+
+// Dropped image files are copied into the site and inserted as markdown images.
+function dropImages(importImages: React.RefObject<Props['importImages']>): Extension {
+  return EditorView.domEventHandlers({
+    dragover: (event) => {
+      if (!event.dataTransfer?.types.includes('Files')) return false
+      event.preventDefault()
+      return true
+    },
+    drop: (event, view) => {
+      const files = [...(event.dataTransfer?.files ?? [])].filter((f) => imageFile.test(f.name))
+      const handler = importImages.current
+      if (files.length === 0 || !handler) return false
+      event.preventDefault()
+      const pos =
+        view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head
+      void handler(files).then((urls) => {
+        const text = urls.map((url) => `![Description](${url})`).join('\n')
+        view.dispatch({
+          changes: { from: pos, insert: text },
+          selection: { anchor: pos + text.length }
+        })
+        view.focus()
+      })
+      return true
+    }
+  })
 }
 
 async function languageFor(filename: string): Promise<Extension> {
