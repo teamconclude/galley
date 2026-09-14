@@ -1,3 +1,4 @@
+import { syntaxTree } from '@codemirror/language'
 import type { EditorView } from '@codemirror/view'
 import { useActiveEditor } from '../lib/activeEditor'
 
@@ -53,31 +54,63 @@ const snippets: Record<string, string> = {
 }
 
 // Acts on whichever markdown editor has focus: the page body or a markdown field.
+const inlineStyles: Record<string, string> = {
+  StrongEmphasis: 'bold',
+  Emphasis: 'italic',
+  InlineCode: 'code',
+  Link: 'link',
+  Image: 'image'
+}
+
+// Styles in effect at the cursor: line markers from the text, inline ones from the tree.
+function activeStyles(view: EditorView): Set<string> {
+  const styles = new Set<string>()
+  const pos = view.state.selection.main.head
+  const text = view.state.doc.lineAt(pos).text
+  if (text.startsWith('## ')) styles.add('h2')
+  if (text.startsWith('### ')) styles.add('h3')
+  if (bullet.test(text)) styles.add('list')
+  if (quote.test(text)) styles.add('quote')
+  for (let node = syntaxTree(view.state).resolveInner(pos, -1); node.parent; node = node.parent) {
+    const style = inlineStyles[node.name]
+    if (style) styles.add(style)
+  }
+  return styles
+}
+
 export default function Toolbar(): React.JSX.Element {
   const view = useActiveEditor()
+  const styles = view ? activeStyles(view) : new Set<string>()
   const keepFocus = (e: React.MouseEvent): void => e.preventDefault()
   const action = (
+    key: string,
     title: string,
     label: React.ReactNode,
     fn: (v: EditorView) => void
   ): React.JSX.Element => (
-    <button title={title} disabled={!view} onMouseDown={keepFocus} onClick={() => view && fn(view)}>
+    <button
+      title={title}
+      className={styles.has(key) ? 'on' : ''}
+      disabled={!view}
+      onMouseDown={keepFocus}
+      onClick={() => view && fn(view)}
+    >
       {label}
     </button>
   )
   return (
     <div className="toolbar">
-      {action('Bold', <b>B</b>, (v) => wrap(v, '**'))}
-      {action('Italic', <i>I</i>, (v) => wrap(v, '_'))}
-      {action('Heading', 'H2', (v) => toggleLine(v, '## ', heading))}
-      {action('Subheading', 'H3', (v) => toggleLine(v, '### ', heading))}
+      {action('bold', 'Bold', <b>B</b>, (v) => wrap(v, '**'))}
+      {action('italic', 'Italic', <i>I</i>, (v) => wrap(v, '_'))}
+      {action('h2', 'Heading', 'H2', (v) => toggleLine(v, '## ', heading))}
+      {action('h3', 'Subheading', 'H3', (v) => toggleLine(v, '### ', heading))}
       <span className="toolbar-gap" />
-      {action('Link', 'Link', (v) => wrap(v, '[', '](https://)'))}
-      {action('Image', 'Image', (v) => insert(v, '![Description](/images/…)'))}
-      {action('Code', 'Code', (v) => wrap(v, '`'))}
+      {action('link', 'Link', 'Link', (v) => wrap(v, '[', '](https://)'))}
+      {action('image', 'Image', 'Image', (v) => insert(v, '![Description](/images/…)'))}
+      {action('code', 'Code', 'Code', (v) => wrap(v, '`'))}
       <span className="toolbar-gap" />
-      {action('Bullet list', 'List', (v) => toggleLine(v, '- ', bullet))}
-      {action('Quote block', 'Quote', (v) => toggleLine(v, '> ', quote))}
+      {action('list', 'Bullet list', 'List', (v) => toggleLine(v, '- ', bullet))}
+      {action('quote', 'Quote block', 'Quote', (v) => toggleLine(v, '> ', quote))}
       <select
         value=""
         title="Insert a shortcode"

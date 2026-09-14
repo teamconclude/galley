@@ -6,7 +6,7 @@ import { languages } from '@codemirror/language-data'
 import { markdown } from '@codemirror/lang-markdown'
 import { yaml } from '@codemirror/lang-yaml'
 import { basicSetup } from 'codemirror'
-import { clearActiveEditor, setActiveEditor } from '../lib/activeEditor'
+import { clearActiveEditor, editorChanged, setActiveEditor } from '../lib/activeEditor'
 
 interface Props {
   filename: string
@@ -79,17 +79,22 @@ export default function Editor({ filename, value, onChange, onSave }: Props): Re
 
 // Focus moving to the toolbar keeps the editor active so its buttons can act on it.
 function trackFocus(): Extension {
-  return EditorView.domEventHandlers({
-    focus: (_event, view) => {
-      setActiveEditor(view)
-      return false
-    },
-    blur: (event, view) => {
-      const target = event.relatedTarget as Element | null
-      if (!target?.closest('.toolbar')) clearActiveEditor(view)
-      return false
-    }
-  })
+  return [
+    EditorView.domEventHandlers({
+      focus: (_event, view) => {
+        setActiveEditor(view)
+        return false
+      },
+      blur: (event, view) => {
+        const target = event.relatedTarget as Element | null
+        if (!target?.closest('.toolbar')) clearActiveEditor(view)
+        return false
+      }
+    }),
+    EditorView.updateListener.of((update) => {
+      if (update.selectionSet || update.docChanged) editorChanged(update.view)
+    })
+  ]
 }
 
 async function languageFor(filename: string): Promise<Extension> {
