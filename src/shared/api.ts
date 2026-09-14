@@ -1,4 +1,11 @@
-import type { DirEntry, HugoStatus, MenuCommand, RepoInfo } from './types'
+import type {
+  ComponentSchema,
+  DataLists,
+  DirEntry,
+  HugoStatus,
+  MenuCommand,
+  RepoInfo
+} from './types'
 
 export type Unsubscribe = () => void
 
@@ -10,6 +17,10 @@ export interface Api {
     read: (rel: string) => Promise<string>
     write: (rel: string, text: string) => Promise<void>
     pageUrl: (rel: string) => Promise<string | null>
+    components: () => Promise<ComponentSchema[]>
+    data: () => Promise<DataLists>
+    images: () => Promise<string[]>
+    importImage: (dir: string) => Promise<string | null>
     onOpened: (cb: () => void) => Unsubscribe
     onChanged: (cb: (paths: string[]) => void) => Unsubscribe
   }

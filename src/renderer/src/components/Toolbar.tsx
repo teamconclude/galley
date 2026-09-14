@@ -1,24 +1,43 @@
 import type { EditorView } from '@codemirror/view'
+import { useActiveEditor } from '../lib/activeEditor'
 
-interface Props {
-  view: EditorView | null
-}
-
+// Wrapping a selection that is already wrapped unwraps it, so the buttons toggle.
 function wrap(view: EditorView, before: string, after = before): void {
   const { from, to } = view.state.selection.main
   const selected = view.state.sliceDoc(from, to)
-  view.dispatch({
-    changes: { from, to, insert: before + selected + after },
-    selection: { anchor: from + before.length, head: from + before.length + selected.length }
-  })
+  const outerFrom = from - before.length
+  const outerTo = to + after.length
+  const wrapped =
+    outerFrom >= 0 &&
+    outerTo <= view.state.doc.length &&
+    view.state.sliceDoc(outerFrom, from) === before &&
+    view.state.sliceDoc(to, outerTo) === after
+  if (wrapped) {
+    view.dispatch({
+      changes: { from: outerFrom, to: outerTo, insert: selected },
+      selection: { anchor: outerFrom, head: outerFrom + selected.length }
+    })
+  } else {
+    view.dispatch({
+      changes: { from, to, insert: before + selected + after },
+      selection: { anchor: from + before.length, head: from + before.length + selected.length }
+    })
+  }
   view.focus()
 }
 
-function prefixLine(view: EditorView, prefix: string): void {
+// Replaces any existing marker of the same family and removes it when already applied.
+function toggleLine(view: EditorView, prefix: string, family: RegExp): void {
   const line = view.state.doc.lineAt(view.state.selection.main.from)
-  view.dispatch({ changes: { from: line.from, insert: prefix } })
+  const current = line.text.match(family)?.[0] ?? ''
+  const insert = current === prefix ? '' : prefix
+  view.dispatch({ changes: { from: line.from, to: line.from + current.length, insert } })
   view.focus()
 }
+
+const heading = /^#{1,6} /
+const bullet = /^[-*] /
+const quote = /^> /
 
 function insert(view: EditorView, text: string): void {
   const { from, to } = view.state.selection.main
@@ -33,42 +52,36 @@ const snippets: Record<string, string> = {
   tooltip: '{{< tooltip "Explanation shown on hover" >}}term{{< /tooltip >}}'
 }
 
-export default function Toolbar({ view }: Props): React.JSX.Element {
-  const run = (fn: (v: EditorView) => void) => () => view && fn(view)
+// Acts on whichever markdown editor has focus: the page body or a markdown field.
+export default function Toolbar(): React.JSX.Element {
+  const view = useActiveEditor()
+  const keepFocus = (e: React.MouseEvent): void => e.preventDefault()
+  const action = (
+    title: string,
+    label: React.ReactNode,
+    fn: (v: EditorView) => void
+  ): React.JSX.Element => (
+    <button title={title} disabled={!view} onMouseDown={keepFocus} onClick={() => view && fn(view)}>
+      {label}
+    </button>
+  )
   return (
     <div className="toolbar">
-      <button title="Bold" onClick={run((v) => wrap(v, '**'))}>
-        <b>B</b>
-      </button>
-      <button title="Italic" onClick={run((v) => wrap(v, '_'))}>
-        <i>I</i>
-      </button>
-      <button title="Heading" onClick={run((v) => prefixLine(v, '## '))}>
-        H2
-      </button>
-      <button title="Subheading" onClick={run((v) => prefixLine(v, '### '))}>
-        H3
-      </button>
+      {action('Bold', <b>B</b>, (v) => wrap(v, '**'))}
+      {action('Italic', <i>I</i>, (v) => wrap(v, '_'))}
+      {action('Heading', 'H2', (v) => toggleLine(v, '## ', heading))}
+      {action('Subheading', 'H3', (v) => toggleLine(v, '### ', heading))}
       <span className="toolbar-gap" />
-      <button title="Link" onClick={run((v) => wrap(v, '[', '](https://)'))}>
-        Link
-      </button>
-      <button title="Image" onClick={run((v) => insert(v, '![Description](/images/…)'))}>
-        Image
-      </button>
-      <button title="Code" onClick={run((v) => wrap(v, '`'))}>
-        Code
-      </button>
+      {action('Link', 'Link', (v) => wrap(v, '[', '](https://)'))}
+      {action('Image', 'Image', (v) => insert(v, '![Description](/images/…)'))}
+      {action('Code', 'Code', (v) => wrap(v, '`'))}
       <span className="toolbar-gap" />
-      <button title="Bullet list" onClick={run((v) => prefixLine(v, '- '))}>
-        List
-      </button>
-      <button title="Quote block" onClick={run((v) => prefixLine(v, '> '))}>
-        Quote
-      </button>
+      {action('Bullet list', 'List', (v) => toggleLine(v, '- ', bullet))}
+      {action('Quote block', 'Quote', (v) => toggleLine(v, '> ', quote))}
       <select
         value=""
         title="Insert a shortcode"
+        disabled={!view}
         onChange={(e) => {
           const text = snippets[e.target.value]
           if (text && view) insert(view, text)
@@ -80,6 +93,7 @@ export default function Toolbar({ view }: Props): React.JSX.Element {
         <option value="quote">Customer quote</option>
         <option value="tooltip">Tooltip</option>
       </select>
+      {!view && <span className="toolbar-hint">Click into a text to format it</span>}
     </div>
   )
 }

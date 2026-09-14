@@ -15,6 +15,10 @@ const api: Api = {
     read: (rel) => ipcRenderer.invoke('repo:read', rel),
     write: (rel, text) => ipcRenderer.invoke('repo:write', rel, text),
     pageUrl: (rel) => ipcRenderer.invoke('repo:pageUrl', rel),
+    components: () => ipcRenderer.invoke('repo:components'),
+    data: () => ipcRenderer.invoke('repo:data'),
+    images: () => ipcRenderer.invoke('repo:images'),
+    importImage: (dir) => ipcRenderer.invoke('repo:importImage', dir),
     onOpened: (cb) => on('repo:opened', cb),
     onChanged: (cb) => on('repo:changed', cb)
   },

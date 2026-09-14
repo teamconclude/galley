@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
-import { electronApp, is, optimizer } from '@electron-toolkit/utils'
+import { electronApp, optimizer } from '@electron-toolkit/utils'
+import icon from '../../resources/icon.png?asset'
 import type { MenuCommand } from '../shared/types'
+import { isDev } from './env'
 import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
@@ -73,7 +75,7 @@ function createWindow(): void {
     void shell.openExternal(details.url)
     return { action: 'deny' }
   })
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'))
@@ -109,6 +111,20 @@ function registerIpc(): void {
   ipcMain.handle('repo:read', (_e, rel: string) => current().read(rel))
   ipcMain.handle('repo:write', (_e, rel: string, text: string) => current().write(rel, text))
   ipcMain.handle('repo:pageUrl', (_e, rel: string) => current().pageUrl(rel))
+  ipcMain.handle('repo:components', () => current().components())
+  ipcMain.handle('repo:data', () => current().data())
+  ipcMain.handle('repo:images', () => current().images())
+  ipcMain.handle('repo:importImage', async (_e, dir: string) => {
+    const result = await dialog.showOpenDialog({
+      title: 'Add image',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'] }
+      ]
+    })
+    const src = result.filePaths[0]
+    return src ? current().importImage(src, dir) : null
+  })
   ipcMain.handle('hugo:status', () => hugo.status)
   ipcMain.handle('hugo:restart', () => (repo ? hugo.start(repo.path) : undefined))
   ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
@@ -147,6 +163,8 @@ app.setName('Galley')
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('io.conclude.galley')
+  // The packaged app carries its own icon; in development the Dock shows Electron's.
+  if (isDev) app.dock?.setIcon(icon)
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   Menu.setApplicationMenu(
     buildMenu({

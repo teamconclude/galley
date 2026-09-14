@@ -1,6 +1,6 @@
 import { Menu, MenuItemConstructorOptions } from 'electron'
-import { is } from '@electron-toolkit/utils'
 import type { MenuCommand } from '../shared/types'
+import { isDev } from './env'
 
 interface Actions {
   openRepo: () => void
@@ -8,7 +8,7 @@ interface Actions {
 }
 
 export function buildMenu(actions: Actions): Menu {
-  const devItems: MenuItemConstructorOptions[] = is.dev
+  const devItems: MenuItemConstructorOptions[] = isDev
     ? [{ type: 'separator' }, { role: 'toggleDevTools' }]
     : []
   const template: MenuItemConstructorOptions[] = [

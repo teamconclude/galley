@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { EditorView } from '@codemirror/view'
 import type { HugoStatus, RepoInfo } from '../../shared/types'
 import ClaudePane from './components/ClaudePane'
 import Editor from './components/Editor'
 import FileTree from './components/FileTree'
 import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
+import { SchemaProvider } from './components/SchemaContext'
 import Splitter from './components/Splitter'
 import Toolbar from './components/Toolbar'
 import Welcome from './components/Welcome'
@@ -36,7 +36,7 @@ export default function App(): React.JSX.Element | null {
   const [sidebarWidth, setSidebarWidth] = useState(240)
   const [previewWidth, setPreviewWidth] = useState(600)
   const [claudeHeight, setClaudeHeight] = useState(300)
-  const [view, setView] = useState<EditorView | null>(null)
+  const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
 
   const fileRef = useRef(file)
   const saveTimer = useRef<number | null>(null)
@@ -181,105 +181,127 @@ export default function App(): React.JSX.Element | null {
   const isMarkdown = file ? markdownFile.test(file.path) : false
   const parts = file && isMarkdown ? split(file.text) : null
   const dirty = file ? file.text !== file.saved : false
+  // Pages built from components have no prose, so the settings form gets the whole column.
+  const blocksPage =
+    parts?.frontmatter != null &&
+    /^content_blocks:/m.test(parts.frontmatter) &&
+    parts.body.trim() === ''
+  const showBody = !blocksPage || bodyShownFor === file?.path
 
   return (
-    <div className="app">
-      <header className="titlebar">
-        <div className="title">
-          <strong>{repo.name}</strong>
-          {repo.branch && <span className="branch">{repo.branch}</span>}
-        </div>
-        <div className="title-file">{file?.path ?? ''}</div>
-        <div className="title-right">
-          <span className="save-state">
-            {file ? (saving ? 'Saving…' : dirty ? 'Unsaved' : 'Saved') : ''}
-          </span>
-          <button
-            className={showPreview || detached ? 'on' : ''}
-            title={
-              detached ? 'Bring the preview back into this window' : 'Show or hide the preview'
-            }
-            onClick={() => (detached ? toggleDetached() : setShowPreview(!showPreview))}
-          >
-            {detached ? 'Preview ↗' : 'Preview'}
-          </button>
-          <button className={showClaude ? 'on' : ''} onClick={() => setShowClaude(!showClaude)}>
-            Claude
-          </button>
-        </div>
-      </header>
-      <div className="body">
-        <aside className="sidebar" style={{ width: sidebarWidth }}>
-          <FileTree
-            name={repo.name}
-            selected={file?.path ?? null}
-            onSelect={(path) => void open(path)}
-            version={treeVersion}
+    <SchemaProvider repoPath={repo.path}>
+      <div className="app">
+        <header className="titlebar">
+          <div className="title">
+            <strong>{repo.name}</strong>
+            {repo.branch && <span className="branch">{repo.branch}</span>}
+          </div>
+          <div className="title-file">{file?.path ?? ''}</div>
+          <div className="title-right">
+            <span className="save-state">
+              {file ? (saving ? 'Saving…' : dirty ? 'Unsaved' : 'Saved') : ''}
+            </span>
+            <button
+              className={showPreview || detached ? 'on' : ''}
+              title={
+                detached ? 'Bring the preview back into this window' : 'Show or hide the preview'
+              }
+              onClick={() => (detached ? toggleDetached() : setShowPreview(!showPreview))}
+            >
+              {detached ? 'Preview ↗' : 'Preview'}
+            </button>
+            <button className={showClaude ? 'on' : ''} onClick={() => setShowClaude(!showClaude)}>
+              Claude
+            </button>
+          </div>
+        </header>
+        <div className="body">
+          <aside className="sidebar" style={{ width: sidebarWidth }}>
+            <FileTree
+              name={repo.name}
+              selected={file?.path ?? null}
+              onSelect={(path) => void open(path)}
+              version={treeVersion}
+            />
+          </aside>
+          <Splitter
+            direction="horizontal"
+            onDrag={(d) => setSidebarWidth((w) => clamp(w + d, 160, 500))}
           />
-        </aside>
-        <Splitter
-          direction="horizontal"
-          onDrag={(d) => setSidebarWidth((w) => clamp(w + d, 160, 500))}
-        />
-        <div className="center">
-          <div className="upper">
-            <main className="editor-column">
-              {!file ? (
-                <div className="pane-empty">Choose a page on the left.</div>
-              ) : imageFile.test(file.path) ? (
-                <div className="image-view">
-                  <img src={`galley://repo/${file.path}`} alt={file.path} />
-                </div>
-              ) : binaryFile.test(file.path) ? (
-                <div className="pane-empty">This file cannot be edited here.</div>
-              ) : (
+          <div className="center">
+            <div className="upper">
+              <main className="editor-column">
+                {!file ? (
+                  <div className="pane-empty">Choose a page on the left.</div>
+                ) : imageFile.test(file.path) ? (
+                  <div className="image-view">
+                    <img src={`galley://repo/${file.path}`} alt={file.path} />
+                  </div>
+                ) : binaryFile.test(file.path) ? (
+                  <div className="pane-empty">This file cannot be edited here.</div>
+                ) : (
+                  <>
+                    {isMarkdown && <Toolbar />}
+                    {parts && parts.frontmatter !== null && (
+                      <Frontmatter
+                        key={`settings:${file.path}`}
+                        text={parts.frontmatter}
+                        onChange={(fm) => changeText(join(fm, parts.body))}
+                        grow={blocksPage}
+                      />
+                    )}
+                    {blocksPage && (
+                      <button
+                        className="body-toggle"
+                        onClick={() => setBodyShownFor(showBody ? null : file.path)}
+                      >
+                        {showBody ? 'Hide body text' : 'Show body text (empty)'}
+                      </button>
+                    )}
+                    {showBody && (
+                      <>
+                        <Editor
+                          key={`body:${file.path}`}
+                          filename={file.path}
+                          value={parts ? parts.body : file.text}
+                          onChange={(body) =>
+                            changeText(parts ? join(parts.frontmatter, body) : body)
+                          }
+                          onSave={() => void save()}
+                        />
+                      </>
+                    )}
+                  </>
+                )}
+              </main>
+              {showPreview && !detached && (
                 <>
-                  {parts && parts.frontmatter !== null && (
-                    <Frontmatter
-                      key={`settings:${file.path}`}
-                      text={parts.frontmatter}
-                      onChange={(fm) => changeText(join(fm, parts.body))}
-                    />
-                  )}
-                  {isMarkdown && <Toolbar view={view} />}
-                  <Editor
-                    key={`body:${file.path}`}
-                    filename={file.path}
-                    value={parts ? parts.body : file.text}
-                    onChange={(body) => changeText(parts ? join(parts.frontmatter, body) : body)}
-                    onSave={() => void save()}
-                    onView={setView}
+                  <Splitter
+                    direction="horizontal"
+                    onDrag={(d) => setPreviewWidth((w) => clamp(w - d, 320, 1400))}
                   />
+                  <section className="preview-column" style={{ width: previewWidth }}>
+                    <Preview
+                      status={hugo}
+                      url={previewUrl}
+                      reloadKey={reloadKey}
+                      onDetach={toggleDetached}
+                    />
+                  </section>
                 </>
               )}
-            </main>
-            {showPreview && !detached && (
-              <>
-                <Splitter
-                  direction="horizontal"
-                  onDrag={(d) => setPreviewWidth((w) => clamp(w - d, 320, 1400))}
-                />
-                <section className="preview-column" style={{ width: previewWidth }}>
-                  <Preview
-                    status={hugo}
-                    url={previewUrl}
-                    reloadKey={reloadKey}
-                    onDetach={toggleDetached}
-                  />
-                </section>
-              </>
-            )}
+            </div>
+            <Splitter
+              direction="vertical"
+              hidden={!showClaude}
+              onDrag={(d) => setClaudeHeight((h) => clamp(h - d, 120, 900))}
+            />
+            <section className="claude-row" style={{ height: claudeHeight }} hidden={!showClaude}>
+              <ClaudePane repoPath={repo.path} />
+            </section>
           </div>
-          <Splitter
-            direction="vertical"
-            hidden={!showClaude}
-            onDrag={(d) => setClaudeHeight((h) => clamp(h - d, 120, 900))}
-          />
-          <section className="claude-row" style={{ height: claudeHeight }} hidden={!showClaude}>
-            <ClaudePane repoPath={repo.path} />
-          </section>
         </div>
       </div>
-    </div>
+    </SchemaProvider>
   )
 }

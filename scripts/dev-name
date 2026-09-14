@@ -1,9 +1,27 @@
 #!/bin/sh
-# In development the app runs inside the stock Electron binary, and macOS takes the menu
-# bar name from that bundle's Info.plist. Rename it so the menu bar says Galley.
-app=node_modules/electron/dist/Electron.app
+# In development the app runs inside the stock Electron binary, and macOS names the
+# process after that bundle and executable and shows that bundle's icon. Rename them and
+# swap the icon so the menu bar and Dock show Galley. The packaged app gets all of this
+# from electron-builder.
+dist=node_modules/electron/dist
+[ -d "$dist/Electron.app" ] && mv "$dist/Electron.app" "$dist/Galley.app"
+app=$dist/Galley.app
+[ -d "$app" ] || exit 0
+[ -f "$app/Contents/MacOS/Electron" ] && mv "$app/Contents/MacOS/Electron" "$app/Contents/MacOS/Galley"
 plist=$app/Contents/Info.plist
-[ -f "$plist" ] || exit 0
 plutil -replace CFBundleName -string Galley "$plist"
 plutil -replace CFBundleDisplayName -string Galley "$plist"
+plutil -replace CFBundleExecutable -string Galley "$plist"
+plutil -replace CFBundleIdentifier -string io.conclude.galley.dev "$plist"
+printf 'Galley.app/Contents/MacOS/Galley' > node_modules/electron/path.txt
+
+iconset=$(mktemp -d)/icon.iconset
+mkdir -p "$iconset"
+for size in 16 32 128 256 512; do
+  sips -z $size $size build/icon.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+  sips -z $((size * 2)) $((size * 2)) build/icon.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/electron.icns"
+rm -rf "$(dirname "$iconset")"
+
 codesign --force --deep --sign - "$app" 2>/dev/null
