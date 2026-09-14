@@ -1,0 +1,50 @@
+import { Menu, MenuItemConstructorOptions } from 'electron'
+import { is } from '@electron-toolkit/utils'
+import type { MenuCommand } from '../shared/types'
+
+interface Actions {
+  openRepo: () => void
+  command: (command: MenuCommand) => void
+}
+
+export function buildMenu(actions: Actions): Menu {
+  const devItems: MenuItemConstructorOptions[] = is.dev
+    ? [{ type: 'separator' }, { role: 'toggleDevTools' }]
+    : []
+  const template: MenuItemConstructorOptions[] = [
+    { role: 'appMenu' },
+    {
+      label: 'File',
+      submenu: [
+        { label: 'Open site checkout…', accelerator: 'CmdOrCtrl+O', click: actions.openRepo },
+        { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => actions.command('save') },
+        { type: 'separator' },
+        { role: 'close' }
+      ]
+    },
+    { role: 'editMenu' },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle preview',
+          accelerator: 'CmdOrCtrl+Shift+P',
+          click: () => actions.command('toggle-preview')
+        },
+        {
+          label: 'Toggle Claude',
+          accelerator: 'CmdOrCtrl+J',
+          click: () => actions.command('toggle-terminal')
+        },
+        {
+          label: 'Reload preview',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => actions.command('reload-preview')
+        },
+        ...devItems
+      ]
+    },
+    { role: 'windowMenu' }
+  ]
+  return Menu.buildFromTemplate(template)
+}

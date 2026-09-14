@@ -1,0 +1,50 @@
+import * as pty from 'node-pty'
+
+export class ClaudeTerminal {
+  private proc: pty.IPty | null = null
+
+  constructor(
+    private onData: (data: string) => void,
+    private onExit: (code: number) => void
+  ) {}
+
+  start(cwd: string, cols: number, rows: number): void {
+    this.kill()
+    const env: Record<string, string> = {}
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v
+    env.TERM = 'xterm-256color'
+    env.COLORTERM = 'truecolor'
+    env.LANG ||= 'en_US.UTF-8'
+    // The login shell supplies the user's PATH, which a GUI app does not inherit.
+    const proc = pty.spawn('/bin/zsh', ['-lc', 'exec claude'], {
+      name: 'xterm-256color',
+      cols: Math.max(cols, 2),
+      rows: Math.max(rows, 1),
+      cwd,
+      env
+    })
+    this.proc = proc
+    proc.onData((data) => {
+      if (this.proc === proc) this.onData(data)
+    })
+    proc.onExit(({ exitCode }) => {
+      if (this.proc !== proc) return
+      this.proc = null
+      this.onExit(exitCode)
+    })
+  }
+
+  write(data: string): void {
+    this.proc?.write(data)
+  }
+
+  resize(cols: number, rows: number): void {
+    if (cols > 1 && rows > 0) this.proc?.resize(cols, rows)
+  }
+
+  kill(): void {
+    const proc = this.proc
+    this.proc = null
+    proc?.kill()
+  }
+}
