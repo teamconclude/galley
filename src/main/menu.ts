@@ -32,6 +32,11 @@ export function buildMenu(actions: Actions): Menu {
           click: () => actions.command('toggle-preview')
         },
         {
+          label: 'Preview in separate window',
+          accelerator: 'CmdOrCtrl+Alt+P',
+          click: () => actions.command('detach-preview')
+        },
+        {
           label: 'Toggle Claude',
           accelerator: 'CmdOrCtrl+J',
           click: () => actions.command('toggle-terminal')

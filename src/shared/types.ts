@@ -18,4 +18,5 @@ export interface HugoStatus {
   message?: string
 }
 
-export type MenuCommand = 'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview'
+export type MenuCommand =
+  'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview' | 'detach-preview'

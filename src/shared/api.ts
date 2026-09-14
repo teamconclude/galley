@@ -18,6 +18,13 @@ export interface Api {
     restart: () => Promise<void>
     onStatus: (cb: (status: HugoStatus) => void) => Unsubscribe
   }
+  preview: {
+    detach: (url: string) => void
+    navigate: (url: string) => void
+    reload: () => void
+    attach: () => void
+    onClosed: (cb: () => void) => Unsubscribe
+  }
   terminal: {
     start: (cols: number, rows: number) => void
     write: (data: string) => void

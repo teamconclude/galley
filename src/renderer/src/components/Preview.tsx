@@ -1,33 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { HugoStatus } from '../../../shared/types'
 import type { WebviewElement } from '../env'
 
 interface Props {
   status: HugoStatus
-  path: string | null
+  url: string | null
   reloadKey: number
+  onDetach: () => void
 }
 
-export default function Preview({ status, path, reloadKey }: Props): React.JSX.Element {
-  const [pagePath, setPagePath] = useState('/')
+export default function Preview({ status, url, reloadKey, onDetach }: Props): React.JSX.Element {
   const view = useRef<WebviewElement>(null)
-
-  useEffect(() => {
-    if (!path) return
-    let live = true
-    void window.api.repo.pageUrl(path).then((url) => {
-      if (live && url) setPagePath(url)
-    })
-    return () => {
-      live = false
-    }
-  }, [path])
 
   useEffect(() => {
     if (reloadKey) view.current?.reload()
   }, [reloadKey])
 
-  const url = status.state === 'running' && status.url ? status.url + pagePath : null
   return (
     <div className="preview">
       <div className="pane-bar">
@@ -35,6 +23,11 @@ export default function Preview({ status, path, reloadKey }: Props): React.JSX.E
         <span className="pane-title">{url ?? statusText(status)}</span>
         {url && <button onClick={() => view.current?.reload()}>Reload</button>}
         {url && <button onClick={() => window.api.openExternal(url)}>Open in browser</button>}
+        {url && (
+          <button onClick={onDetach} title="Move the preview into its own window">
+            Separate window
+          </button>
+        )}
         {status.state === 'error' && (
           <button onClick={() => void window.api.hugo.restart()}>Restart Hugo</button>
         )}

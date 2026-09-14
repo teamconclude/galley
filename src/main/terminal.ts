@@ -11,7 +11,10 @@ export class ClaudeTerminal {
   start(cwd: string, cols: number, rows: number): void {
     this.kill()
     const env: Record<string, string> = {}
-    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v
+    // Markers from a Claude session that launched the app would make the CLI think it is nested.
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v !== undefined && !k.startsWith('CLAUDE')) env[k] = v
+    }
     env.TERM = 'xterm-256color'
     env.COLORTERM = 'truecolor'
     env.LANG ||= 'en_US.UTF-8'

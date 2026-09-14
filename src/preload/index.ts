@@ -23,6 +23,13 @@ const api: Api = {
     restart: () => ipcRenderer.invoke('hugo:restart'),
     onStatus: (cb) => on('hugo:status', cb)
   },
+  preview: {
+    detach: (url) => ipcRenderer.send('preview:detach', url),
+    navigate: (url) => ipcRenderer.send('preview:navigate', url),
+    reload: () => ipcRenderer.send('preview:reload'),
+    attach: () => ipcRenderer.send('preview:attach'),
+    onClosed: (cb) => on('preview:closed', cb)
+  },
   terminal: {
     start: (cols, rows) => ipcRenderer.send('terminal:start', cols, rows),
     write: (data) => ipcRenderer.send('terminal:write', data),

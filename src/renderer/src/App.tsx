@@ -30,6 +30,8 @@ export default function App(): React.JSX.Element | null {
   const [treeVersion, setTreeVersion] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
   const [showPreview, setShowPreview] = useState(true)
+  const [detached, setDetached] = useState(false)
+  const [pagePath, setPagePath] = useState('/')
   const [showClaude, setShowClaude] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(240)
   const [previewWidth, setPreviewWidth] = useState(600)
@@ -116,6 +118,39 @@ export default function App(): React.JSX.Element | null {
     []
   )
 
+  const filePath = file?.path ?? null
+  useEffect(() => {
+    if (!filePath) return
+    let live = true
+    void window.api.repo.pageUrl(filePath).then((url) => {
+      if (live && url) setPagePath(url)
+    })
+    return () => {
+      live = false
+    }
+  }, [filePath])
+
+  const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + pagePath : null
+
+  const toggleDetached = useCallback(() => {
+    if (detached) {
+      window.api.preview.attach()
+    } else if (previewUrl) {
+      window.api.preview.detach(previewUrl)
+      setDetached(true)
+    }
+  }, [detached, previewUrl])
+
+  useEffect(() => window.api.preview.onClosed(() => setDetached(false)), [])
+
+  useEffect(() => {
+    if (detached && previewUrl) window.api.preview.navigate(previewUrl)
+  }, [detached, previewUrl])
+
+  useEffect(() => {
+    if (detached && reloadKey) window.api.preview.reload()
+  }, [detached, reloadKey])
+
   useEffect(
     () =>
       window.api.onMenu((command) => {
@@ -126,6 +161,9 @@ export default function App(): React.JSX.Element | null {
           case 'toggle-preview':
             setShowPreview((p) => !p)
             break
+          case 'detach-preview':
+            toggleDetached()
+            break
           case 'toggle-terminal':
             setShowClaude((c) => !c)
             break
@@ -134,7 +172,7 @@ export default function App(): React.JSX.Element | null {
             break
         }
       }),
-    [save]
+    [save, toggleDetached]
   )
 
   if (repo === undefined) return null
@@ -156,8 +194,14 @@ export default function App(): React.JSX.Element | null {
           <span className="save-state">
             {file ? (saving ? 'Saving…' : dirty ? 'Unsaved' : 'Saved') : ''}
           </span>
-          <button className={showPreview ? 'on' : ''} onClick={() => setShowPreview(!showPreview)}>
-            Preview
+          <button
+            className={showPreview || detached ? 'on' : ''}
+            title={
+              detached ? 'Bring the preview back into this window' : 'Show or hide the preview'
+            }
+            onClick={() => (detached ? toggleDetached() : setShowPreview(!showPreview))}
+          >
+            {detached ? 'Preview ↗' : 'Preview'}
           </button>
           <button className={showClaude ? 'on' : ''} onClick={() => setShowClaude(!showClaude)}>
             Claude
@@ -192,14 +236,14 @@ export default function App(): React.JSX.Element | null {
                 <>
                   {parts && parts.frontmatter !== null && (
                     <Frontmatter
-                      key={file.path}
+                      key={`settings:${file.path}`}
                       text={parts.frontmatter}
                       onChange={(fm) => changeText(join(fm, parts.body))}
                     />
                   )}
                   {isMarkdown && <Toolbar view={view} />}
                   <Editor
-                    key={file.path}
+                    key={`body:${file.path}`}
                     filename={file.path}
                     value={parts ? parts.body : file.text}
                     onChange={(body) => changeText(parts ? join(parts.frontmatter, body) : body)}
@@ -209,14 +253,19 @@ export default function App(): React.JSX.Element | null {
                 </>
               )}
             </main>
-            {showPreview && (
+            {showPreview && !detached && (
               <>
                 <Splitter
                   direction="horizontal"
                   onDrag={(d) => setPreviewWidth((w) => clamp(w - d, 320, 1400))}
                 />
                 <section className="preview-column" style={{ width: previewWidth }}>
-                  <Preview status={hugo} path={file?.path ?? null} reloadKey={reloadKey} />
+                  <Preview
+                    status={hugo}
+                    url={previewUrl}
+                    reloadKey={reloadKey}
+                    onDetach={toggleDetached}
+                  />
                 </section>
               </>
             )}

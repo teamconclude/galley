@@ -1,0 +1,9 @@
+#!/bin/sh
+# In development the app runs inside the stock Electron binary, and macOS takes the menu
+# bar name from that bundle's Info.plist. Rename it so the menu bar says Galley.
+app=node_modules/electron/dist/Electron.app
+plist=$app/Contents/Info.plist
+[ -f "$plist" ] || exit 0
+plutil -replace CFBundleName -string Galley "$plist"
+plutil -replace CFBundleDisplayName -string Galley "$plist"
+codesign --force --deep --sign - "$app" 2>/dev/null

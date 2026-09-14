@@ -10,6 +10,7 @@ import { loadSettings, saveSettings } from './settings'
 import { ClaudeTerminal } from './terminal'
 
 let win: BrowserWindow | null = null
+let previewWin: BrowserWindow | null = null
 let repo: Repo | null = null
 
 const send = (channel: string, ...args: unknown[]): void => {
@@ -64,7 +65,10 @@ function createWindow(): void {
     }
   })
   win.on('ready-to-show', () => win?.show())
-  win.on('closed', () => (win = null))
+  win.on('closed', () => {
+    win = null
+    previewWin?.close()
+  })
   win.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
@@ -74,6 +78,24 @@ function createWindow(): void {
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+function detachPreview(url: string): void {
+  if (previewWin) {
+    void previewWin.loadURL(url)
+    previewWin.focus()
+    return
+  }
+  previewWin = new BrowserWindow({ width: 1100, height: 850, title: 'Preview' })
+  previewWin.webContents.setWindowOpenHandler((details) => {
+    void shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+  previewWin.on('closed', () => {
+    previewWin = null
+    send('preview:closed')
+  })
+  void previewWin.loadURL(url)
 }
 
 function registerIpc(): void {
@@ -89,6 +111,12 @@ function registerIpc(): void {
   ipcMain.handle('repo:pageUrl', (_e, rel: string) => current().pageUrl(rel))
   ipcMain.handle('hugo:status', () => hugo.status)
   ipcMain.handle('hugo:restart', () => (repo ? hugo.start(repo.path) : undefined))
+  ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
+  ipcMain.on('preview:navigate', (_e, url: string) => {
+    if (previewWin && previewWin.webContents.getURL() !== url) void previewWin.loadURL(url)
+  })
+  ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
+  ipcMain.on('preview:attach', () => previewWin?.close())
   ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
     if (repo) terminal.start(repo.path, cols, rows)
   })
