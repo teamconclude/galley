@@ -44,9 +44,20 @@ jobs:
             echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
           fi
 
-      - name: Build and publish ${{ github.ref_name }}
+      - name: Build
+        run: |
+          npm run build
+          npx electron-builder --mac --publish never $NOTARIZE
+
+      # electron-builder's own GitHub publisher raced between the zip and DMG targets and
+      # left the release half filled, so the assets are uploaded with gh instead.
+      - name: Publish ${{ github.ref_name }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          npm run build
-          npx electron-builder --mac --publish always $NOTARIZE
+          assets=(dist/*.dmg dist/*.zip dist/latest-mac.yml)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --title "${GITHUB_REF_NAME#v}" --generate-notes
+          fi
