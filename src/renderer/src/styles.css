@@ -432,6 +432,31 @@ body.dragging .terminal-host {
   max-height: 80%;
 }
 
+.frontmatter .pane-title {
+  flex: none;
+}
+
+.pane-spacer {
+  flex: 1;
+}
+
+.page-badge {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--yellow1);
+  color: var(--yellow5);
+  border: 1px solid var(--yellow3);
+}
+
+.page-badge.expired {
+  background: var(--red1);
+  color: var(--red5);
+  border-color: var(--red2);
+}
+
 .frontmatter-form {
   overflow: auto;
   min-height: 0;

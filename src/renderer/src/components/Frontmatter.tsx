@@ -15,6 +15,30 @@ interface Props {
 // The default 80-column folding and single quotes match how existing pages are written.
 const serialize = (doc: Document): string => doc.toString({ singleQuote: true }).replace(/\n$/, '')
 
+// Why Hugo would leave this page out of the live site: a draft, a publishing date still
+// ahead, or an expiry date behind. The preview shows such pages anyway.
+function visibility(data: Record<string, unknown>): { label: string; kind: string } | null {
+  if (data.draft === true) return { label: 'Draft', kind: 'draft' }
+  const when = (v: unknown): Date | null => {
+    if (!(typeof v === 'string' || v instanceof Date)) return null
+    const d = new Date(v)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const now = Date.now()
+  const publish = when(data.publishDate) ?? when(data.date)
+  if (publish && publish.getTime() > now) {
+    const day = publish.toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    })
+    return { label: `Publishes on ${day}`, kind: 'scheduled' }
+  }
+  const expiry = when(data.expiryDate)
+  if (expiry && expiry.getTime() < now) return { label: 'Expired', kind: 'expired' }
+  return null
+}
+
 export default function Frontmatter({ text, onChange, grow, height }: Props): React.JSX.Element {
   const [raw, setRaw] = useState(false)
   const { lists } = useSchemas()
@@ -29,10 +53,13 @@ export default function Frontmatter({ text, onChange, grow, height }: Props): Re
     },
     [doc, onChange]
   )
+  const badge = broken ? null : visibility(data)
   return (
     <div className={'frontmatter' + (grow ? ' grow' : '')} style={{ height }}>
       <div className="pane-bar">
         <span className="pane-title">Page settings</span>
+        {badge && <span className={`page-badge ${badge.kind}`}>{badge.label}</span>}
+        <span className="pane-spacer" />
         {broken ? (
           <span className="error">
             {doc.errors[0]?.message.split('\n')[0] ?? 'Not a list of fields'}
