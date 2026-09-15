@@ -7,7 +7,8 @@ const defaults: Layout = {
   sidebarWidth: 240,
   previewWidth: 600,
   claudeHeight: 300,
-  sidebarTab: 'files'
+  sidebarTab: 'files',
+  showAllFiles: false
 }
 
 // The saved layout arrives with the preload, so the first render already has it.

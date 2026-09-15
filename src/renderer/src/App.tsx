@@ -69,6 +69,7 @@ export default function App(): React.JSX.Element | null {
   const [sidebarWidth, setSidebarWidth] = useState(layout.sidebarWidth)
   const [previewWidth, setPreviewWidth] = useState(layout.previewWidth)
   const [claudeHeight, setClaudeHeight] = useState(layout.claudeHeight)
+  const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
   const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
@@ -416,9 +417,19 @@ export default function App(): React.JSX.Element | null {
       sidebarWidth,
       previewWidth,
       claudeHeight,
-      sidebarTab
+      sidebarTab,
+      showAllFiles
     })
-  }, [showPreview, showClaude, detached, sidebarWidth, previewWidth, claudeHeight, sidebarTab])
+  }, [
+    showPreview,
+    showClaude,
+    detached,
+    sidebarWidth,
+    previewWidth,
+    claudeHeight,
+    sidebarTab,
+    showAllFiles
+  ])
 
   // A preview that was in its own window when Galley closed reopens there.
   useEffect(() => {
@@ -545,6 +556,8 @@ export default function App(): React.JSX.Element | null {
                 onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
                 onRefresh={() => setTreeVersion((v) => v + 1)}
                 onCollapseAll={() => setExpanded(new Set())}
+                showAll={showAllFiles}
+                onToggleShowAll={() => setShowAllFiles(!showAllFiles)}
                 version={treeVersion}
               />
             ) : (

@@ -87,6 +87,7 @@ export interface Layout {
   previewWidth: number
   claudeHeight: number
   sidebarTab: 'files' | 'changes'
+  showAllFiles: boolean
 }
 
 export interface GitHubUser {

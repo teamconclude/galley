@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { DirEntry } from '../../../shared/types'
-import { ChevronRight, ChevronsDownUp, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
+import {
+  ChevronRight,
+  ChevronsDownUp,
+  Eye,
+  EyeOff,
+  FilePlus,
+  FolderPlus,
+  RefreshCw
+} from 'lucide-react'
 import FileIcon from './FileIcon'
 
 interface Props {
@@ -15,8 +23,13 @@ interface Props {
   onNewFolder: () => void
   onRefresh: () => void
   onCollapseAll: () => void
+  showAll: boolean
+  onToggleShowAll: () => void
   version: number
 }
+
+// What an editor works in: pages, images and downloads, and the menus and authors.
+const editorRoots = new Set(['content', 'static', 'data'])
 
 const indent = 12
 const rowStart = 6
@@ -27,7 +40,7 @@ const parentOf = (path: string): string =>
 const hasFiles = (e: React.DragEvent): boolean => e.dataTransfer.types.includes('Files')
 
 export default function FileTree(props: Props): React.JSX.Element {
-  const { name, onNewPage, onNewFolder, onRefresh, onCollapseAll } = props
+  const { name, onNewPage, onNewFolder, onRefresh, onCollapseAll, showAll, onToggleShowAll } = props
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   return (
     <div className="tree">
@@ -45,6 +58,13 @@ export default function FileTree(props: Props): React.JSX.Element {
           </button>
           <button title="Collapse all" onClick={onCollapseAll}>
             <ChevronsDownUp size={16} />
+          </button>
+          <button
+            title={showAll ? 'Show content files only' : 'Show all files'}
+            className={showAll ? 'on' : ''}
+            onClick={onToggleShowAll}
+          >
+            {showAll ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </span>
       </div>
@@ -68,18 +88,21 @@ interface ChildrenProps extends Props {
 
 function Children(props: ChildrenProps): React.JSX.Element {
   const { path, depth, expanded, onToggle, selected, onSelect, version } = props
-  const { onContextMenu, onDropFiles, dropTarget, setDropTarget } = props
+  const { onContextMenu, onDropFiles, dropTarget, setDropTarget, showAll } = props
   const [entries, setEntries] = useState<DirEntry[]>([])
   useEffect(() => {
     let live = true
     window.api.repo
       .list(path)
-      .then((list) => live && setEntries(list))
+      .then((list) => {
+        if (!live) return
+        setEntries(path === '' && !showAll ? list.filter((e) => editorRoots.has(e.name)) : list)
+      })
       .catch(() => live && setEntries([]))
     return () => {
       live = false
     }
-  }, [path, version])
+  }, [path, version, showAll])
   return (
     <>
       {entries.map((entry) => {
