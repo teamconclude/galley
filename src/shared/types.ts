@@ -103,6 +103,7 @@ export interface Layout {
   sidebarWidth: number
   previewWidth: number
   claudeHeight: number
+  frontmatterHeight: number
   sidebarTab: 'files' | 'changes'
   showAllFiles: boolean
 }

@@ -429,8 +429,7 @@ body.dragging .terminal-host {
   flex: none;
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid var(--border);
-  max-height: 45%;
+  max-height: 80%;
 }
 
 .frontmatter-form {
@@ -665,7 +664,6 @@ body.dragging .terminal-host {
   flex: 1;
   max-height: none;
   min-height: 0;
-  border-bottom: none;
 }
 
 .frontmatter.grow .frontmatter-form {

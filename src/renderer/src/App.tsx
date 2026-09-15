@@ -84,6 +84,7 @@ export default function App(): React.JSX.Element | null {
   const [sidebarWidth, setSidebarWidth] = useState(layout.sidebarWidth)
   const [previewWidth, setPreviewWidth] = useState(layout.previewWidth)
   const [claudeHeight, setClaudeHeight] = useState(layout.claudeHeight)
+  const [frontmatterHeight, setFrontmatterHeight] = useState(layout.frontmatterHeight)
   const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
   const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
@@ -485,6 +486,7 @@ export default function App(): React.JSX.Element | null {
       sidebarWidth,
       previewWidth,
       claudeHeight,
+      frontmatterHeight,
       sidebarTab,
       showAllFiles
     })
@@ -495,6 +497,7 @@ export default function App(): React.JSX.Element | null {
     sidebarWidth,
     previewWidth,
     claudeHeight,
+    frontmatterHeight,
     sidebarTab,
     showAllFiles
   ])
@@ -683,6 +686,13 @@ export default function App(): React.JSX.Element | null {
                         text={parts.frontmatter}
                         onChange={(fm) => changeText(join(fm, parts.body))}
                         grow={blocksPage}
+                        height={blocksPage ? undefined : frontmatterHeight}
+                      />
+                    )}
+                    {parts && parts.frontmatter !== null && !blocksPage && (
+                      <Splitter
+                        direction="vertical"
+                        onDrag={(d) => setFrontmatterHeight((h) => Math.max(80, h + d))}
                       />
                     )}
                     {blocksPage && (

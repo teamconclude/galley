@@ -9,12 +9,13 @@ interface Props {
   text: string
   onChange: (text: string) => void
   grow?: boolean
+  height?: number
 }
 
 // The default 80-column folding and single quotes match how existing pages are written.
 const serialize = (doc: Document): string => doc.toString({ singleQuote: true }).replace(/\n$/, '')
 
-export default function Frontmatter({ text, onChange, grow }: Props): React.JSX.Element {
+export default function Frontmatter({ text, onChange, grow, height }: Props): React.JSX.Element {
   const [raw, setRaw] = useState(false)
   const { lists } = useSchemas()
   const doc = useMemo(() => parseDocument(text), [text])
@@ -29,7 +30,7 @@ export default function Frontmatter({ text, onChange, grow }: Props): React.JSX.
     [doc, onChange]
   )
   return (
-    <div className={'frontmatter' + (grow ? ' grow' : '')}>
+    <div className={'frontmatter' + (grow ? ' grow' : '')} style={{ height }}>
       <div className="pane-bar">
         <span className="pane-title">Page settings</span>
         {broken ? (

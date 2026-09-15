@@ -7,6 +7,7 @@ const defaults: Layout = {
   sidebarWidth: 240,
   previewWidth: 600,
   claudeHeight: 300,
+  frontmatterHeight: 280,
   sidebarTab: 'files',
   showAllFiles: false
 }
