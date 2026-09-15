@@ -1,0 +1,14 @@
+#!/bin/sh
+# Builds build/icon.icns from build/icon.png with Apple's own tools. electron-builder's
+# converter writes legacy small-size entries that Finder renders as garbage.
+set -e
+cd "$(dirname "$0")/.."
+iconset=$(mktemp -d)/icon.iconset
+mkdir -p "$iconset"
+for size in 16 32 128 256 512; do
+  sips -z $size $size build/icon.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+  sips -z $((size * 2)) $((size * 2)) build/icon.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$iconset" -o build/icon.icns
+rm -rf "$(dirname "$iconset")"
+echo "wrote build/icon.icns"

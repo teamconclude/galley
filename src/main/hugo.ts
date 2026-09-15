@@ -5,6 +5,7 @@ import { join } from 'path'
 import type { HugoStatus } from '../shared/types'
 import { loadSettings, saveSettings } from './settings'
 import { resolveCommand } from './shell'
+import { pretendMissing } from './tools'
 import { isNewer } from './updater'
 
 const week = 7 * 24 * 60 * 60 * 1000
@@ -30,10 +31,17 @@ async function ownHugo(): Promise<Own | null> {
 // copy Galley downloaded.
 export async function findHugo(repo: string): Promise<string | null> {
   const local = join(repo, 'bin', 'hugo')
-  if (existsSync(local)) return local
-  const onPath = await resolveCommand('hugo')
+  if (repo && existsSync(local) && !pretendMissing('hugo')) return local
+  const onPath = pretendMissing('hugo') ? null : await resolveCommand('hugo')
   if (onPath) return onPath
   return (await ownHugo())?.path ?? null
+}
+
+// Downloads Hugo when no usable copy exists; true when a download happened.
+export async function ensureHugo(progress: (percent: number) => void): Promise<boolean> {
+  if (await findHugo('')) return false
+  await downloadHugo(await latestHugo(), progress)
+  return true
 }
 
 // CI builds the site with the latest Hugo, so Galley previews with the same.

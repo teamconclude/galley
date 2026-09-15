@@ -1,0 +1,58 @@
+#!/bin/sh
+# Installs the DMG from dist/ into a fresh macOS virtual machine and starts Galley there,
+# then brings back a screenshot and Galley's log. Needs tart (https://tart.run) and a VM
+# created with:  tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest galley-test
+# Usage: scripts/vm-test [vm-name]      TART=/path/to/tart overrides the binary.
+set -e
+cd "$(dirname "$0")/.."
+vm=${1:-galley-test}
+tart=${TART:-tart}
+dmg=$(ls dist/Galley-*.dmg 2>/dev/null | head -1)
+[ -n "$dmg" ] || { echo "No DMG in dist/; run npm run build:mac first" >&2; exit 1; }
+out=dist/vm
+mkdir -p "$out"
+
+if ! "$tart" list | grep -q "^local *$vm "; then
+  echo "VM $vm not found; create it with: $tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest $vm" >&2
+  exit 1
+fi
+# `tart ip` still answers for a stopped VM, so go by the state column.
+if ! "$tart" list | grep "^local *$vm " | grep -q running; then
+  echo "Starting $vm"
+  "$tart" run "$vm" --no-graphics >"$out/tart.log" 2>&1 &
+  for _ in $(seq 1 90); do "$tart" list | grep "^local *$vm " | grep -q running && break; sleep 2; done
+fi
+ip=$("$tart" ip "$vm" --wait 120)
+echo "VM at $ip"
+
+# The stock image logs in as admin/admin; sshpass is not on macOS, so expect types it.
+ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive"
+vm_ssh() { expect -c "
+  set timeout 300
+  spawn ssh $ssh_opts admin@$ip $*
+  expect { \"assword:\" { send \"admin\r\"; exp_continue } eof }
+  catch wait result
+  exit [lindex \$result 3]
+"; }
+vm_scp() { expect -c "
+  set timeout 600
+  spawn scp $ssh_opts $*
+  expect { \"assword:\" { send \"admin\r\"; exp_continue } eof }
+  catch wait result
+  exit [lindex \$result 3]
+"; }
+
+for _ in $(seq 1 30); do vm_ssh true >/dev/null 2>&1 && break; sleep 3; done
+echo "Copying $dmg"
+vm_scp "$dmg" "admin@$ip:/tmp/Galley.dmg" >/dev/null
+echo "Installing"
+vm_ssh 'hdiutil attach -nobrowse -quiet /tmp/Galley.dmg -mountpoint /tmp/galley-dmg && rm -rf /Applications/Galley.app && cp -R /tmp/galley-dmg/Galley.app /Applications/ && hdiutil detach -quiet /tmp/galley-dmg && rm -rf ~/Library/Logs/Galley' >/dev/null
+echo "Starting Galley"
+vm_ssh "launchctl asuser \$(id -u) open -a Galley" >/dev/null
+sleep "${WAIT:-90}"
+vm_ssh "launchctl asuser \$(id -u) screencapture -x /tmp/galley.png" >/dev/null
+vm_scp "admin@$ip:/tmp/galley.png" "$out/screenshot.png" >/dev/null
+vm_scp "admin@$ip:Library/Logs/Galley/galley.log" "$out/galley.log" >/dev/null 2>&1 || echo "(no log yet)"
+echo "Screenshot: $out/screenshot.png"
+[ -f "$out/galley.log" ] && { echo "Log:"; cat "$out/galley.log"; }
+echo "The VM keeps running; open it with: $tart run $vm    stop it with: $tart stop $vm"

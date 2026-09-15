@@ -1394,3 +1394,93 @@ body.dragging .terminal-host {
   font-size: 12px;
   color: var(--text-muted);
 }
+
+.dialog.setup {
+  width: 520px;
+}
+
+.setup-steps {
+  list-style: none;
+  margin: 12px 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.setup-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.setup-icon.done {
+  color: #1a9a4a;
+}
+
+.setup-icon.failed {
+  color: #d40026;
+}
+
+.setup-icon.running {
+  color: var(--accent);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.setup-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-label {
+  font-weight: 500;
+}
+
+.setup-percent,
+.setup-detail {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.setup-detail {
+  margin-top: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.setup-device {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.setup-device code {
+  font-size: 18px;
+  letter-spacing: 0.1em;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-muted);
+}
+
+.setup-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}

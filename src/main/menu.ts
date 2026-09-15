@@ -18,6 +18,7 @@ export function buildMenu(actions: Actions): Menu {
       submenu: [
         { role: 'about' },
         { label: 'Check for updates…', click: actions.checkUpdates },
+        { label: 'Setup…', click: () => actions.command('setup') },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },

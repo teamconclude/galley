@@ -1,4 +1,6 @@
 import * as pty from 'node-pty'
+import { dirname } from 'path'
+import { findClaude, findGit, gitEnv } from './tools'
 
 export class ClaudeTerminal {
   private proc: pty.IPty | null = null
@@ -8,7 +10,7 @@ export class ClaudeTerminal {
     private onExit: (code: number) => void
   ) {}
 
-  start(cwd: string, cols: number, rows: number): void {
+  async start(cwd: string, cols: number, rows: number): Promise<void> {
     this.kill()
     const env: Record<string, string> = {}
     // Markers from a Claude session that launched the app would make the CLI think it is nested.
@@ -18,8 +20,14 @@ export class ClaudeTerminal {
     env.TERM = 'xterm-256color'
     env.COLORTERM = 'truecolor'
     env.LANG ||= 'en_US.UTF-8'
+    Object.assign(env, await gitEnv())
+    const git = await findGit()
+    const claude = await findClaude()
+    // Claude's own git calls get the portable git when that is what this Mac has.
+    const extraPath = [claude && dirname(claude), git && dirname(git.bin)].filter(Boolean)
+    const command = `export PATH="${extraPath.join(':')}:$PATH"; exec ${claude ? JSON.stringify(claude) : 'claude'}`
     // The login shell supplies the user's PATH, which a GUI app does not inherit.
-    const proc = pty.spawn('/bin/zsh', ['-lc', 'exec claude'], {
+    const proc = pty.spawn('/bin/zsh', ['-lc', command], {
       name: 'xterm-256color',
       cols: Math.max(cols, 2),
       rows: Math.max(rows, 1),

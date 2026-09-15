@@ -8,6 +8,8 @@ import type {
   Layout,
   MenuCommand,
   RepoInfo,
+  SetupStatus,
+  SetupStepId,
   UpdateStatus
 } from './types'
 
@@ -79,6 +81,16 @@ export interface Api {
   layout: {
     initial: Partial<Layout>
     save: (layout: Layout) => void
+  }
+  setup: {
+    status: () => Promise<SetupStatus>
+    retry: (step: SetupStepId) => Promise<void>
+    signIn: () => Promise<void>
+    cancelSignIn: () => void
+    skipGithub: () => void
+    signOut: () => void
+    cloneSite: (dest?: string) => Promise<void>
+    onStatus: (cb: (status: SetupStatus) => void) => Unsubscribe
   }
   update: {
     status: () => Promise<UpdateStatus>

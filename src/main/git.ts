@@ -2,22 +2,21 @@ import { execFile, spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import { join } from 'path'
 import type { Change, ChangeKind, GitStatus, Identity } from '../shared/types'
-import { resolveCommand } from './shell'
+import { findGit, gitEnv } from './tools'
 
 const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'develop'])
 const fetchInterval = 5 * 60_000
 
-let gitBin: string | null = null
-
-async function findGit(): Promise<string> {
-  gitBin ??= (await resolveCommand('git')) ?? '/usr/bin/git'
-  return gitBin
+async function gitBinary(): Promise<string> {
+  const tool = await findGit()
+  if (!tool) throw new Error('git is not installed')
+  return tool.bin
 }
 
 async function run(cwd: string, args: string[]): Promise<string> {
-  const bin = await findGit()
+  const bin = await gitBinary()
+  const env = { ...process.env, ...(await gitEnv()) }
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' }
     execFile(bin, args, { cwd, env, maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr.trim() || err.message))
       else resolve(stdout)
@@ -265,9 +264,9 @@ export async function clone(
   dest: string,
   onProgress: (line: string) => void
 ): Promise<void> {
-  const bin = await findGit()
+  const bin = await gitBinary()
+  const env = { ...process.env, ...(await gitEnv()) }
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' }
     const proc = spawn(bin, ['clone', '--progress', url, dest], { env })
     let output = ''
     const onData = (chunk: Buffer): void => {

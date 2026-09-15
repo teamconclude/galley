@@ -9,6 +9,9 @@ export interface Settings {
   hugoChecked?: number
   windows?: { main?: Rectangle; preview?: Rectangle }
   layout?: Layout
+  githubToken?: string
+  githubSkipped?: boolean
+  setupSeen?: string
 }
 
 const file = (): string => join(app.getPath('userData'), 'settings.json')

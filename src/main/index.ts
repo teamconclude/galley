@@ -15,13 +15,14 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import type { Identity, Layout, MenuCommand } from '../shared/types'
+import type { Identity, Layout, MenuCommand, SetupStepId } from '../shared/types'
 import { isDev } from './env'
 import { clone, Git } from './git'
 import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
 import { loadSettings, saveSettings } from './settings'
+import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
 import { Updater } from './updater'
 
@@ -36,6 +37,13 @@ const send = (channel: string, ...args: unknown[]): void => {
 
 const hugo = new HugoServer((status) => send('hugo:status', status))
 const updater = new Updater((status) => send('update:status', status))
+const setup = new Setup((status) => send('setup:status', status), {
+  openRepo: (path) => openRepo(path),
+  hasRepo: () => repo !== null,
+  restartHugo: () => {
+    if (repo) void hugo.start(repo.path)
+  }
+})
 const terminal = new ClaudeTerminal(
   (data) => send('terminal:data', data),
   (code) => send('terminal:exit', code)
@@ -54,6 +62,7 @@ function openRepo(path: string): void {
   git.start()
   saveSettings({ ...loadSettings(), repoPath: path })
   void hugo.start(path).then(() => hugo.refresh())
+  setup.siteOpened()
   send('repo:opened')
 }
 
@@ -237,7 +246,7 @@ function registerIpc(): void {
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
   ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
-    if (repo) terminal.start(repo.path, cols, rows)
+    if (repo) void terminal.start(repo.path, cols, rows)
   })
   ipcMain.on('terminal:write', (_e, data: string) => terminal.write(data))
   ipcMain.on('terminal:resize', (_e, cols: number, rows: number) => terminal.resize(cols, rows))
@@ -246,6 +255,13 @@ function registerIpc(): void {
     e.returnValue = loadSettings().layout ?? {}
   })
   ipcMain.on('layout:save', (_e, layout: Layout) => saveSettings({ ...loadSettings(), layout }))
+  ipcMain.handle('setup:status', () => setup.status)
+  ipcMain.handle('setup:retry', (_e, step: SetupStepId) => setup.retry(step))
+  ipcMain.handle('setup:signIn', () => setup.signIn())
+  ipcMain.on('setup:cancelSignIn', () => setup.cancelSignIn())
+  ipcMain.on('setup:skipGithub', () => setup.skipGithub())
+  ipcMain.on('setup:signOut', () => setup.signOut())
+  ipcMain.handle('setup:cloneSite', (_e, dest?: string) => setup.cloneSite(dest))
   ipcMain.handle('update:status', () => updater.status)
   ipcMain.handle('update:download', () => updater.download())
   ipcMain.on('update:install', () => updater.install())
@@ -280,6 +296,13 @@ protocol.registerSchemesAsPrivileged([
 
 app.setName('Galley')
 
+// GALLEY_USER_DATA isolates settings, downloads and logs, for tests on a developer's Mac.
+const userData = process.env['GALLEY_USER_DATA']
+if (userData) {
+  app.setPath('userData', userData)
+  app.setPath('logs', join(userData, 'logs'))
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('io.conclude.galley')
   // The packaged app carries its own icon; in development the Dock shows Electron's.
@@ -299,6 +322,7 @@ app.whenReady().then(() => {
   if (offerMoveToApplications()) return
   createWindow()
   updater.start()
+  void setup.run()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

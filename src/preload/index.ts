@@ -74,6 +74,16 @@ const api: Api = {
     initial: ipcRenderer.sendSync('layout:get'),
     save: (layout) => ipcRenderer.send('layout:save', layout)
   },
+  setup: {
+    status: () => ipcRenderer.invoke('setup:status'),
+    retry: (step) => ipcRenderer.invoke('setup:retry', step),
+    signIn: () => ipcRenderer.invoke('setup:signIn'),
+    cancelSignIn: () => ipcRenderer.send('setup:cancelSignIn'),
+    skipGithub: () => ipcRenderer.send('setup:skipGithub'),
+    signOut: () => ipcRenderer.send('setup:signOut'),
+    cloneSite: (dest) => ipcRenderer.invoke('setup:cloneSite', dest),
+    onStatus: (cb) => on('setup:status', cb)
+  },
   update: {
     status: () => ipcRenderer.invoke('update:status'),
     download: () => ipcRenderer.invoke('update:download'),

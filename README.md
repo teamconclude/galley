@@ -18,12 +18,19 @@ You need a Mac with Apple silicon and access to the `teamconclude` organisation 
    click **Open Anyway**. This is needed once.
 3. If Galley was started from another folder it offers to move itself to Applications.
    Accept, otherwise it cannot update itself later.
-4. Galley uses three tools from your Mac and helps to set them up when they are missing:
-   - **git**, which macOS offers to install on first use.
-   - **Hugo**, the site generator. Galley uses an installed one, from Homebrew for example,
-     and otherwise offers to download the latest release, which it refreshes weekly.
-   - **Claude Code**, for the Claude pane. Install it from
-     [claude.ai/code](https://claude.ai/code) and sign in once.
+4. On first start Galley shows what it is setting up. It downloads what the Mac lacks and
+   asks for the two things only you can do:
+   - **git** and **Hugo**, the site generator, are used from the Mac when installed, from
+     Homebrew for example, and otherwise downloaded into Galley's own folder. Galley's own
+     Hugo is refreshed weekly.
+   - **Claude Code** is installed with its official installer. The first time the Claude
+     pane opens it asks you to sign in.
+   - **GitHub sign-in** shows a short code and opens github.com; enter the code there. That
+     is what lets Galley fetch and push the site. Skip it if you use SSH keys with GitHub.
+   - **The site checkout** is cloned into `~/Conclude/web` with one click, or you point
+     Galley at an existing checkout.
+
+   The Setup entry in the Galley menu shows this list again at any time.
 
 Galley checks for new releases when it starts and offers them in the title bar. **Update**
 downloads the release, **Restart to update** installs it.
@@ -98,6 +105,21 @@ and notarisation without further changes.
 
 `GALLEY_UPDATE_FEED=<url>` points the updater at another folder holding `latest-mac.yml` and
 the zip, to test updates against a local build.
+
+### Testing on a fresh Mac
+
+`GALLEY_FRESH=git,hugo,claude` makes a development build behave as if those tools were
+missing, so the downloads run on a machine that has them. The real test is a fresh macOS
+virtual machine with [tart](https://tart.run): create one with
+`tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest galley-test`, build the DMG, and
+run `scripts/vm-test`. It installs the DMG in the VM, starts Galley, and copies a screenshot
+and Galley's log (`~/Library/Logs/Galley/galley.log`) back into `dist/vm/`. `tart run
+galley-test` opens the VM's screen to click through the setup by hand.
+
+GitHub sign-in needs the client id of a GitHub OAuth app with the device flow enabled, set
+as `builtInClientId` in `src/main/github.ts`; `GALLEY_GITHUB_CLIENT_ID` overrides it for
+development. Without it the sign-in step is skipped and git relies on the Mac's own
+credentials.
 
 ## License
 

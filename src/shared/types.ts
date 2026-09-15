@@ -89,6 +89,31 @@ export interface Layout {
   sidebarTab: 'files' | 'changes'
 }
 
+export interface GitHubUser {
+  login: string
+  name: string
+  email: string
+}
+
+export type SetupStepId = 'git' | 'hugo' | 'claude' | 'github' | 'site'
+
+export interface SetupStep {
+  id: SetupStepId
+  label: string
+  state: 'pending' | 'running' | 'done' | 'failed' | 'action' | 'skipped'
+  detail?: string
+  percent?: number
+}
+
+// Progress of getting a Mac ready to edit the site.
+export interface SetupStatus {
+  steps: SetupStep[]
+  complete: boolean
+  githubConfigured: boolean
+  device?: { code: string; url: string }
+  user?: GitHubUser
+}
+
 export type UpdateStatus =
   | { state: 'idle' }
   | { state: 'checking' }
@@ -99,4 +124,4 @@ export type UpdateStatus =
   | { state: 'error'; message: string }
 
 export type MenuCommand =
-  'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview' | 'detach-preview'
+  'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview' | 'detach-preview' | 'setup'

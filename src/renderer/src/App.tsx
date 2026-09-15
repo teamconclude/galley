@@ -3,6 +3,7 @@ import type {
   Change,
   DirEntry,
   GitStatus,
+  SetupStatus,
   HugoStatus,
   Identity,
   RepoInfo
@@ -21,6 +22,7 @@ import { SchemaProvider } from './components/SchemaContext'
 import Splitter from './components/Splitter'
 import { loadLayout, saveLayout } from './lib/layout'
 import Toolbar from './components/Toolbar'
+import SetupDialog from './components/SetupDialog'
 import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
@@ -58,6 +60,8 @@ export default function App(): React.JSX.Element | null {
   const [treeVersion, setTreeVersion] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
   const [layout] = useState(loadLayout)
+  const [setup, setSetup] = useState<SetupStatus | null>(null)
+  const [showSetup, setShowSetup] = useState<boolean | null>(null)
   const [showPreview, setShowPreview] = useState(layout.showPreview)
   const [detached, setDetached] = useState(layout.detached)
   const [pagePath, setPagePath] = useState('/')
@@ -392,6 +396,16 @@ export default function App(): React.JSX.Element | null {
 
   const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + pagePath : null
 
+  // A checkout that opens with tools still missing shows the setup progress once.
+  useEffect(() => {
+    const apply = (s: SetupStatus): void => {
+      setSetup(s)
+      setShowSetup((shown) => (shown === null && !s.complete ? true : shown))
+    }
+    void window.api.setup.status().then(apply)
+    return window.api.setup.onStatus(apply)
+  }, [])
+
   useEffect(() => {
     saveLayout({
       showPreview,
@@ -433,6 +447,9 @@ export default function App(): React.JSX.Element | null {
             break
           case 'toggle-preview':
             setShowPreview((p) => !p)
+            break
+          case 'setup':
+            setShowSetup(true)
             break
           case 'detach-preview':
             toggleDetached()
@@ -629,6 +646,7 @@ export default function App(): React.JSX.Element | null {
             </section>
           </div>
         </div>
+        {showSetup && setup && <SetupDialog status={setup} onClose={() => setShowSetup(false)} />}
         {menu && (
           <ContextMenu
             x={menu.x}
