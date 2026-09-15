@@ -140,7 +140,10 @@ button.primary {
 }
 
 .tree-root {
-  padding: 8px 10px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 4px 10px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -148,16 +151,44 @@ button.primary {
   letter-spacing: 0.04em;
 }
 
+.tree-actions {
+  display: none;
+  gap: 2px;
+}
+
+.tree:hover .tree-actions {
+  display: flex;
+}
+
+.tree-actions button {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.tree-actions button:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: var(--text);
+}
+
 .tree-item {
-  padding: 3px 8px 3px 0;
+  position: relative;
+  height: 22px;
+  padding-right: 8px;
   white-space: nowrap;
   cursor: default;
   display: flex;
   align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  margin: 0 4px;
 }
 
 .tree-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .tree-item.selected {
@@ -165,11 +196,32 @@ button.primary {
   color: var(--accent);
 }
 
+.tree-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+}
+
 .tree-arrow {
-  display: inline-block;
-  width: 14px;
+  flex: none;
+  width: 16px;
+  height: 16px;
   color: var(--text-muted);
-  font-size: 11px;
+  transition: transform 0.1s;
+}
+
+.tree-arrow.open {
+  transform: rotate(90deg);
+}
+
+.tree-item .file-icon {
+  flex: none;
+}
+
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .splitter {
@@ -893,21 +945,6 @@ body.dragging .terminal-host {
   color: var(--text-muted);
   font-size: 12px;
   margin-left: 6px;
-}
-
-.tree-root {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-right: 8px;
-}
-
-.tree-root button {
-  padding: 0 7px;
-  line-height: 18px;
-  font-size: 14px;
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .tree-item.drop-target {

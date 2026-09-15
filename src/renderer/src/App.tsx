@@ -523,6 +523,9 @@ export default function App(): React.JSX.Element | null {
                 onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
                 onDropFiles={(dir, files) => void dropFiles(dir, files)}
                 onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
+                onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
+                onRefresh={() => setTreeVersion((v) => v + 1)}
+                onCollapseAll={() => setExpanded(new Set())}
                 version={treeVersion}
               />
             ) : (
