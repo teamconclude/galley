@@ -7,6 +7,8 @@ import type {
   Identity,
   Layout,
   MenuCommand,
+  Preferences,
+  PublishResult,
   RepoInfo,
   SetupStatus,
   SetupStepId,
@@ -52,6 +54,9 @@ export interface Api {
     push: () => Promise<void>
     pull: () => Promise<void>
     update: () => Promise<void>
+    mergeToBase: () => Promise<void>
+    release: (from: string, to: string) => Promise<void>
+    publish: (from: string, to: string) => Promise<PublishResult>
     discard: (path: string, untracked: boolean) => Promise<void>
     diff: (path: string) => Promise<string>
     identity: () => Promise<Identity | null>
@@ -77,6 +82,10 @@ export interface Api {
   }
   files: {
     pathFor: (file: File) => string
+  }
+  prefs: {
+    get: () => Promise<Preferences>
+    set: (prefs: Preferences) => Promise<void>
   }
   layout: {
     initial: Partial<Layout>

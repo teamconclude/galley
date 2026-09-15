@@ -10,6 +10,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import FileIcon from './FileIcon'
+import Tip from './Tip'
 
 interface Props {
   name: string
@@ -47,26 +48,35 @@ export default function FileTree(props: Props): React.JSX.Element {
       <div className="tree-root">
         <span className="tree-title">{name}</span>
         <span className="tree-actions">
-          <button data-tip="New page" aria-label="New page" onClick={onNewPage}>
-            <FilePlus size={16} />
-          </button>
-          <button data-tip="New folder" aria-label="New folder" onClick={onNewFolder}>
-            <FolderPlus size={16} />
-          </button>
-          <button data-tip="Refresh" aria-label="Refresh" onClick={onRefresh}>
-            <RefreshCw size={16} />
-          </button>
-          <button data-tip="Collapse all" aria-label="Collapse all" onClick={onCollapseAll}>
-            <ChevronsDownUp size={16} />
-          </button>
-          <button
-            data-tip={showAll ? 'Show content files only' : 'Show all files'}
-            aria-label={showAll ? 'Show content files only' : 'Show all files'}
-            className={showAll ? 'on' : ''}
-            onClick={onToggleShowAll}
-          >
-            {showAll ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
+          <Tip text="New page">
+            <button aria-label="New page" onClick={onNewPage}>
+              <FilePlus size={16} />
+            </button>
+          </Tip>
+          <Tip text="New folder">
+            <button aria-label="New folder" onClick={onNewFolder}>
+              <FolderPlus size={16} />
+            </button>
+          </Tip>
+          <Tip text="Refresh">
+            <button aria-label="Refresh" onClick={onRefresh}>
+              <RefreshCw size={16} />
+            </button>
+          </Tip>
+          <Tip text="Collapse all">
+            <button aria-label="Collapse all" onClick={onCollapseAll}>
+              <ChevronsDownUp size={16} />
+            </button>
+          </Tip>
+          <Tip text={showAll ? 'Show content files only' : 'Show all files'}>
+            <button
+              aria-label={showAll ? 'Show content files only' : 'Show all files'}
+              className={showAll ? 'on' : ''}
+              onClick={onToggleShowAll}
+            >
+              {showAll ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </Tip>
         </span>
       </div>
       <Children

@@ -15,13 +15,13 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import type { Identity, Layout, MenuCommand, SetupStepId } from '../shared/types'
+import type { Identity, Layout, MenuCommand, SetupStepId, Preferences } from '../shared/types'
 import { isDev } from './env'
 import { clone, Git } from './git'
 import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
-import { loadSettings, saveSettings } from './settings'
+import { loadSettings, prefs, saveSettings } from './settings'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
 import { Updater } from './updater'
@@ -218,6 +218,9 @@ function registerIpc(): void {
   ipcMain.handle('git:push', () => currentGit().push())
   ipcMain.handle('git:pull', () => currentGit().pull())
   ipcMain.handle('git:update', () => currentGit().update())
+  ipcMain.handle('git:mergeToBase', () => currentGit().mergeToBase())
+  ipcMain.handle('git:release', (_e, from: string, to: string) => currentGit().release(from, to))
+  ipcMain.handle('git:publish', (_e, from: string, to: string) => currentGit().publish(from, to))
   ipcMain.handle('git:discard', async (_e, rel: string, untracked: boolean) => {
     if (untracked) await shell.trashItem(current().absolute(rel))
     else await currentGit().discard(rel)
@@ -255,6 +258,8 @@ function registerIpc(): void {
     e.returnValue = loadSettings().layout ?? {}
   })
   ipcMain.on('layout:save', (_e, layout: Layout) => saveSettings({ ...loadSettings(), layout }))
+  ipcMain.handle('prefs:get', () => prefs())
+  ipcMain.handle('prefs:set', (_e, p: Preferences) => saveSettings({ ...loadSettings(), prefs: p }))
   ipcMain.handle('setup:status', () => setup.status)
   ipcMain.handle('setup:retry', (_e, step: SetupStepId) => setup.retry(step))
   ipcMain.handle('setup:signIn', () => setup.signIn())

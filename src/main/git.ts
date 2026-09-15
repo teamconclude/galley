@@ -1,10 +1,22 @@
 import { execFile, spawn } from 'child_process'
 import { promises as fs } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
-import type { Change, ChangeKind, GitStatus, Identity } from '../shared/types'
+import type {
+  Change,
+  ChangeKind,
+  GitStatus,
+  Identity,
+  PublishResult,
+  ReleaseStep
+} from '../shared/types'
+import { publish } from './github'
+import { prefs } from './settings'
 import { findGit, gitEnv } from './tools'
 
 const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'develop'])
+// Work flows from personal branches into the first of these, then on to the next.
+const sharedChain = ['develop', 'staging', 'production']
 const fetchInterval = 5 * 60_000
 
 async function gitBinary(): Promise<string> {
@@ -97,20 +109,32 @@ export class Git {
     const originHead = await this.git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
       .then((s) => s.trim().replace(/^origin\//, ''))
       .catch(() => 'main')
-    const base = remotes.includes('origin/staging') ? 'staging' : originHead
+    const base = remotes.includes('origin/develop') ? 'develop' : originHead
     const upstream =
       (await this.git(['rev-parse', '--abbrev-ref', '@{upstream}']).catch(() => '')).trim() || null
     let ahead = 0
     let behind = 0
+    let rebased = false
     if (upstream) {
       const counts = await this.git(['rev-list', '--left-right', '--count', `HEAD...${upstream}`])
       ;[ahead, behind] = counts.trim().split(/\s+/).map(Number)
-    }
-    const baseAhead = remotes.includes(`origin/${base}`)
-      ? Number(
-          (await this.git(['rev-list', '--count', `HEAD..origin/${base}`]).catch(() => '0')).trim()
+      if (behind > 0) {
+        const unique = await this.count(
+          `--cherry-pick --right-only HEAD...${upstream}`.split(' '),
+          1
         )
-      : 0
+        rebased = unique === 0
+      }
+    }
+    const hasBase = remotes.includes(`origin/${base}`)
+    const baseAhead = hasBase ? await this.count([`HEAD..origin/${base}`]) : 0
+    const aheadOfBase = hasBase ? await this.count([`origin/${base}..HEAD`]) : 0
+    const chain = sharedChain.filter((b) => remotes.includes(`origin/${b}`))
+    const releases: ReleaseStep[] = []
+    for (let i = 0; i + 1 < chain.length; i++) {
+      const [from, to] = [chain[i], chain[i + 1]]
+      releases.push({ from, to, count: await this.count([`origin/${to}..origin/${from}`]) })
+    }
     const remoteUrl =
       (await this.git(['remote', 'get-url', 'origin']).catch(() => '')).trim() || null
     const changes = parseStatus(
@@ -130,12 +154,20 @@ export class Git {
       upstream,
       ahead,
       behind,
+      rebased,
       baseAhead,
+      aheadOfBase,
+      releases,
       remoteUrl,
       lastFetch: this.lastFetch,
       fetchError: this.fetchError,
       busy: this.busy
     }
+  }
+
+  private async count(revs: string[], fallback = 0): Promise<number> {
+    const out = await this.git(['rev-list', '--count', ...revs]).catch(() => String(fallback))
+    return Number(out.trim())
   }
 
   async refresh(): Promise<void> {
@@ -194,16 +226,21 @@ export class Git {
     })
   }
 
-  commit(msg: string, paths: string[]): Promise<void> {
-    return this.op('Committing…', async () => {
+  async commit(msg: string, paths: string[]): Promise<void> {
+    await this.op('Committing…', async () => {
       await this.git(['add', '-A', '--', ...paths])
       await this.git(['commit', '-m', msg])
     })
+    const { branch } = await this.status()
+    if (prefs().pushOnCommit && branch && !protectedBranches.has(branch)) await this.push()
   }
 
-  push(): Promise<void> {
+  // After a rebase the upstream holds only older versions of our commits, so replacing
+  // them is safe; the lease still refuses if someone else pushed in the meantime.
+  async push(): Promise<void> {
+    const { rebased } = await this.status()
     return this.op('Pushing…', async () => {
-      await this.git(['push', '-u', 'origin', 'HEAD'])
+      await this.git(['push', '-u', ...(rebased ? ['--force-with-lease'] : []), 'origin', 'HEAD'])
       this.lastFetch = Date.now()
     })
   }
@@ -214,17 +251,86 @@ export class Git {
     })
   }
 
-  // Brings the latest base branch into the current one; a conflict is rolled back.
-  update(): Promise<void> {
-    return this.op('Updating from staging…', async () => {
-      const { base } = await this.status()
+  // Rebases the current branch onto the latest base branch; a conflict is rolled back.
+  async update(): Promise<void> {
+    const { base } = await this.status()
+    return this.op(`Updating from ${base}…`, async () => {
       await this.git(['fetch', 'origin', base])
       try {
-        await this.git(['merge', '--no-edit', `origin/${base}`])
+        await this.git(['rebase', '--autostash', `origin/${base}`])
       } catch (e) {
-        await this.git(['merge', '--abort']).catch(() => undefined)
-        throw new Error(`The update conflicts with changes on this branch. ${message(e)}`)
+        await this.git(['rebase', '--abort']).catch(() => undefined)
+        throw new Error(`The changes on ${base} conflict with this branch. ${message(e)}`)
       }
+    })
+  }
+
+  // Fast-forwards the base branch on GitHub to this branch. By default the merged branch
+  // is then removed here and on GitHub and work continues on the base branch.
+  async mergeToBase(): Promise<void> {
+    const { branch, base, changes } = await this.status()
+    if (!branch || branch === base) throw new Error(`Not on a branch to merge into ${base}`)
+    if (changes.length > 0) throw new Error('Commit or discard your changes first')
+    return this.op(`Merging into ${base}…`, async () => {
+      await this.git(['fetch', 'origin', base])
+      try {
+        await this.git(['push', 'origin', `HEAD:${base}`])
+      } catch (e) {
+        throw new Error(`${base} has changed on GitHub. Update this branch first. ${message(e)}`)
+      }
+      this.lastFetch = Date.now()
+      if (!prefs().deleteMergedBranch) return
+      await this.git(['fetch', 'origin', base])
+      await this.git(['switch', base]).catch(() =>
+        this.git(['switch', '-c', base, `origin/${base}`])
+      )
+      await this.git(['merge', '--ff-only', `origin/${base}`])
+      await this.git(['branch', '-D', branch])
+      await this.git(['push', 'origin', '--delete', branch]).catch(() => undefined)
+    })
+  }
+
+  // Merges one shared branch into the next in a temporary worktree, leaving the
+  // editor's own checkout untouched.
+  release(from: string, to: string): Promise<void> {
+    return this.op(`Merging ${from} into ${to}…`, async () => {
+      await this.git(['fetch', 'origin', from, to])
+      const dir = await fs.mkdtemp(join(tmpdir(), 'galley-release-'))
+      try {
+        await this.git(['worktree', 'add', '--detach', dir, `origin/${to}`])
+        try {
+          await this.git([
+            '-C',
+            dir,
+            'merge',
+            '--no-edit',
+            '-m',
+            `Merge ${from} into ${to}`,
+            `origin/${from}`
+          ])
+        } catch (e) {
+          throw new Error(
+            `${from} conflicts with ${to}; this needs resolving in git. ${message(e)}`
+          )
+        }
+        await this.git(['-C', dir, 'push', 'origin', `HEAD:${to}`])
+        this.lastFetch = Date.now()
+      } finally {
+        await this.git(['worktree', 'remove', '--force', dir]).catch(() => undefined)
+      }
+    })
+  }
+
+  // The last hop is protected on GitHub and only takes pull requests.
+  async publish(from: string, to: string): Promise<PublishResult> {
+    const { remoteUrl } = await this.status()
+    const slug = remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
+    if (!slug) throw new Error('The repository is not on GitHub')
+    return this.op(`Publishing ${from} to ${to}…`, async () => {
+      const result = await publish(slug, from, to)
+      await this.git(['fetch', 'origin', to]).catch(() => undefined)
+      this.lastFetch = Date.now()
+      return result
     })
   }
 

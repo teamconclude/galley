@@ -157,7 +157,6 @@ button.primary {
 }
 
 .tree-actions button {
-  position: relative;
   border: none;
   background: transparent;
   padding: 2px;
@@ -170,26 +169,6 @@ button.primary {
 .tree-actions button.on {
   background: rgba(0, 0, 0, 0.07);
   color: var(--text);
-}
-
-/* Native title tooltips are unreliable in the webview, so these draw their own. */
-.tree-actions button[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 10;
-  padding: 3px 7px;
-  border-radius: 4px;
-  background: var(--text);
-  color: var(--bg);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  white-space: nowrap;
-  line-height: 1.4;
-  pointer-events: none;
 }
 
 .tree-item {
@@ -1214,13 +1193,18 @@ body.dragging .terminal-host {
 }
 
 .change-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 10px;
+  gap: 4px;
 }
 
-.change-row:hover,
+.change-row input[type='checkbox'] {
+  flex: none;
+  margin: 0 2px 0 0;
+}
+
+.change-row .tree-name {
+  flex: 1;
+}
+
 .change-row.selected {
   background: var(--accent-soft);
 }
@@ -1248,24 +1232,58 @@ body.dragging .terminal-host {
   color: var(--danger);
 }
 
-.change-path {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;
-  text-align: left;
-  cursor: default;
-}
-
 .change-discard {
-  border-color: transparent;
-  padding: 0 6px;
-  opacity: 0;
+  flex: none;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  line-height: 0;
+  color: var(--text-muted);
 }
 
-.change-row:hover .change-discard {
-  opacity: 1;
+.change-discard:hover {
+  color: var(--danger);
+}
+
+.tip {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, calc(-100% - 6px));
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.changes-select button.danger {
+  color: var(--danger);
+}
+
+.dialog-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 10px 0;
+}
+
+.dialog-check input {
+  margin-top: 3px;
+}
+
+.dialog-check small {
+  display: block;
+  color: var(--text-muted);
+}
+
+.releases {
+  border-top: 1px solid var(--border);
 }
 
 .commit-box {

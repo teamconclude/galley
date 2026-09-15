@@ -44,6 +44,9 @@ const api: Api = {
     push: () => ipcRenderer.invoke('git:push'),
     pull: () => ipcRenderer.invoke('git:pull'),
     update: () => ipcRenderer.invoke('git:update'),
+    mergeToBase: () => ipcRenderer.invoke('git:mergeToBase'),
+    release: (from, to) => ipcRenderer.invoke('git:release', from, to),
+    publish: (from, to) => ipcRenderer.invoke('git:publish', from, to),
     discard: (path, untracked) => ipcRenderer.invoke('git:discard', path, untracked),
     diff: (path) => ipcRenderer.invoke('git:diff', path),
     identity: () => ipcRenderer.invoke('git:identity'),
@@ -69,6 +72,10 @@ const api: Api = {
   },
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)
+  },
+  prefs: {
+    get: () => ipcRenderer.invoke('prefs:get'),
+    set: (prefs) => ipcRenderer.invoke('prefs:set', prefs)
   },
   layout: {
     initial: ipcRenderer.sendSync('layout:get'),

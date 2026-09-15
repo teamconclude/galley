@@ -44,6 +44,23 @@ function Frame(props: FrameProps): React.JSX.Element {
   )
 }
 
+interface ConfirmProps {
+  title: string
+  action: string
+  onConfirm: () => void
+  onCancel: () => void
+  children: React.ReactNode
+}
+
+export function ConfirmDialog(props: ConfirmProps): React.JSX.Element {
+  const { title, action, onConfirm, onCancel, children } = props
+  return (
+    <Frame title={title} submitLabel={action} canSubmit onSubmit={onConfirm} onCancel={onCancel}>
+      {children}
+    </Frame>
+  )
+}
+
 interface NewBranchProps {
   base: string
   prefix: string

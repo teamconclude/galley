@@ -19,6 +19,11 @@ export function buildMenu(actions: Actions): Menu {
         { role: 'about' },
         { label: 'Check for updates…', click: actions.checkUpdates },
         { label: 'Setup…', click: () => actions.command('setup') },
+        {
+          label: 'Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => actions.command('settings')
+        },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },

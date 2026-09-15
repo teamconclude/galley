@@ -6,7 +6,9 @@ import type {
   SetupStatus,
   HugoStatus,
   Identity,
-  RepoInfo
+  RepoInfo,
+  ReleaseStep,
+  Preferences
 } from '../../shared/types'
 import ChangesPanel from './components/ChangesPanel'
 import ClaudePane from './components/ClaudePane'
@@ -15,7 +17,12 @@ import { NewPageDialog, PromptDialog } from './components/Dialogs'
 import DiffView from './components/DiffView'
 import Editor from './components/Editor'
 import FileTree from './components/FileTree'
-import { IdentityDialog, NewBranchDialog, SwitchBranchDialog } from './components/GitDialogs'
+import {
+  ConfirmDialog,
+  IdentityDialog,
+  NewBranchDialog,
+  SwitchBranchDialog
+} from './components/GitDialogs'
 import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
@@ -23,6 +30,7 @@ import Splitter from './components/Splitter'
 import { loadLayout, saveLayout } from './lib/layout'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
+import SettingsDialog from './components/SettingsDialog'
 import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
@@ -50,7 +58,14 @@ const inDir = (dir: string, name: string): string => (dir ? `${dir}/${name}` : n
 // File and folder names stay lowercase with hyphens, as the site's URLs expect.
 const normalizeName = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, '-')
 const copyName = (name: string): string => name.replace(/(\.[^.]+)?$/, '-copy$1')
-const fail = (e: unknown): void => window.alert(e instanceof Error ? e.message : String(e))
+// Errors from the main process arrive wrapped by Electron's IPC.
+const fail = (e: unknown): void =>
+  window.alert(
+    (e instanceof Error ? e.message : String(e)).replace(
+      /^Error invoking remote method '[^']+': (?:Error: )?/,
+      ''
+    )
+  )
 
 export default function App(): React.JSX.Element | null {
   const [repo, setRepo] = useState<RepoInfo | null | undefined>(undefined)
@@ -78,9 +93,15 @@ export default function App(): React.JSX.Element | null {
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>(layout.sidebarTab)
   const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
-  const [gitDialog, setGitDialog] = useState<'new-branch' | 'switch-branch' | 'identity' | null>(
-    null
-  )
+  const [gitDialog, setGitDialog] = useState<
+    'new-branch' | 'switch-branch' | 'identity' | 'merge' | null
+  >(null)
+  const [releaseDialog, setReleaseDialog] = useState<ReleaseStep | null>(null)
+  const [prefs, setPrefs] = useState<Preferences | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  useEffect(() => {
+    void window.api.prefs.get().then(setPrefs)
+  }, [])
   const [branches, setBranches] = useState<string[]>([])
   const [pendingCommit, setPendingCommit] = useState<{ message: string; paths: string[] } | null>(
     null
@@ -339,6 +360,44 @@ export default function App(): React.JSX.Element | null {
     if (file?.path === change.path) await reopen(change.path)
   }
 
+  const discardAll = async (changes: Change[]): Promise<void> => {
+    const question = `Discard all ${changes.length} changes? New files move to the Trash.`
+    if (!window.confirm(question)) return
+    await save()
+    for (const change of changes) {
+      await gitAction(() => window.api.git.discard(change.path, change.kind === 'untracked'))
+    }
+    setDiff(null)
+    if (file) await reopen(file.path)
+  }
+
+  const mergeToBase = async (): Promise<void> => {
+    setGitDialog(null)
+    await save()
+    await gitAction(() => window.api.git.mergeToBase())
+    setDiff(null)
+    if (file) await reopen(file.path)
+  }
+
+  const runRelease = async (step: ReleaseStep): Promise<void> => {
+    setReleaseDialog(null)
+    if (step.to !== 'production') {
+      await gitAction(() => window.api.git.release(step.from, step.to))
+      return
+    }
+    try {
+      const result = await window.api.git.publish(step.from, step.to)
+      if (!result.merged) {
+        window.alert(
+          `${result.error ?? 'The pull request is waiting'}. Finish publishing on GitHub.`
+        )
+        window.api.openExternal(result.url)
+      }
+    } catch (e) {
+      fail(e)
+    }
+  }
+
   const reopen = async (path: string): Promise<void> => {
     const text = await window.api.repo.read(path).catch(() => null)
     setFile(text === null ? null : { path, text, saved: text })
@@ -464,6 +523,9 @@ export default function App(): React.JSX.Element | null {
           case 'setup':
             setShowSetup(true)
             break
+          case 'settings':
+            setShowSettings(true)
+            break
           case 'detach-preview':
             toggleDetached()
             break
@@ -566,12 +628,16 @@ export default function App(): React.JSX.Element | null {
                 selected={diff?.change.path ?? null}
                 onShowDiff={(c) => void showDiff(c)}
                 onDiscard={(c) => void discardChange(c)}
+                onDiscardAll={(cs) => void discardAll(cs)}
                 onCommit={commit}
                 onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
                 onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
                 onUpdate={() => void save().then(() => gitAction(() => window.api.git.update()))}
                 onFetch={() => void gitAction(() => window.api.git.fetch())}
                 onNewBranch={() => setGitDialog('new-branch')}
+                onMerge={() => setGitDialog('merge')}
+                onRelease={setReleaseDialog}
+                onPublish={setReleaseDialog}
                 onSwitchBranch={() => void openSwitchBranch()}
               />
             )}
@@ -726,6 +792,52 @@ export default function App(): React.JSX.Element | null {
               setGitDialog(null)
               void switchBranch(name)
             }}
+          />
+        )}
+        {gitDialog === 'merge' && gitStatus && (
+          <ConfirmDialog
+            title={`Merge into ${gitStatus.base}`}
+            action="Merge"
+            onCancel={() => setGitDialog(null)}
+            onConfirm={() => void mergeToBase()}
+          >
+            <p className="dialog-note">
+              The {gitStatus.aheadOfBase} commit{gitStatus.aheadOfBase === 1 ? '' : 's'} on{' '}
+              {gitStatus.branch} become part of {gitStatus.base} on GitHub.{' '}
+              {prefs?.deleteMergedBranch === false
+                ? 'The branch stays and you keep working on it.'
+                : `The branch is then removed and you continue on ${gitStatus.base}.`}
+            </p>
+          </ConfirmDialog>
+        )}
+        {releaseDialog && (
+          <ConfirmDialog
+            title={
+              releaseDialog.to === 'production'
+                ? `Publish ${releaseDialog.from}`
+                : `Merge ${releaseDialog.from} into ${releaseDialog.to}`
+            }
+            action={releaseDialog.to === 'production' ? 'Publish' : 'Merge'}
+            onCancel={() => setReleaseDialog(null)}
+            onConfirm={() => void runRelease(releaseDialog)}
+          >
+            <p className="dialog-note">
+              {releaseDialog.count} change{releaseDialog.count === 1 ? '' : 's'} on{' '}
+              {releaseDialog.from} go to {releaseDialog.to}.{' '}
+              {releaseDialog.to === 'production'
+                ? 'A pull request is opened and merged, and the live site updates a few minutes later.'
+                : 'GitHub publishes the branch a few minutes later.'}
+            </p>
+          </ConfirmDialog>
+        )}
+        {showSettings && prefs && (
+          <SettingsDialog
+            prefs={prefs}
+            onChange={(p) => {
+              setPrefs(p)
+              void window.api.prefs.set(p)
+            }}
+            onClose={() => setShowSettings(false)}
           />
         )}
         {gitDialog === 'identity' && (

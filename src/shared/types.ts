@@ -58,6 +58,19 @@ export interface Change {
   from?: string
 }
 
+// One hop in the chain of shared branches, e.g. develop to staging.
+export interface ReleaseStep {
+  from: string
+  to: string
+  count: number
+}
+
+export interface PublishResult {
+  url: string
+  merged: boolean
+  error?: string
+}
+
 export interface GitStatus {
   branch: string
   base: string
@@ -66,7 +79,11 @@ export interface GitStatus {
   upstream: string | null
   ahead: number
   behind: number
+  // The upstream only holds older versions of this branch's commits, after a rebase.
+  rebased: boolean
   baseAhead: number
+  aheadOfBase: number
+  releases: ReleaseStep[]
   remoteUrl: string | null
   lastFetch: number | null
   fetchError: string | null
@@ -125,4 +142,16 @@ export type UpdateStatus =
   | { state: 'error'; message: string }
 
 export type MenuCommand =
-  'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview' | 'detach-preview' | 'setup'
+  | 'save'
+  | 'toggle-preview'
+  | 'toggle-terminal'
+  | 'reload-preview'
+  | 'detach-preview'
+  | 'setup'
+  | 'settings'
+
+// Git conveniences for editors who are not git users; both on unless turned off.
+export interface Preferences {
+  pushOnCommit: boolean
+  deleteMergedBranch: boolean
+}
