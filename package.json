@@ -5,6 +5,7 @@
   "main": "./out/main/index.js",
   "author": "Conclude",
   "homepage": "https://conclude.io",
+  "license": "BSD-3-Clause",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
