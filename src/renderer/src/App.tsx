@@ -396,11 +396,13 @@ export default function App(): React.JSX.Element | null {
 
   const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + pagePath : null
 
-  // A checkout that opens with tools still missing shows the setup progress once.
+  // The setup dialog appears by itself only when a step downloads, fails or needs the
+  // user; quick checks that pass leave it closed.
   useEffect(() => {
     const apply = (s: SetupStatus): void => {
       setSetup(s)
-      setShowSetup((shown) => (shown === null && !s.complete ? true : shown))
+      const busy = s.steps.some((step) => ['running', 'failed', 'action'].includes(step.state))
+      setShowSetup((shown) => (shown === null && busy ? true : shown))
     }
     void window.api.setup.status().then(apply)
     return window.api.setup.onStatus(apply)
