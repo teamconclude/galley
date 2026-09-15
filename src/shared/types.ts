@@ -40,5 +40,33 @@ export interface DataLists {
   customercategories: string[]
 }
 
+export type ChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'
+
+export interface Change {
+  path: string
+  kind: ChangeKind
+  from?: string
+}
+
+export interface GitStatus {
+  branch: string
+  base: string
+  protected: boolean
+  changes: Change[]
+  upstream: string | null
+  ahead: number
+  behind: number
+  baseAhead: number
+  remoteUrl: string | null
+  lastFetch: number | null
+  fetchError: string | null
+  busy: string | null
+}
+
+export interface Identity {
+  name: string
+  email: string
+}
+
 export type MenuCommand =
   'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview' | 'detach-preview'

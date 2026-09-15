@@ -1,10 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron'
+import { spawn } from 'child_process'
+import { basename } from 'path'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import type { MenuCommand } from '../shared/types'
+import type { Identity, MenuCommand } from '../shared/types'
 import { isDev } from './env'
+import { clone, Git } from './git'
 import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
@@ -14,6 +17,7 @@ import { ClaudeTerminal } from './terminal'
 let win: BrowserWindow | null = null
 let previewWin: BrowserWindow | null = null
 let repo: Repo | null = null
+let git: Git | null = null
 
 const send = (channel: string, ...args: unknown[]): void => {
   win?.webContents.send(channel, ...args)
@@ -27,9 +31,15 @@ const terminal = new ClaudeTerminal(
 
 function openRepo(path: string): void {
   repo?.close()
+  git?.stop()
   terminal.kill()
-  repo = new Repo(path, (paths) => send('repo:changed', paths))
+  repo = new Repo(path, (paths) => {
+    send('repo:changed', paths)
+    git?.scheduleRefresh()
+  })
   repo.watch()
+  git = new Git(path, (status) => send('git:status', status))
+  git.start()
   saveSettings({ ...loadSettings(), repoPath: path })
   void hugo.start(path)
   send('repo:opened')
@@ -135,6 +145,46 @@ function registerIpc(): void {
   })
   ipcMain.handle('hugo:status', () => hugo.status)
   ipcMain.handle('hugo:restart', () => (repo ? hugo.start(repo.path) : undefined))
+  ipcMain.handle('hugo:install', () => installHugo())
+  const currentGit = (): Git => {
+    if (!git) throw new Error('No repository open')
+    return git
+  }
+  ipcMain.handle('git:status', () => git?.status() ?? null)
+  ipcMain.handle('git:fetch', () => currentGit().fetch())
+  ipcMain.handle('git:branches', () => currentGit().branches())
+  ipcMain.handle('git:createBranch', (_e, name: string) => currentGit().createBranch(name))
+  ipcMain.handle('git:switchBranch', (_e, name: string) => currentGit().switchBranch(name))
+  ipcMain.handle('git:commit', (_e, msg: string, paths: string[]) =>
+    currentGit().commit(msg, paths)
+  )
+  ipcMain.handle('git:push', () => currentGit().push())
+  ipcMain.handle('git:pull', () => currentGit().pull())
+  ipcMain.handle('git:update', () => currentGit().update())
+  ipcMain.handle('git:discard', async (_e, rel: string, untracked: boolean) => {
+    if (untracked) await shell.trashItem(current().absolute(rel))
+    else await currentGit().discard(rel)
+    currentGit().scheduleRefresh()
+  })
+  ipcMain.handle('git:diff', async (_e, rel: string) => {
+    const status = await currentGit().status()
+    const change = status.changes.find((c) => c.path === rel)
+    return currentGit().diff(rel, change?.kind === 'untracked')
+  })
+  ipcMain.handle('git:identity', () => currentGit().identity())
+  ipcMain.handle('git:setIdentity', (_e, identity: Identity) => currentGit().setIdentity(identity))
+  ipcMain.handle('git:chooseFolder', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Where to put the site checkout',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return result.filePaths[0] ?? null
+  })
+  ipcMain.handle('git:clone', async (_e, url: string, dest: string) => {
+    await clone(url, dest, (line) => send('git:cloneProgress', line))
+    if (!Repo.isSite(dest)) throw new Error(`${basename(dest)} is not a Hugo site checkout`)
+    openRepo(dest)
+  })
   ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
   ipcMain.on('preview:navigate', (_e, url: string) => {
     if (previewWin && previewWin.webContents.getURL() !== url) void previewWin.loadURL(url)
@@ -148,6 +198,25 @@ function registerIpc(): void {
   ipcMain.on('terminal:resize', (_e, cols: number, rows: number) => terminal.resize(cols, rows))
   ipcMain.on('terminal:kill', () => terminal.kill())
   ipcMain.on('open-external', (_e, url: string) => void shell.openExternal(url))
+}
+
+// Runs the site's own setup script, which downloads Hugo into bin/, then starts it.
+function installHugo(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const path = repo?.path
+    if (!path) return reject(new Error('No repository open'))
+    const proc = spawn('/bin/sh', ['scripts/setup'], { cwd: path })
+    let output = ''
+    proc.stdout.on('data', (d: Buffer) => (output += d.toString()))
+    proc.stderr.on('data', (d: Buffer) => (output += d.toString()))
+    proc.on('error', reject)
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        void hugo.start(path)
+        resolve()
+      } else reject(new Error(output.trim().split('\n').slice(-3).join('\n') || 'setup failed'))
+    })
+  })
 }
 
 // Serves files from the open checkout, e.g. galley://repo/static/images/logo.png.
@@ -194,6 +263,7 @@ app.on('window-all-closed', () => app.quit())
 
 app.on('before-quit', () => {
   hugo.stop()
+  git?.stop()
   terminal.kill()
   repo?.close()
 })

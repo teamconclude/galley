@@ -999,3 +999,342 @@ body.dragging .terminal-host {
 .dialog-buttons button.primary:disabled {
   opacity: 0.5;
 }
+
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px 0;
+  gap: 2px;
+}
+
+.sidebar-tabs button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 10px 6px;
+  color: var(--text-muted);
+}
+
+.sidebar-tabs button.on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.sidebar-tabs .badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: white;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.changes {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.changes-branch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.branch-icon {
+  color: var(--text-muted);
+}
+
+.branch-name {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-menu {
+  position: absolute;
+  right: 8px;
+  top: 34px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+
+.branch-menu button {
+  border: none;
+  text-align: left;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.branch-menu button:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.changes-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.changes-sync:empty {
+  display: none;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.sync-row.muted {
+  color: var(--text-muted);
+}
+
+.sync-row.warn {
+  color: #8a5a00;
+}
+
+.sync-row.error {
+  color: var(--danger);
+}
+
+.sync-row button {
+  padding: 1px 8px;
+}
+
+.changes-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px 4px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.changes-select button {
+  border: none;
+  background: transparent;
+  padding: 0 4px;
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.changes-list {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.change-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 10px;
+}
+
+.change-row:hover,
+.change-row.selected {
+  background: var(--accent-soft);
+}
+
+.change-mark {
+  width: 16px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.change-mark.modified {
+  color: #b7791f;
+}
+
+.change-mark.added,
+.change-mark.untracked {
+  color: #2e9e4f;
+}
+
+.change-mark.deleted,
+.change-mark.conflict {
+  color: var(--danger);
+}
+
+.change-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  cursor: default;
+}
+
+.change-discard {
+  border-color: transparent;
+  padding: 0 6px;
+  opacity: 0;
+}
+
+.change-row:hover .change-discard {
+  opacity: 1;
+}
+
+.commit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.commit-box textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 7px;
+  resize: vertical;
+  background: var(--bg);
+}
+
+.commit-box button.primary:disabled {
+  opacity: 0.5;
+}
+
+.diff-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.change-kind {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.diff {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.diff-line {
+  display: block;
+  padding: 0 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-line.add {
+  background: #e6ffed;
+  color: #116329;
+}
+
+.diff-line.del {
+  background: #ffebe9;
+  color: #82071e;
+}
+
+.diff-line.hunk {
+  color: var(--accent);
+  background: #f0f6ff;
+  margin-top: 6px;
+}
+
+.diff-line.meta {
+  color: var(--text-muted);
+}
+
+.welcome-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.welcome-buttons button {
+  padding: 8px 18px;
+  font-size: 14px;
+}
+
+.dialog-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialog-path {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-log {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  padding: 6px 8px;
+  background: var(--bg-muted);
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.dialog-field select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: var(--bg);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tree {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}

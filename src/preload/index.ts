@@ -31,7 +31,27 @@ const api: Api = {
   hugo: {
     status: () => ipcRenderer.invoke('hugo:status'),
     restart: () => ipcRenderer.invoke('hugo:restart'),
+    install: () => ipcRenderer.invoke('hugo:install'),
     onStatus: (cb) => on('hugo:status', cb)
+  },
+  git: {
+    status: () => ipcRenderer.invoke('git:status'),
+    fetch: () => ipcRenderer.invoke('git:fetch'),
+    branches: () => ipcRenderer.invoke('git:branches'),
+    createBranch: (name) => ipcRenderer.invoke('git:createBranch', name),
+    switchBranch: (name) => ipcRenderer.invoke('git:switchBranch', name),
+    commit: (message, paths) => ipcRenderer.invoke('git:commit', message, paths),
+    push: () => ipcRenderer.invoke('git:push'),
+    pull: () => ipcRenderer.invoke('git:pull'),
+    update: () => ipcRenderer.invoke('git:update'),
+    discard: (path, untracked) => ipcRenderer.invoke('git:discard', path, untracked),
+    diff: (path) => ipcRenderer.invoke('git:diff', path),
+    identity: () => ipcRenderer.invoke('git:identity'),
+    setIdentity: (identity) => ipcRenderer.invoke('git:setIdentity', identity),
+    clone: (url, dest) => ipcRenderer.invoke('git:clone', url, dest),
+    chooseFolder: () => ipcRenderer.invoke('git:chooseFolder'),
+    onStatus: (cb) => on('git:status', cb),
+    onCloneProgress: (cb) => on('git:cloneProgress', cb)
   },
   preview: {
     detach: (url) => ipcRenderer.send('preview:detach', url),

@@ -2,7 +2,9 @@ import type {
   ComponentSchema,
   DataLists,
   DirEntry,
+  GitStatus,
   HugoStatus,
+  Identity,
   MenuCommand,
   RepoInfo
 } from './types'
@@ -33,7 +35,27 @@ export interface Api {
   hugo: {
     status: () => Promise<HugoStatus>
     restart: () => Promise<void>
+    install: () => Promise<void>
     onStatus: (cb: (status: HugoStatus) => void) => Unsubscribe
+  }
+  git: {
+    status: () => Promise<GitStatus | null>
+    fetch: () => Promise<void>
+    branches: () => Promise<string[]>
+    createBranch: (name: string) => Promise<void>
+    switchBranch: (name: string) => Promise<void>
+    commit: (message: string, paths: string[]) => Promise<void>
+    push: () => Promise<void>
+    pull: () => Promise<void>
+    update: () => Promise<void>
+    discard: (path: string, untracked: boolean) => Promise<void>
+    diff: (path: string) => Promise<string>
+    identity: () => Promise<Identity | null>
+    setIdentity: (identity: Identity) => Promise<void>
+    clone: (url: string, dest: string) => Promise<void>
+    chooseFolder: () => Promise<string | null>
+    onStatus: (cb: (status: GitStatus) => void) => Unsubscribe
+    onCloneProgress: (cb: (line: string) => void) => Unsubscribe
   }
   preview: {
     detach: (url: string) => void

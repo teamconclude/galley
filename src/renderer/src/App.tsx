@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DirEntry, HugoStatus, RepoInfo } from '../../shared/types'
+import type {
+  Change,
+  DirEntry,
+  GitStatus,
+  HugoStatus,
+  Identity,
+  RepoInfo
+} from '../../shared/types'
+import ChangesPanel from './components/ChangesPanel'
 import ClaudePane from './components/ClaudePane'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
 import { NewPageDialog, PromptDialog } from './components/Dialogs'
+import DiffView from './components/DiffView'
 import Editor from './components/Editor'
 import FileTree from './components/FileTree'
+import { IdentityDialog, NewBranchDialog, SwitchBranchDialog } from './components/GitDialogs'
 import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
@@ -56,6 +66,17 @@ export default function App(): React.JSX.Element | null {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
+  const [gitStatus, setGitStatus] = useState<GitStatus | null>(null)
+  const [identity, setIdentity] = useState<Identity | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>('files')
+  const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
+  const [gitDialog, setGitDialog] = useState<'new-branch' | 'switch-branch' | 'identity' | null>(
+    null
+  )
+  const [branches, setBranches] = useState<string[]>([])
+  const [pendingCommit, setPendingCommit] = useState<{ message: string; paths: string[] } | null>(
+    null
+  )
 
   const fileRef = useRef(file)
   const saveTimer = useRef<number | null>(null)
@@ -109,6 +130,7 @@ export default function App(): React.JSX.Element | null {
 
   const open = async (path: string): Promise<void> => {
     await save()
+    setDiff(null)
     if (imageFile.test(path) || binaryFile.test(path)) {
       setFile({ path, text: '', saved: '' })
       return
@@ -234,6 +256,105 @@ export default function App(): React.JSX.Element | null {
           { label: 'Move to Trash', danger: true, onClick: () => void trashEntry(entry) }
         ]
 
+  const repoPath = repo?.path
+  useEffect(() => {
+    if (!repoPath) return
+    void window.api.git.status().then(setGitStatus)
+    void window.api.git.identity().then(setIdentity)
+    return window.api.git.onStatus(setGitStatus)
+  }, [repoPath])
+
+  const gitAction = async (fn: () => Promise<void>): Promise<void> => {
+    try {
+      await fn()
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  const showDiff = async (change: Change): Promise<void> => {
+    setDiff({ change, text: null })
+    try {
+      const text = await window.api.git.diff(change.path)
+      setDiff((d) => (d && d.change.path === change.path ? { change, text } : d))
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  // Commits need a name and email; ask once and keep the commit waiting.
+  const commit = async (message: string, paths: string[]): Promise<boolean> => {
+    await save()
+    if (!identity) {
+      const found = await window.api.git.identity()
+      if (!found) {
+        setPendingCommit({ message, paths })
+        setGitDialog('identity')
+        return false
+      }
+      setIdentity(found)
+    }
+    try {
+      await window.api.git.commit(message, paths)
+      setDiff(null)
+      return true
+    } catch (e) {
+      fail(e)
+      return false
+    }
+  }
+
+  const saveIdentity = async (id: Identity): Promise<void> => {
+    setGitDialog(null)
+    try {
+      await window.api.git.setIdentity(id)
+      setIdentity(id)
+    } catch (e) {
+      fail(e)
+      return
+    }
+    if (pendingCommit) {
+      setPendingCommit(null)
+      void commit(pendingCommit.message, pendingCommit.paths)
+    }
+  }
+
+  const discardChange = async (change: Change): Promise<void> => {
+    const question =
+      change.kind === 'untracked'
+        ? `Move the new file ${change.path} to the Trash?`
+        : `Discard the changes to ${change.path}?`
+    if (!window.confirm(question)) return
+    await save()
+    await gitAction(() => window.api.git.discard(change.path, change.kind === 'untracked'))
+    if (diff?.change.path === change.path) setDiff(null)
+    if (file?.path === change.path) await reopen(change.path)
+  }
+
+  const reopen = async (path: string): Promise<void> => {
+    const text = await window.api.repo.read(path).catch(() => null)
+    setFile(text === null ? null : { path, text, saved: text })
+  }
+
+  const switchBranch = async (name: string): Promise<void> => {
+    await save()
+    await gitAction(() => window.api.git.switchBranch(name))
+    setDiff(null)
+    if (file) await reopen(file.path)
+  }
+
+  const openSwitchBranch = async (): Promise<void> => {
+    try {
+      setBranches(await window.api.git.branches())
+      setGitDialog('switch-branch')
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  const branchPrefix =
+    (identity?.email.split('@')[0] ?? 'me').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '/'
+
   useEffect(
     () =>
       window.api.repo.onChanged((paths) => {
@@ -335,7 +456,7 @@ export default function App(): React.JSX.Element | null {
         <header className="titlebar">
           <div className="title">
             <strong>{repo.name}</strong>
-            {repo.branch && <span className="branch">{repo.branch}</span>}
+            <span className="branch">{gitStatus?.branch ?? repo.branch}</span>
           </div>
           <div className="title-file">{file?.path ?? ''}</div>
           <div className="title-right">
@@ -358,17 +479,50 @@ export default function App(): React.JSX.Element | null {
         </header>
         <div className="body">
           <aside className="sidebar" style={{ width: sidebarWidth }}>
-            <FileTree
-              name={repo.name}
-              selected={file?.path ?? null}
-              expanded={expanded}
-              onToggle={toggleDir}
-              onSelect={(path) => void open(path)}
-              onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
-              onDropFiles={(dir, files) => void dropFiles(dir, files)}
-              onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
-              version={treeVersion}
-            />
+            <div className="sidebar-tabs">
+              <button
+                className={sidebarTab === 'files' ? 'on' : ''}
+                onClick={() => setSidebarTab('files')}
+              >
+                Files
+              </button>
+              <button
+                className={sidebarTab === 'changes' ? 'on' : ''}
+                onClick={() => setSidebarTab('changes')}
+              >
+                Changes
+                {gitStatus && gitStatus.changes.length > 0 && (
+                  <span className="badge">{gitStatus.changes.length}</span>
+                )}
+              </button>
+            </div>
+            {sidebarTab === 'files' ? (
+              <FileTree
+                name={repo.name}
+                selected={file?.path ?? null}
+                expanded={expanded}
+                onToggle={toggleDir}
+                onSelect={(path) => void open(path)}
+                onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
+                onDropFiles={(dir, files) => void dropFiles(dir, files)}
+                onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
+                version={treeVersion}
+              />
+            ) : (
+              <ChangesPanel
+                status={gitStatus}
+                selected={diff?.change.path ?? null}
+                onShowDiff={(c) => void showDiff(c)}
+                onDiscard={(c) => void discardChange(c)}
+                onCommit={commit}
+                onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
+                onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
+                onUpdate={() => void save().then(() => gitAction(() => window.api.git.update()))}
+                onFetch={() => void gitAction(() => window.api.git.fetch())}
+                onNewBranch={() => setGitDialog('new-branch')}
+                onSwitchBranch={() => void openSwitchBranch()}
+              />
+            )}
           </aside>
           <Splitter
             direction="horizontal"
@@ -377,7 +531,14 @@ export default function App(): React.JSX.Element | null {
           <div className="center">
             <div className="upper">
               <main className="editor-column">
-                {!file ? (
+                {diff ? (
+                  <DiffView
+                    change={diff.change}
+                    diff={diff.text}
+                    onOpen={() => void open(diff.change.path)}
+                    onDiscard={() => void discardChange(diff.change)}
+                  />
+                ) : !file ? (
                   <div className="pane-empty">Choose a page on the left.</div>
                 ) : imageFile.test(file.path) ? (
                   <div className="image-view">
@@ -490,6 +651,37 @@ export default function App(): React.JSX.Element | null {
               setDialog(null)
               void renameEntry(dialog.entry, name)
             }}
+          />
+        )}
+        {gitDialog === 'new-branch' && gitStatus && (
+          <NewBranchDialog
+            base={gitStatus.base}
+            prefix={branchPrefix}
+            onCancel={() => setGitDialog(null)}
+            onSubmit={(name) => {
+              setGitDialog(null)
+              void save().then(() => gitAction(() => window.api.git.createBranch(name)))
+            }}
+          />
+        )}
+        {gitDialog === 'switch-branch' && gitStatus && (
+          <SwitchBranchDialog
+            branches={branches}
+            current={gitStatus.branch}
+            onCancel={() => setGitDialog(null)}
+            onSubmit={(name) => {
+              setGitDialog(null)
+              void switchBranch(name)
+            }}
+          />
+        )}
+        {gitDialog === 'identity' && (
+          <IdentityDialog
+            onCancel={() => {
+              setGitDialog(null)
+              setPendingCommit(null)
+            }}
+            onSubmit={(id) => void saveIdentity(id)}
           />
         )}
         {dialog?.kind === 'duplicate' && (
