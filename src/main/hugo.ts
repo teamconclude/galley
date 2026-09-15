@@ -131,7 +131,9 @@ export class HugoServer {
     // Pointing the server at an empty directory of Galley's own keeps the preview on what
     // this process renders. Hugo rejects --destination with --renderToMemory, hence the
     // environment variable.
-    const proc = spawn(bin, ['server', '-D', '--renderToMemory'], {
+    // Drafts, future-dated and expired pages all render, so an editor can preview a post
+    // before its publishing date.
+    const proc = spawn(bin, ['server', '-D', '-F', '-E', '--renderToMemory'], {
       cwd: repo,
       env: { ...process.env, HUGO_PUBLISHDIR: join(app.getPath('temp'), 'galley-preview') }
     })
