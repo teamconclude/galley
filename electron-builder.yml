@@ -11,6 +11,7 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+afterPack: scripts/pty-helper.cjs
 afterSign: scripts/adhoc-sign.cjs
 mac:
   category: public.app-category.productivity
@@ -19,9 +20,9 @@ mac:
   artifactName: ${productName}-${version}-${arch}.${ext}
   target:
     - target: dmg
-      arch: [arm64]
+      arch: [arm64, x64]
     - target: zip
-      arch: [arm64]
+      arch: [arm64, x64]
 publish:
   provider: github
   owner: teamconclude

@@ -113,8 +113,7 @@ export class Updater {
     }
     const { version, files } = manifest as unknown as Manifest
     if (!isNewer(version, app.getVersion())) return null
-    const wantArm = process.arch === 'arm64'
-    const file = files.find((f) => f.url.endsWith('.zip') && f.url.includes('arm64') === wantArm)
+    const file = files.find((f) => f.url.endsWith(`-${process.arch}.zip`))
     if (!file) throw new Error(`Release ${version} has no build for this Mac`)
     const assets = feed ?? `${repoUrl}/releases/download/v${version}`
     return { version, url: `${assets}/${file.url}`, sha512: file.sha512, size: file.size ?? 0 }

@@ -9,7 +9,7 @@ the git steps needed to get a change reviewed.
 
 ## Installation
 
-You need a Mac with Apple silicon and access to the `teamconclude` organisation on GitHub.
+You need a Mac running macOS 12 or later and access to the `teamconclude` organisation on GitHub.
 
 1. Open **Terminal**: press ⌘ Space, type `Terminal`, press Return.
 2. Paste this line and press Return:
