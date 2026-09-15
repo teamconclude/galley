@@ -24,7 +24,16 @@ export interface InputHint {
   options?: { allow_empty?: boolean; values?: unknown[] }
 }
 
-// One component from component-library/components/<name>/<name>.yml.
+// The key naming a block's component: fieldGroup in the new component library,
+// _bookshop_name while the site still uses Bookshop and CloudCannon.
+export type BlockKey = 'fieldGroup' | '_bookshop_name'
+
+export interface ComponentLibrary {
+  blockKey: BlockKey
+  components: ComponentSchema[]
+}
+
+// One component, from <name>.yml or normalised from <name>.bookshop.yml.
 export interface ComponentSchema {
   name: string
   label: string

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { InputHint } from '../../../shared/types'
 import {
   blankItem,
+  blockName,
+  currentBlockKey,
   humanize,
   isRecord,
   labelsFor,
@@ -263,20 +265,21 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
       path={path}
       items={items}
       titleOf={(item) => {
-        const name = isRecord(item) && typeof item.fieldGroup === 'string' ? item.fieldGroup : null
+        const name = blockName(item)
         if (!name) return 'Block'
         return schemas.get(name)?.label ?? `Unknown block “${name}”`
       }}
       bodyOf={(item, index) => {
         const obj = isRecord(item) ? item : {}
-        const schema = typeof obj.fieldGroup === 'string' ? schemas.get(obj.fieldGroup) : undefined
+        const name = blockName(obj)
+        const schema = name === null ? undefined : schemas.get(name)
         return (
           <ObjectFields
             path={[...path, index]}
             obj={obj}
             blueprint={schema?.blueprint ?? {}}
             inputs={schema?.inputs ?? {}}
-            skip={['fieldGroup']}
+            skip={[currentBlockKey()]}
           />
         )
       }}
@@ -384,7 +387,7 @@ export function SingleBlock({ path, value, component }: SingleBlockProps): React
           obj={value}
           blueprint={schema?.blueprint ?? {}}
           inputs={schema?.inputs ?? {}}
-          skip={['fieldGroup']}
+          skip={[currentBlockKey()]}
         />
       </div>
     </div>

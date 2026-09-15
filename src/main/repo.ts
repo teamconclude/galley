@@ -2,7 +2,14 @@ import { execFile } from 'child_process'
 import { FSWatcher, existsSync, promises as fs, watch } from 'fs'
 import { basename, extname, join, resolve, sep } from 'path'
 import { parse as parseYaml } from 'yaml'
-import type { ComponentSchema, DataLists, DirEntry, InputHint, RepoInfo } from '../shared/types'
+import type {
+  ComponentLibrary,
+  ComponentSchema,
+  DataLists,
+  DirEntry,
+  InputHint,
+  RepoInfo
+} from '../shared/types'
 import { findHugo, listPages } from './hugo'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
@@ -18,7 +25,7 @@ export class Repo {
   private pending = new Set<string>()
   private structureChanged = false
   private timer: NodeJS.Timeout | null = null
-  private componentCache: ComponentSchema[] | null = null
+  private componentCache: ComponentLibrary | null = null
   private dataCache: DataLists | null = null
   private imageCache: string[] | null = null
 
@@ -76,33 +83,30 @@ export class Repo {
     return this.pages.get(rel) ?? guessUrl(rel)
   }
 
-  async components(): Promise<ComponentSchema[]> {
+  // A checkout has either <name>.yml files or, while the site still uses Bookshop,
+  // <name>.bookshop.yml files; the latter are normalised to the same shape.
+  async components(): Promise<ComponentLibrary> {
     if (this.componentCache) return this.componentCache
     const dir = join(this.path, 'component-library', 'components')
     const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
-    const out: ComponentSchema[] = []
-    for (const entry of entries.filter((e) => e.isDirectory()).sort()) {
-      const name = entry.name
-      const text = await fs.readFile(join(dir, name, `${name}.yml`), 'utf8').catch(() => null)
-      if (text === null) continue
-      let raw: unknown
-      try {
-        raw = parseYaml(text)
-      } catch {
-        continue
+    const names = entries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort()
+    const load = async (suffix: string): Promise<RawComponent[]> => {
+      const out: RawComponent[] = []
+      for (const name of names) {
+        const raw = await readYaml(join(dir, name, `${name}${suffix}`))
+        if (raw) out.push({ name, raw })
       }
-      if (!isRecord(raw)) continue
-      out.push({
-        name,
-        label: typeof raw.label === 'string' ? raw.label : name,
-        description: typeof raw.description === 'string' ? raw.description : '',
-        standalone: raw.standalone !== false,
-        blueprint: isRecord(raw.blueprint) ? raw.blueprint : {},
-        inputs: isRecord(raw.inputs) ? (raw.inputs as Record<string, InputHint>) : {}
-      })
+      return out
     }
-    this.componentCache = out
-    return out
+    const own = await load('.yml')
+    this.componentCache =
+      own.length > 0
+        ? { blockKey: 'fieldGroup', components: own.map(fromSchema) }
+        : { blockKey: '_bookshop_name', components: fromBookshop(await load('.bookshop.yml')) }
+    return this.componentCache
   }
 
   async data(): Promise<DataLists> {
@@ -241,4 +245,71 @@ function guessUrl(rel: string): string {
     .replace(/\.md$/, '')
     .replace(/\/?_?index$/, '')
   return path ? `/${path}/` : '/'
+}
+
+interface RawComponent {
+  name: string
+  raw: Record<string, unknown>
+}
+
+async function readYaml(path: string): Promise<Record<string, unknown> | null> {
+  const text = await fs.readFile(path, 'utf8').catch(() => null)
+  if (text === null) return null
+  try {
+    const raw: unknown = parseYaml(text)
+    return isRecord(raw) ? raw : null
+  } catch {
+    return null
+  }
+}
+
+const str = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : fallback)
+
+function fromSchema({ name, raw }: RawComponent): ComponentSchema {
+  return {
+    name,
+    label: str(raw.label, name),
+    description: str(raw.description, ''),
+    standalone: raw.standalone !== false,
+    blueprint: isRecord(raw.blueprint) ? raw.blueprint : {},
+    inputs: isRecord(raw.inputs) ? (raw.inputs as Record<string, InputHint>) : {}
+  }
+}
+
+// Bookshop blueprints reference components as `bookshop:<name>` (one nested block),
+// `[bookshop:<name>]` (a list of that component) or `[bookshop:structure:<structure>]`
+// (a list of every component declaring that structure in spec.structures).
+function fromBookshop(entries: RawComponent[]): ComponentSchema[] {
+  const spec = (raw: Record<string, unknown>): Record<string, unknown> =>
+    isRecord(raw.spec) ? raw.spec : {}
+  const structuresOf = (raw: Record<string, unknown>): string[] => {
+    const list = spec(raw).structures
+    return Array.isArray(list) ? list.map(String) : []
+  }
+  const members = new Map<string, string[]>()
+  for (const { name, raw } of entries) {
+    for (const s of structuresOf(raw)) members.set(s, [...(members.get(s) ?? []), name])
+  }
+  const ref = (v: unknown): string | null =>
+    typeof v === 'string' && v.startsWith('bookshop:') ? v.slice('bookshop:'.length) : null
+  const convert = (v: unknown): unknown => {
+    const single = ref(v)
+    if (single !== null) return `block/${single}`
+    const listed = Array.isArray(v) && v.length === 1 ? ref(v[0]) : null
+    if (listed === null) return v
+    if (!listed.startsWith('structure:')) return [`blocks/${listed}`]
+    const structure = listed.slice('structure:'.length)
+    if (structure === 'content_blocks') return ['blocks']
+    return (members.get(structure) ?? []).map((n) => `blocks/${n}`)
+  }
+  return entries.map(({ name, raw }) => ({
+    name,
+    label: str(spec(raw).label, name),
+    description: str(spec(raw).description, ''),
+    standalone: structuresOf(raw).includes('content_blocks'),
+    blueprint: isRecord(raw.blueprint)
+      ? Object.fromEntries(Object.entries(raw.blueprint).map(([k, v]) => [k, convert(v)]))
+      : {},
+    inputs: isRecord(raw._inputs) ? (raw._inputs as Record<string, InputHint>) : {}
+  }))
 }

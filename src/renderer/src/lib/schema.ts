@@ -1,4 +1,4 @@
-import type { ComponentSchema, DataLists, InputHint } from '../../../shared/types'
+import type { BlockKey, ComponentSchema, DataLists, InputHint } from '../../../shared/types'
 
 export type FieldSpec =
   | { kind: 'blocks'; allowed: string[] | null }
@@ -16,12 +16,32 @@ export type FieldSpec =
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
-// `[blocks]` allows any standalone component, `[blocks/name]` exactly one component.
-function blockMarker(v: unknown): string | null {
-  if (Array.isArray(v) && v.length === 1 && typeof v[0] === 'string') {
-    if (v[0] === 'blocks' || v[0].startsWith('blocks/')) return v[0]
+let blockKey: BlockKey = 'fieldGroup'
+
+export function setBlockKey(key: BlockKey): void {
+  blockKey = key
+}
+
+export const currentBlockKey = (): BlockKey => blockKey
+
+// The component a block names, or null when the value is not a block.
+export function blockName(v: unknown): string | null {
+  if (!isRecord(v)) return null
+  const name = v[blockKey]
+  return typeof name === 'string' ? name : null
+}
+
+// `[blocks]` allows any standalone component, `[blocks/a, blocks/b]` only those; other
+// values are not block lists at all.
+function blockAllowed(v: unknown): string[] | null | undefined {
+  if (!Array.isArray(v) || v.length === 0) return undefined
+  const names: string[] = []
+  for (const item of v) {
+    if (item === 'blocks') return null
+    if (typeof item !== 'string' || !item.startsWith('blocks/')) return undefined
+    names.push(item.slice('blocks/'.length))
   }
-  return null
+  return names
 }
 
 const imageKey = /^image$|^image_path$|Img$|^logo$|^icon$|^thumbnail$/
@@ -32,13 +52,8 @@ export function resolveField(
   inputs: Record<string, InputHint>,
   currentValue: unknown
 ): FieldSpec {
-  const marker = blockMarker(blueprintValue)
-  if (marker) {
-    return {
-      kind: 'blocks',
-      allowed: marker === 'blocks' ? null : [marker.slice('blocks/'.length)]
-    }
-  }
+  const allowed = blockAllowed(blueprintValue)
+  if (allowed !== undefined) return { kind: 'blocks', allowed }
   if (typeof blueprintValue === 'string' && blueprintValue.startsWith('block/')) {
     return { kind: 'block', component: blueprintValue.slice('block/'.length) }
   }
@@ -72,13 +87,14 @@ export function resolveField(
   if (Array.isArray(v)) {
     const first: unknown = v[0]
     if (isRecord(first)) {
-      if ('fieldGroup' in first) return { kind: 'blocks', allowed: null }
+      if (blockName(first) !== null) return { kind: 'blocks', allowed: null }
       return { kind: 'objects', item: first, fromBlueprint }
     }
     return { kind: 'list' }
   }
   if (isRecord(v)) {
-    if (typeof v.fieldGroup === 'string') return { kind: 'block', component: v.fieldGroup }
+    const component = blockName(v)
+    if (component !== null) return { kind: 'block', component }
     return { kind: 'fields', blueprint: v }
   }
   const s = typeof v === 'string' ? v : ''
@@ -97,9 +113,9 @@ export function pageField(key: string, value: unknown, lists: DataLists): FieldS
 }
 
 export function newBlock(schema: ComponentSchema): Record<string, unknown> {
-  const out: Record<string, unknown> = { fieldGroup: schema.name }
+  const out: Record<string, unknown> = { [blockKey]: schema.name }
   for (const [key, value] of Object.entries(schema.blueprint)) {
-    if (blockMarker(value)) out[key] = []
+    if (blockAllowed(value) !== undefined) out[key] = []
     else if (typeof value === 'string' && value.startsWith('block/')) continue
     else out[key] = structuredClone(value)
   }
@@ -125,7 +141,7 @@ export function summaryOf(obj: Record<string, unknown>): string {
     if (typeof v === 'string' && v.trim()) return v.trim()
   }
   for (const [k, v] of Object.entries(obj)) {
-    if (k === 'fieldGroup') continue
+    if (k === blockKey) continue
     if (typeof v === 'string' && v.trim() && !v.startsWith('/')) return v.trim()
   }
   return ''

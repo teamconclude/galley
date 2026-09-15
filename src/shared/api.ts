@@ -1,5 +1,5 @@
 import type {
-  ComponentSchema,
+  ComponentLibrary,
   DataLists,
   DirEntry,
   GitStatus,
@@ -19,7 +19,7 @@ export interface Api {
     read: (rel: string) => Promise<string>
     write: (rel: string, text: string) => Promise<void>
     pageUrl: (rel: string) => Promise<string | null>
-    components: () => Promise<ComponentSchema[]>
+    components: () => Promise<ComponentLibrary>
     data: () => Promise<DataLists>
     images: () => Promise<string[]>
     importImage: (dir: string) => Promise<string | null>

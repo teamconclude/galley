@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ComponentSchema, DataLists } from '../../../shared/types'
 import { emptyLists, SchemaContext, type Schemas } from '../lib/contexts'
+import { setBlockKey } from '../lib/schema'
 
 interface Props {
   repoPath: string
@@ -17,7 +18,11 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
   useEffect(() => {
     let live = true
     const loadComponents = (): void => {
-      void window.api.repo.components().then((c) => live && setComponents(c))
+      void window.api.repo.components().then((lib) => {
+        if (!live) return
+        setBlockKey(lib.blockKey)
+        setComponents(lib.components)
+      })
     }
     const loadLists = (): void => {
       void window.api.repo.data().then((d) => live && setLists(d))
