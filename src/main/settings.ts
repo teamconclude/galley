@@ -4,6 +4,7 @@ import { join } from 'path'
 
 export interface Settings {
   repoPath?: string
+  declinedMove?: boolean
 }
 
 const file = (): string => join(app.getPath('userData'), 'settings.json')

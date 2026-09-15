@@ -149,7 +149,7 @@ interface CloneProps {
   onCancel: () => void
 }
 
-const defaultUrl = 'git@github.com:teamconclude/Conclude-web.git'
+const defaultUrl = 'https://github.com/teamconclude/Conclude-web.git'
 
 // Clones into <folder>/<repository name>; progress lines stream in from git.
 export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {

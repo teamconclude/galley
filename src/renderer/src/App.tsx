@@ -20,6 +20,7 @@ import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import Splitter from './components/Splitter'
 import Toolbar from './components/Toolbar'
+import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
 import { newPageText } from './lib/newPage'
@@ -463,6 +464,7 @@ export default function App(): React.JSX.Element | null {
             <span className="save-state">
               {file ? (saving ? 'Saving…' : dirty ? 'Unsaved' : 'Saved') : ''}
             </span>
+            <UpdateButton />
             <button
               className={showPreview || detached ? 'on' : ''}
               title={

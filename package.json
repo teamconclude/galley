@@ -1,6 +1,6 @@
 {
   "name": "galley",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Desktop editor for the conclude.io website",
   "main": "./out/main/index.js",
   "author": "Conclude",
@@ -16,9 +16,7 @@
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps && scripts/dev-name",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.0",

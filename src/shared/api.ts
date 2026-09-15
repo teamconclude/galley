@@ -6,7 +6,8 @@ import type {
   HugoStatus,
   Identity,
   MenuCommand,
-  RepoInfo
+  RepoInfo,
+  UpdateStatus
 } from './types'
 
 export type Unsubscribe = () => void
@@ -74,6 +75,12 @@ export interface Api {
   }
   files: {
     pathFor: (file: File) => string
+  }
+  update: {
+    status: () => Promise<UpdateStatus>
+    download: () => Promise<void>
+    install: () => void
+    onStatus: (cb: (status: UpdateStatus) => void) => Unsubscribe
   }
   onMenu: (cb: (command: MenuCommand) => void) => Unsubscribe
   openExternal: (url: string) => void

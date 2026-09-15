@@ -77,5 +77,14 @@ export interface Identity {
   email: string
 }
 
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'ready'; version: string }
+  | { state: 'manual'; version: string; url: string; problem: string }
+  | { state: 'error'; message: string }
+
 export type MenuCommand =
   'save' | 'toggle-preview' | 'toggle-terminal' | 'reload-preview' | 'detach-preview'

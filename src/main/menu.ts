@@ -1,9 +1,10 @@
-import { Menu, MenuItemConstructorOptions } from 'electron'
+import { app, Menu, MenuItemConstructorOptions } from 'electron'
 import type { MenuCommand } from '../shared/types'
 import { isDev } from './env'
 
 interface Actions {
   openRepo: () => void
+  checkUpdates: () => void
   command: (command: MenuCommand) => void
 }
 
@@ -12,7 +13,21 @@ export function buildMenu(actions: Actions): Menu {
     ? [{ type: 'separator' }, { role: 'toggleDevTools' }]
     : []
   const template: MenuItemConstructorOptions[] = [
-    { role: 'appMenu' },
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { label: 'Check for updates…', click: actions.checkUpdates },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
     {
       label: 'File',
       submenu: [

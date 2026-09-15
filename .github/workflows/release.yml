@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Take the version from the tag
+        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish ${{ github.ref_name }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Signing and notarisation switch on when these secrets exist; without them the
+          # build is signed ad hoc by scripts/adhoc-sign.cjs.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          npm run build
+          npx electron-builder --mac --publish always ${{ secrets.CSC_LINK != '' && '--config.mac.notarize=true' || '' }}

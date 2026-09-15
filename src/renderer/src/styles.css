@@ -1338,3 +1338,18 @@ body.dragging .terminal-host {
   overflow: auto;
   min-height: 0;
 }
+
+.titlebar .update {
+  border-color: #d40026;
+  color: #d40026;
+}
+.titlebar .update.primary {
+  background: #d40026;
+  border-color: #d40026;
+  color: #fff;
+}
+.titlebar .update-progress,
+.titlebar .update-error {
+  font-size: 12px;
+  color: var(--text-muted);
+}

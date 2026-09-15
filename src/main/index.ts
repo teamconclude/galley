@@ -13,6 +13,7 @@ import { buildMenu } from './menu'
 import { Repo } from './repo'
 import { loadSettings, saveSettings } from './settings'
 import { ClaudeTerminal } from './terminal'
+import { Updater } from './updater'
 
 let win: BrowserWindow | null = null
 let previewWin: BrowserWindow | null = null
@@ -24,6 +25,7 @@ const send = (channel: string, ...args: unknown[]): void => {
 }
 
 const hugo = new HugoServer((status) => send('hugo:status', status))
+const updater = new Updater((status) => send('update:status', status))
 const terminal = new ClaudeTerminal(
   (data) => send('terminal:data', data),
   (code) => send('terminal:exit', code)
@@ -197,7 +199,19 @@ function registerIpc(): void {
   ipcMain.on('terminal:write', (_e, data: string) => terminal.write(data))
   ipcMain.on('terminal:resize', (_e, cols: number, rows: number) => terminal.resize(cols, rows))
   ipcMain.on('terminal:kill', () => terminal.kill())
+  ipcMain.handle('update:status', () => updater.status)
+  ipcMain.handle('update:download', () => updater.download())
+  ipcMain.on('update:install', () => updater.install())
   ipcMain.on('open-external', (_e, url: string) => void shell.openExternal(url))
+}
+
+// A copy started from Downloads runs from a read-only location the updater cannot replace.
+// Electron's prompt moves it to /Applications and relaunches; a refusal is remembered.
+function offerMoveToApplications(): boolean {
+  if (isDev || app.isInApplicationsFolder() || loadSettings().declinedMove) return false
+  if (app.moveToApplicationsFolder()) return true
+  saveSettings({ ...loadSettings(), declinedMove: true })
+  return false
 }
 
 // Runs the site's own setup script, which downloads Hugo into bin/, then starts it.
@@ -246,6 +260,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(
     buildMenu({
       openRepo: () => void chooseRepo(),
+      checkUpdates: () => void updater.check(true),
       command: (command: MenuCommand) => send('menu', command)
     })
   )
@@ -253,7 +268,9 @@ app.whenReady().then(() => {
   registerRepoProtocol()
   const { repoPath } = loadSettings()
   if (repoPath && Repo.isSite(repoPath)) openRepo(repoPath)
+  if (offerMoveToApplications()) return
   createWindow()
+  updater.start()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -262,6 +279,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => app.quit())
 
 app.on('before-quit', () => {
+  updater.stop()
   hugo.stop()
   git?.stop()
   terminal.kill()

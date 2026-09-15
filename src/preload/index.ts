@@ -71,6 +71,12 @@ const api: Api = {
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)
   },
+  update: {
+    status: () => ipcRenderer.invoke('update:status'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.send('update:install'),
+    onStatus: (cb) => on('update:status', cb)
+  },
   onMenu: (cb) => on('menu', cb),
   openExternal: (url) => ipcRenderer.send('open-external', url)
 }
