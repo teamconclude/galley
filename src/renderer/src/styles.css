@@ -42,9 +42,50 @@
   box-sizing: border-box;
 }
 
-input[type='checkbox'],
 input[type='radio'] {
   accent-color: var(--accent);
+}
+
+/* The accent is light enough that the system draws a black check on it; draw a white one. */
+input[type='checkbox'] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid var(--gray3);
+  border-radius: 3px;
+  background: var(--bg);
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  flex: none;
+}
+
+input[type='checkbox']:checked,
+input[type='checkbox']:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type='checkbox']:checked::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+input[type='checkbox']:indeterminate::before {
+  content: '';
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: white;
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--green2);
+  outline-offset: 1px;
 }
 
 html,
@@ -1253,8 +1294,7 @@ body.dragging .terminal-host {
 }
 
 .change-row input[type='checkbox'] {
-  flex: none;
-  margin: 0 2px 0 0;
+  margin-right: 2px;
 }
 
 .change-row .tree-name {
