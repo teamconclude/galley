@@ -103,6 +103,21 @@ export default function App(): React.JSX.Element | null {
   useEffect(() => {
     void window.api.prefs.get().then(setPrefs)
   }, [])
+
+  // Shifted variants of the text size shortcuts arrive as "+" and "_", which the menu's
+  // accelerators do not match on every keyboard layout. A match in the menu never gets here.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+      const step = ['+', '='].includes(e.key) ? 1 : ['-', '_'].includes(e.key) ? -1 : null
+      if (step === null) return
+      e.preventDefault()
+      e.stopPropagation()
+      window.api.zoom(step)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
   const [branches, setBranches] = useState<string[]>([])
   const [pendingCommit, setPendingCommit] = useState<{ message: string; paths: string[] } | null>(
     null

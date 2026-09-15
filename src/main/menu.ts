@@ -6,6 +6,8 @@ interface Actions {
   openRepo: () => void
   checkUpdates: () => void
   command: (command: MenuCommand) => void
+  // Steps the text size up or down; null returns to the default.
+  zoom: (step: number | null) => void
 }
 
 export function buildMenu(actions: Actions): Menu {
@@ -67,6 +69,12 @@ export function buildMenu(actions: Actions): Menu {
           accelerator: 'CmdOrCtrl+R',
           click: () => actions.command('reload-preview')
         },
+        { type: 'separator' },
+        // macOS matches these by character, with or without shift; the shifted variants
+        // that slip through are caught by the key handler on the window.
+        { label: 'Larger text', accelerator: 'CmdOrCtrl+Plus', click: () => actions.zoom(1) },
+        { label: 'Smaller text', accelerator: 'CmdOrCtrl+-', click: () => actions.zoom(-1) },
+        { label: 'Actual size', accelerator: 'CmdOrCtrl+0', click: () => actions.zoom(null) },
         ...devItems
       ]
     },

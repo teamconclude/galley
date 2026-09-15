@@ -13,6 +13,7 @@ export interface Settings {
   githubSkipped?: boolean
   setupSeen?: string
   prefs?: Partial<Preferences>
+  zoom?: number
 }
 
 const file = (): string => join(app.getPath('userData'), 'settings.json')

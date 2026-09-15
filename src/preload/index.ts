@@ -74,6 +74,7 @@ const api: Api = {
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)
   },
+  zoom: (step) => ipcRenderer.send('zoom', step),
   prefs: {
     get: () => ipcRenderer.invoke('prefs:get'),
     set: (prefs) => ipcRenderer.invoke('prefs:set', prefs)

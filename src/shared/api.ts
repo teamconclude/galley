@@ -84,6 +84,8 @@ export interface Api {
   files: {
     pathFor: (file: File) => string
   }
+  // Text size steps; null returns to the default.
+  zoom: (step: number | null) => void
   prefs: {
     get: () => Promise<Preferences>
     set: (prefs: Preferences) => Promise<void>

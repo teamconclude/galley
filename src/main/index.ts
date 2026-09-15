@@ -129,6 +129,9 @@ function createWindow(): void {
   })
   rememberBounds(win, 'main')
   win.on('ready-to-show', () => win?.show())
+  win.webContents.on('did-finish-load', () => {
+    win?.webContents.setZoomLevel(loadSettings().zoom ?? 0)
+  })
   win.on('closed', () => {
     win = null
     previewWin?.close()
@@ -262,6 +265,7 @@ function registerIpc(): void {
   })
   ipcMain.on('layout:save', (_e, layout: Layout) => saveSettings({ ...loadSettings(), layout }))
   ipcMain.handle('prefs:get', () => prefs())
+  ipcMain.on('zoom', (_e, step: number | null) => zoom(step))
   ipcMain.handle('prefs:set', (_e, p: Preferences) => saveSettings({ ...loadSettings(), prefs: p }))
   ipcMain.handle('setup:status', () => setup.status)
   ipcMain.handle('setup:retry', (_e, step: SetupStepId) => setup.retry(step))
@@ -278,6 +282,14 @@ function registerIpc(): void {
 
 // A copy started from Downloads runs from a read-only location the updater cannot replace.
 // Electron's prompt moves it to /Applications and relaunches; a refusal is remembered.
+// Text size for the whole window, in Chromium zoom levels of 20% each, kept across runs.
+function zoom(step: number | null): void {
+  const current = loadSettings().zoom ?? 0
+  const level = step === null ? 0 : Math.max(-3, Math.min(4, current + step * 0.5))
+  saveSettings({ ...loadSettings(), zoom: level })
+  win?.webContents.setZoomLevel(level)
+}
+
 function offerMoveToApplications(): boolean {
   if (isDev || app.isInApplicationsFolder() || loadSettings().declinedMove) return false
   if (app.moveToApplicationsFolder()) return true
@@ -320,6 +332,7 @@ app.whenReady().then(() => {
     buildMenu({
       openRepo: () => void chooseRepo(),
       checkUpdates: () => void updater.check(true),
+      zoom,
       command: (command: MenuCommand) => send('menu', command)
     })
   )
