@@ -28,7 +28,12 @@ export default function Preview({ status, url, reloadKey, onDetach }: Props): Re
             Separate window
           </button>
         )}
-        {status.state === 'error' && (
+        {status.state === 'error' && status.missing && (
+          <button className="primary" onClick={() => void window.api.hugo.install()}>
+            Install Hugo
+          </button>
+        )}
+        {status.state === 'error' && !status.missing && (
           <button onClick={() => void window.api.hugo.restart()}>Restart Hugo</button>
         )}
       </div>

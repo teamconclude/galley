@@ -16,6 +16,7 @@ export interface HugoStatus {
   state: HugoState
   url?: string
   message?: string
+  missing?: boolean
 }
 
 export interface InputHint {

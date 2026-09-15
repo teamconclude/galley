@@ -20,7 +20,8 @@ You need a Mac with Apple silicon and access to the `teamconclude` organisation 
    Accept, otherwise it cannot update itself later.
 4. Galley uses three tools from your Mac and helps to set them up when they are missing:
    - **git**, which macOS offers to install on first use.
-   - **Hugo**, the site generator, which Galley downloads into the checkout.
+   - **Hugo**, the site generator. Galley uses an installed one, from Homebrew for example,
+     and otherwise offers to download it.
    - **Claude Code**, for the Claude pane. Install it from
      [claude.ai/code](https://claude.ai/code) and sign in once.
 

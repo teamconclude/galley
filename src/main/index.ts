@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron'
-import { spawn } from 'child_process'
 import { basename } from 'path'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -147,7 +146,7 @@ function registerIpc(): void {
   })
   ipcMain.handle('hugo:status', () => hugo.status)
   ipcMain.handle('hugo:restart', () => (repo ? hugo.start(repo.path) : undefined))
-  ipcMain.handle('hugo:install', () => installHugo())
+  ipcMain.handle('hugo:install', () => (repo ? hugo.install(repo.path) : undefined))
   const currentGit = (): Git => {
     if (!git) throw new Error('No repository open')
     return git
@@ -212,25 +211,6 @@ function offerMoveToApplications(): boolean {
   if (app.moveToApplicationsFolder()) return true
   saveSettings({ ...loadSettings(), declinedMove: true })
   return false
-}
-
-// Runs the site's own setup script, which downloads Hugo into bin/, then starts it.
-function installHugo(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const path = repo?.path
-    if (!path) return reject(new Error('No repository open'))
-    const proc = spawn('/bin/sh', ['scripts/setup'], { cwd: path })
-    let output = ''
-    proc.stdout.on('data', (d: Buffer) => (output += d.toString()))
-    proc.stderr.on('data', (d: Buffer) => (output += d.toString()))
-    proc.on('error', reject)
-    proc.on('exit', (code) => {
-      if (code === 0) {
-        void hugo.start(path)
-        resolve()
-      } else reject(new Error(output.trim().split('\n').slice(-3).join('\n') || 'setup failed'))
-    })
-  })
 }
 
 // Serves files from the open checkout, e.g. galley://repo/static/images/logo.png.
