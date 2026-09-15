@@ -10,6 +10,7 @@ import type {
   PublishResult,
   ReleaseStep
 } from '../shared/types'
+import { splitDiff } from '../shared/diff'
 import { publish } from './github'
 import { prefs } from './settings'
 import { findGit, gitEnv } from './tools'
@@ -338,6 +339,22 @@ export class Git {
     return this.op('Discarding…', async () => {
       await this.git(['reset', '-q', '--', path]).catch(() => undefined)
       await this.git(['checkout', 'HEAD', '--', path])
+    })
+  }
+
+  // Applies one hunk of the file's diff in reverse, leaving the other edits in place.
+  revertHunk(path: string, index: number): Promise<void> {
+    return this.op('Reverting…', async () => {
+      const diff = await this.git(['diff', '--no-color', '-U3', 'HEAD', '--', path])
+      const { header, hunks } = splitDiff(diff)
+      if (!hunks[index]) throw new Error('That change is no longer in the file')
+      const patch = join(tmpdir(), `galley-hunk-${process.pid}.patch`)
+      await fs.writeFile(patch, header + hunks[index] + '\n')
+      try {
+        await this.git(['apply', '-R', '--recount', patch])
+      } finally {
+        await fs.unlink(patch).catch(() => undefined)
+      }
     })
   }
 

@@ -398,6 +398,15 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
+  const revertHunk = async (change: Change, index: number): Promise<void> => {
+    if (!window.confirm('Revert this change?')) return
+    await save()
+    await gitAction(() => window.api.git.revertHunk(change.path, index))
+    const text = await window.api.git.diff(change.path).catch(() => '')
+    setDiff(text.trim() === '' ? null : { change, text })
+    if (file?.path === change.path) await reopen(change.path)
+  }
+
   const reopen = async (path: string): Promise<void> => {
     const text = await window.api.repo.read(path).catch(() => null)
     setFile(text === null ? null : { path, text, saved: text })
@@ -655,6 +664,7 @@ export default function App(): React.JSX.Element | null {
                     diff={diff.text}
                     onOpen={() => void open(diff.change.path)}
                     onDiscard={() => void discardChange(diff.change)}
+                    onRevertHunk={(i) => void revertHunk(diff.change, i)}
                   />
                 ) : !file ? (
                   <div className="pane-empty">Choose a page on the left.</div>

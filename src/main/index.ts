@@ -226,6 +226,9 @@ function registerIpc(): void {
     else await currentGit().discard(rel)
     currentGit().scheduleRefresh()
   })
+  ipcMain.handle('git:revertHunk', (_e, rel: string, index: number) =>
+    currentGit().revertHunk(rel, index)
+  )
   ipcMain.handle('git:diff', async (_e, rel: string) => {
     const status = await currentGit().status()
     const change = status.changes.find((c) => c.path === rel)

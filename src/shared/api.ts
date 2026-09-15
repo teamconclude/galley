@@ -59,6 +59,7 @@ export interface Api {
     publish: (from: string, to: string) => Promise<PublishResult>
     discard: (path: string, untracked: boolean) => Promise<void>
     diff: (path: string) => Promise<string>
+    revertHunk: (path: string, index: number) => Promise<void>
     identity: () => Promise<Identity | null>
     setIdentity: (identity: Identity) => Promise<void>
     clone: (url: string, dest: string) => Promise<void>

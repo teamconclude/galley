@@ -1351,13 +1351,44 @@ body.dragging .terminal-host {
 }
 
 .diff-line.hunk {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   color: var(--accent);
   background: #f0f6ff;
-  margin-top: 6px;
 }
 
-.diff-line.meta {
+.diff-hunk + .diff-hunk {
+  margin-top: 8px;
+}
+
+.diff-line.hunk button {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  line-height: 0;
   color: var(--text-muted);
+}
+
+.diff-line.hunk button:hover {
+  color: var(--danger);
+}
+
+.diff-line.note {
+  color: var(--text-muted);
+}
+
+.diff-word {
+  border-radius: 2px;
+  color: inherit;
+}
+
+.diff-line.add .diff-word {
+  background: #abf2bc;
+}
+
+.diff-line.del .diff-word {
+  background: #ffb3ad;
 }
 
 .welcome-buttons {

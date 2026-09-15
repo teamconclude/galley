@@ -49,6 +49,7 @@ const api: Api = {
     publish: (from, to) => ipcRenderer.invoke('git:publish', from, to),
     discard: (path, untracked) => ipcRenderer.invoke('git:discard', path, untracked),
     diff: (path) => ipcRenderer.invoke('git:diff', path),
+    revertHunk: (path, index) => ipcRenderer.invoke('git:revertHunk', path, index),
     identity: () => ipcRenderer.invoke('git:identity'),
     setIdentity: (identity) => ipcRenderer.invoke('git:setIdentity', identity),
     clone: (url, dest) => ipcRenderer.invoke('git:clone', url, dest),
