@@ -126,7 +126,15 @@ export class HugoServer {
       return
     }
     this.set({ state: 'starting' })
-    const proc = spawn(bin, ['server', '-D'], { cwd: repo })
+    // The server serves files found in its publish directory in preference to its own
+    // render, so a `hugo` build into public/ by another tool would hijack the preview.
+    // Pointing the server at an empty directory of Galley's own keeps the preview on what
+    // this process renders. Hugo rejects --destination with --renderToMemory, hence the
+    // environment variable.
+    const proc = spawn(bin, ['server', '-D', '--renderToMemory'], {
+      cwd: repo,
+      env: { ...process.env, HUGO_PUBLISHDIR: join(app.getPath('temp'), 'galley-preview') }
+    })
     this.proc = proc
     let output = ''
     const onOutput = (chunk: Buffer): void => {
