@@ -1,18 +1,50 @@
 :root {
+  /* The Conclude palette, as in the site's _variables.scss and the app's theme.tsx. */
+  --gray7: #101010;
+  --gray6: #3e3e3e;
+  --gray5: #777777;
+  --gray4: #a0a0a0;
+  --gray3: #d3d3d3;
+  --gray2: #eeeeee;
+  --gray1: #f8f8f8;
+  --green5: #0d6a5d;
+  --green4: #3bbfad;
+  --green3: #76d2c6;
+  --green2: #b1e5de;
+  --green1: #edfcfa;
+  --red5: #7a0014;
+  --red3: #fa002d;
+  --red2: #fc8ca0;
+  --red1: #fff7f7;
+  --yellow5: #7a5200;
+  --yellow3: #ecb22e;
+  --yellow1: #fffbf1;
+  --blue3: #4e5fbf;
+  --blue1: #f3f6ff;
+
   --bg: #ffffff;
-  --bg-muted: #f5f5f7;
-  --border: #e3e3e6;
-  --text: #1d1d1f;
-  --text-muted: #6e6e73;
-  --accent: #2563eb;
-  --accent-soft: #e8f0fe;
-  --danger: #c62828;
+  --bg-muted: var(--gray1);
+  --border: var(--gray2);
+  /* Unlike the site, the editor's small type is black, easing to gray7 on hover. */
+  --text: #000000;
+  --text-hover: var(--gray7);
+  --text-muted: var(--gray5);
+  --accent: var(--green4);
+  /* The accent is too light to read as text; green5 is its readable counterpart. */
+  --accent-text: var(--green5);
+  --accent-soft: var(--green2);
+  --danger: var(--red3);
   --font: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --mono: Menlo, Monaco, 'SF Mono', monospace;
 }
 
 * {
   box-sizing: border-box;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
 }
 
 html,
@@ -58,7 +90,7 @@ button:hover {
 button.on {
   background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 button.primary {
@@ -168,7 +200,7 @@ button.primary {
 .tree-actions button:hover,
 .tree-actions button.on {
   background: rgba(0, 0, 0, 0.07);
-  color: var(--text);
+  color: var(--text-hover);
 }
 
 .tree-item {
@@ -185,12 +217,12 @@ button.primary {
 }
 
 .tree-item:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-hover);
 }
 
 .tree-item.selected {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--gray2);
 }
 
 .tree-guide {
@@ -341,11 +373,11 @@ body.dragging .terminal-host {
 }
 
 .dot.running {
-  background: #2e9e4f;
+  background: var(--green4);
 }
 
 .dot.starting {
-  background: #e0a400;
+  background: var(--yellow3);
 }
 
 .dot.error {
@@ -465,7 +497,7 @@ body.dragging .terminal-host {
 .editor .cm-gutters {
   background: var(--bg);
   border-right: none;
-  color: #c0c0c4;
+  color: var(--gray4);
 }
 
 .image-view {
@@ -622,7 +654,7 @@ body.dragging .terminal-host {
 }
 
 .block-card.open {
-  border-color: #c9c9ce;
+  border-color: var(--gray3);
 }
 
 .block-head {
@@ -681,7 +713,7 @@ body.dragging .terminal-host {
 
 .block-body {
   padding: 10px;
-  background: #fafafa;
+  background: var(--gray1);
   border-radius: 0 0 8px 8px;
 }
 
@@ -696,7 +728,7 @@ body.dragging .terminal-host {
   border-radius: 6px;
   padding: 3px 8px;
   background: var(--bg);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .choice-list {
@@ -902,7 +934,7 @@ body.dragging .terminal-host {
 .switch-track {
   position: absolute;
   inset: 0;
-  background: #d1d1d6;
+  background: var(--gray3);
   border-radius: 10px;
   transition: background 0.15s;
 }
@@ -921,7 +953,7 @@ body.dragging .terminal-host {
 }
 
 .switch input:checked + .switch-track {
-  background: #34c759;
+  background: var(--green4);
 }
 
 .switch input:checked + .switch-track::before {
@@ -1153,7 +1185,7 @@ body.dragging .terminal-host {
 }
 
 .sync-row.warn {
-  color: #8a5a00;
+  color: var(--yellow5);
 }
 
 .sync-row.error {
@@ -1180,7 +1212,7 @@ body.dragging .terminal-host {
   border: none;
   background: transparent;
   padding: 0 4px;
-  color: var(--accent);
+  color: var(--accent-text);
   text-transform: none;
   letter-spacing: 0;
   font-weight: 400;
@@ -1206,7 +1238,7 @@ body.dragging .terminal-host {
 }
 
 .change-row.selected {
-  background: var(--accent-soft);
+  background: var(--gray2);
 }
 
 .change-mark {
@@ -1219,12 +1251,12 @@ body.dragging .terminal-host {
 }
 
 .change-mark.modified {
-  color: #b7791f;
+  color: var(--yellow5);
 }
 
 .change-mark.added,
 .change-mark.untracked {
-  color: #2e9e4f;
+  color: var(--green5);
 }
 
 .change-mark.deleted,
@@ -1341,21 +1373,21 @@ body.dragging .terminal-host {
 }
 
 .diff-line.add {
-  background: #e6ffed;
-  color: #116329;
+  background: var(--green1);
+  color: var(--green5);
 }
 
 .diff-line.del {
-  background: #ffebe9;
-  color: #82071e;
+  background: var(--red1);
+  color: var(--red5);
 }
 
 .diff-line.hunk {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: var(--accent);
-  background: #f0f6ff;
+  color: var(--blue3);
+  background: var(--blue1);
 }
 
 .diff-hunk + .diff-hunk {
@@ -1384,11 +1416,11 @@ body.dragging .terminal-host {
 }
 
 .diff-line.add .diff-word {
-  background: #abf2bc;
+  background: var(--green2);
 }
 
 .diff-line.del .diff-word {
-  background: #ffb3ad;
+  background: var(--red2);
 }
 
 .welcome-buttons {
@@ -1448,12 +1480,12 @@ body.dragging .terminal-host {
 }
 
 .titlebar .update {
-  border-color: #d40026;
-  color: #d40026;
+  border-color: var(--red3);
+  color: var(--red3);
 }
 .titlebar .update.primary {
-  background: #d40026;
-  border-color: #d40026;
+  background: var(--red3);
+  border-color: var(--red3);
   color: #fff;
 }
 .titlebar .update-progress,
@@ -1488,11 +1520,11 @@ body.dragging .terminal-host {
 }
 
 .setup-icon.done {
-  color: #1a9a4a;
+  color: var(--green4);
 }
 
 .setup-icon.failed {
-  color: #d40026;
+  color: var(--red3);
 }
 
 .setup-icon.running {
