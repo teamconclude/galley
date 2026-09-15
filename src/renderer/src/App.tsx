@@ -704,6 +704,7 @@ export default function App(): React.JSX.Element | null {
                           }
                           onSave={() => void save()}
                           importImages={isMarkdown ? importImages : undefined}
+                          prose={isMarkdown}
                         />
                       </>
                     )}

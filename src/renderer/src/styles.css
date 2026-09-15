@@ -500,6 +500,30 @@ body.dragging .terminal-host {
   color: var(--gray4);
 }
 
+.editor.prose .cm-scroller {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.editor.prose .cm-content {
+  padding: 16px 0;
+}
+
+.editor.prose .cm-line {
+  padding: 0 20px;
+}
+
+.editor.prose .cm-gutters {
+  display: none;
+}
+
+.editor.prose .cm-code-line {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--gray1);
+}
+
 .image-view {
   flex: 1;
   display: flex;

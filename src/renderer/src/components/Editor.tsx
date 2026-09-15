@@ -7,6 +7,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { yaml } from '@codemirror/lang-yaml'
 import { basicSetup } from 'codemirror'
 import { clearActiveEditor, editorChanged, setActiveEditor } from '../lib/activeEditor'
+import { markdownStyle } from '../lib/markdownStyle'
 
 interface Props {
   filename: string
@@ -15,6 +16,8 @@ interface Props {
   onSave?: () => void
   // Copies dropped images into the site and returns their URL paths.
   importImages?: (files: File[]) => Promise<string[]>
+  // A writing surface: proportional type, no line numbers.
+  prose?: boolean
 }
 
 const markdownFile = /\.(md|markdown)$/i
@@ -22,7 +25,7 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 // Remount (change the React key) to open a different file.
 export default function Editor(props: Props): React.JSX.Element {
-  const { filename, value, onChange, onSave, importImages } = props
+  const { filename, value, onChange, onSave, importImages, prose } = props
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
@@ -56,7 +59,7 @@ export default function Editor(props: Props): React.JSX.Element {
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString())
           }),
-          isMarkdown ? trackFocus() : [],
+          isMarkdown ? [trackFocus(), markdownStyle] : [],
           importImages ? dropImages(importImagesRef) : []
         ]
       }),
@@ -81,7 +84,7 @@ export default function Editor(props: Props): React.JSX.Element {
     }
   }, [value])
 
-  return <div className="editor" ref={host} />
+  return <div className={prose ? 'editor prose' : 'editor'} ref={host} />
 }
 
 // Focus moving to the toolbar keeps the editor active so its buttons can act on it.
