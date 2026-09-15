@@ -47,20 +47,21 @@ export default function FileTree(props: Props): React.JSX.Element {
       <div className="tree-root">
         <span className="tree-title">{name}</span>
         <span className="tree-actions">
-          <button title="New page" onClick={onNewPage}>
+          <button data-tip="New page" aria-label="New page" onClick={onNewPage}>
             <FilePlus size={16} />
           </button>
-          <button title="New folder" onClick={onNewFolder}>
+          <button data-tip="New folder" aria-label="New folder" onClick={onNewFolder}>
             <FolderPlus size={16} />
           </button>
-          <button title="Refresh" onClick={onRefresh}>
+          <button data-tip="Refresh" aria-label="Refresh" onClick={onRefresh}>
             <RefreshCw size={16} />
           </button>
-          <button title="Collapse all" onClick={onCollapseAll}>
+          <button data-tip="Collapse all" aria-label="Collapse all" onClick={onCollapseAll}>
             <ChevronsDownUp size={16} />
           </button>
           <button
-            title={showAll ? 'Show content files only' : 'Show all files'}
+            data-tip={showAll ? 'Show content files only' : 'Show all files'}
+            aria-label={showAll ? 'Show content files only' : 'Show all files'}
             className={showAll ? 'on' : ''}
             onClick={onToggleShowAll}
           >
