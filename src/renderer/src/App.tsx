@@ -19,6 +19,7 @@ import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import Splitter from './components/Splitter'
+import { loadLayout, saveLayout } from './lib/layout'
 import Toolbar from './components/Toolbar'
 import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
@@ -56,20 +57,21 @@ export default function App(): React.JSX.Element | null {
   const [saving, setSaving] = useState(false)
   const [treeVersion, setTreeVersion] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
-  const [showPreview, setShowPreview] = useState(true)
-  const [detached, setDetached] = useState(false)
+  const [layout] = useState(loadLayout)
+  const [showPreview, setShowPreview] = useState(layout.showPreview)
+  const [detached, setDetached] = useState(layout.detached)
   const [pagePath, setPagePath] = useState('/')
-  const [showClaude, setShowClaude] = useState(true)
-  const [sidebarWidth, setSidebarWidth] = useState(240)
-  const [previewWidth, setPreviewWidth] = useState(600)
-  const [claudeHeight, setClaudeHeight] = useState(300)
+  const [showClaude, setShowClaude] = useState(layout.showClaude)
+  const [sidebarWidth, setSidebarWidth] = useState(layout.sidebarWidth)
+  const [previewWidth, setPreviewWidth] = useState(layout.previewWidth)
+  const [claudeHeight, setClaudeHeight] = useState(layout.claudeHeight)
   const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null)
   const [identity, setIdentity] = useState<Identity | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>('files')
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>(layout.sidebarTab)
   const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
   const [gitDialog, setGitDialog] = useState<'new-branch' | 'switch-branch' | 'identity' | null>(
     null
@@ -390,6 +392,23 @@ export default function App(): React.JSX.Element | null {
 
   const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + pagePath : null
 
+  useEffect(() => {
+    saveLayout({
+      showPreview,
+      showClaude,
+      detached,
+      sidebarWidth,
+      previewWidth,
+      claudeHeight,
+      sidebarTab
+    })
+  }, [showPreview, showClaude, detached, sidebarWidth, previewWidth, claudeHeight, sidebarTab])
+
+  // A preview that was in its own window when Galley closed reopens there.
+  useEffect(() => {
+    if (detached && previewUrl) window.api.preview.detach(previewUrl)
+  }, [detached, previewUrl])
+
   const toggleDetached = useCallback(() => {
     if (detached) {
       window.api.preview.attach()
@@ -400,10 +419,6 @@ export default function App(): React.JSX.Element | null {
   }, [detached, previewUrl])
 
   useEffect(() => window.api.preview.onClosed(() => setDetached(false)), [])
-
-  useEffect(() => {
-    if (detached && previewUrl) window.api.preview.navigate(previewUrl)
-  }, [detached, previewUrl])
 
   useEffect(() => {
     if (detached && reloadKey) window.api.preview.reload()

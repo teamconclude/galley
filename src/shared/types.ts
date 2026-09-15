@@ -78,6 +78,17 @@ export interface Identity {
   email: string
 }
 
+// Pane visibility and divider positions, kept across restarts.
+export interface Layout {
+  showPreview: boolean
+  showClaude: boolean
+  detached: boolean
+  sidebarWidth: number
+  previewWidth: number
+  claudeHeight: number
+  sidebarTab: 'files' | 'changes'
+}
+
 export type UpdateStatus =
   | { state: 'idle' }
   | { state: 'checking' }

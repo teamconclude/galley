@@ -1,10 +1,21 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  net,
+  protocol,
+  Rectangle,
+  screen,
+  shell
+} from 'electron'
 import { basename } from 'path'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import type { Identity, MenuCommand } from '../shared/types'
+import type { Identity, Layout, MenuCommand } from '../shared/types'
 import { isDev } from './env'
 import { clone, Git } from './git'
 import { HugoServer } from './hugo'
@@ -42,7 +53,7 @@ function openRepo(path: string): void {
   git = new Git(path, (status) => send('git:status', status))
   git.start()
   saveSettings({ ...loadSettings(), repoPath: path })
-  void hugo.start(path)
+  void hugo.start(path).then(() => hugo.refresh())
   send('repo:opened')
 }
 
@@ -62,10 +73,40 @@ async function chooseRepo(): Promise<boolean> {
   return true
 }
 
+// Saved bounds are used only when they still fall on a connected display.
+function savedBounds(name: 'main' | 'preview'): Partial<Rectangle> {
+  const bounds = loadSettings().windows?.[name]
+  if (!bounds) return {}
+  const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+  const onScreen = screen.getAllDisplays().some(({ workArea: a }) => {
+    return (
+      center.x >= a.x && center.x < a.x + a.width && center.y >= a.y && center.y < a.y + a.height
+    )
+  })
+  return onScreen ? bounds : {}
+}
+
+function rememberBounds(window: BrowserWindow, name: 'main' | 'preview'): void {
+  let timer: NodeJS.Timeout | null = null
+  const save = (): void => {
+    if (window.isDestroyed() || window.isMinimized()) return
+    const settings = loadSettings()
+    saveSettings({ ...settings, windows: { ...settings.windows, [name]: window.getBounds() } })
+  }
+  const later = (): void => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(save, 500)
+  }
+  window.on('resize', later)
+  window.on('move', later)
+  window.on('close', save)
+}
+
 function createWindow(): void {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    ...savedBounds('main'),
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -77,6 +118,7 @@ function createWindow(): void {
       webviewTag: true
     }
   })
+  rememberBounds(win, 'main')
   win.on('ready-to-show', () => win?.show())
   win.on('closed', () => {
     win = null
@@ -95,11 +137,16 @@ function createWindow(): void {
 
 function detachPreview(url: string): void {
   if (previewWin) {
-    void previewWin.loadURL(url)
-    previewWin.focus()
+    if (previewWin.webContents.getURL() !== url) void previewWin.loadURL(url)
     return
   }
-  previewWin = new BrowserWindow({ width: 1100, height: 850, title: 'Preview' })
+  previewWin = new BrowserWindow({
+    width: 1100,
+    height: 850,
+    ...savedBounds('preview'),
+    title: 'Preview'
+  })
+  rememberBounds(previewWin, 'preview')
   previewWin.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
@@ -187,9 +234,6 @@ function registerIpc(): void {
     openRepo(dest)
   })
   ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
-  ipcMain.on('preview:navigate', (_e, url: string) => {
-    if (previewWin && previewWin.webContents.getURL() !== url) void previewWin.loadURL(url)
-  })
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
   ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
@@ -198,6 +242,10 @@ function registerIpc(): void {
   ipcMain.on('terminal:write', (_e, data: string) => terminal.write(data))
   ipcMain.on('terminal:resize', (_e, cols: number, rows: number) => terminal.resize(cols, rows))
   ipcMain.on('terminal:kill', () => terminal.kill())
+  ipcMain.on('layout:get', (e) => {
+    e.returnValue = loadSettings().layout ?? {}
+  })
+  ipcMain.on('layout:save', (_e, layout: Layout) => saveSettings({ ...loadSettings(), layout }))
   ipcMain.handle('update:status', () => updater.status)
   ipcMain.handle('update:download', () => updater.download())
   ipcMain.on('update:install', () => updater.install())

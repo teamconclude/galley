@@ -5,6 +5,7 @@ import type {
   GitStatus,
   HugoStatus,
   Identity,
+  Layout,
   MenuCommand,
   RepoInfo,
   UpdateStatus
@@ -60,7 +61,6 @@ export interface Api {
   }
   preview: {
     detach: (url: string) => void
-    navigate: (url: string) => void
     reload: () => void
     attach: () => void
     onClosed: (cb: () => void) => Unsubscribe
@@ -75,6 +75,10 @@ export interface Api {
   }
   files: {
     pathFor: (file: File) => string
+  }
+  layout: {
+    initial: Partial<Layout>
+    save: (layout: Layout) => void
   }
   update: {
     status: () => Promise<UpdateStatus>

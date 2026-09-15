@@ -55,7 +55,6 @@ const api: Api = {
   },
   preview: {
     detach: (url) => ipcRenderer.send('preview:detach', url),
-    navigate: (url) => ipcRenderer.send('preview:navigate', url),
     reload: () => ipcRenderer.send('preview:reload'),
     attach: () => ipcRenderer.send('preview:attach'),
     onClosed: (cb) => on('preview:closed', cb)
@@ -70,6 +69,10 @@ const api: Api = {
   },
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)
+  },
+  layout: {
+    initial: ipcRenderer.sendSync('layout:get'),
+    save: (layout) => ipcRenderer.send('layout:save', layout)
   },
   update: {
     status: () => ipcRenderer.invoke('update:status'),

@@ -3,12 +3,28 @@ import { ChildProcess, execFile, spawn } from 'child_process'
 import { existsSync, promises as fs } from 'fs'
 import { join } from 'path'
 import type { HugoStatus } from '../shared/types'
+import { loadSettings, saveSettings } from './settings'
 import { resolveCommand } from './shell'
+import { isNewer } from './updater'
 
-// Pinned so every editor previews with the same Hugo; CI builds with the latest release.
-const hugoVersion = '0.165.0'
+const week = 7 * 24 * 60 * 60 * 1000
 
-const ownHugo = (): string => join(app.getPath('userData'), 'hugo', hugoVersion, 'hugo')
+const ownDir = (): string => join(app.getPath('userData'), 'hugo')
+const ownBinary = (version: string): string => join(ownDir(), version, 'hugo')
+
+interface Own {
+  version: string
+  path: string
+}
+
+// The newest Hugo that Galley downloaded itself, if any.
+async function ownHugo(): Promise<Own | null> {
+  const versions = await fs.readdir(ownDir()).catch(() => [] as string[])
+  const usable = versions.filter((v) => existsSync(ownBinary(v)))
+  if (usable.length === 0) return null
+  const version = usable.reduce((best, v) => (isNewer(v, best) ? v : best))
+  return { version, path: ownBinary(version) }
+}
 
 // The checkout's own binary first, then whatever the login shell has (Homebrew), then the
 // copy Galley downloaded.
@@ -17,11 +33,28 @@ export async function findHugo(repo: string): Promise<string | null> {
   if (existsSync(local)) return local
   const onPath = await resolveCommand('hugo')
   if (onPath) return onPath
-  return existsSync(ownHugo()) ? ownHugo() : null
+  return (await ownHugo())?.path ?? null
+}
+
+// CI builds the site with the latest Hugo, so Galley previews with the same.
+async function latestHugo(): Promise<string> {
+  const res = await net.fetch('https://api.github.com/repos/gohugoio/hugo/releases/latest', {
+    cache: 'no-store'
+  })
+  if (!res.ok) throw new Error(`Could not look up the latest Hugo: ${res.status}`)
+  const json: unknown = await res.json()
+  const tag =
+    typeof json === 'object' && json !== null ? (json as { tag_name?: unknown }).tag_name : null
+  if (typeof tag !== 'string') throw new Error('Unexpected answer when looking up Hugo')
+  saveSettings({ ...loadSettings(), hugoChecked: Date.now() })
+  return tag.replace(/^v/, '')
 }
 
 // Hugo ships macOS builds only as a .pkg; pkgutil unpacks it without installing.
-async function downloadHugo(progress: (percent: number) => void): Promise<string> {
+async function downloadHugo(
+  hugoVersion: string,
+  progress: (percent: number) => void
+): Promise<string> {
   const asset = `hugo_extended_${hugoVersion}_darwin-universal.pkg`
   const url = `https://github.com/gohugoio/hugo/releases/download/v${hugoVersion}/${asset}`
   const tmp = await fs.mkdtemp(join(app.getPath('temp'), 'galley-hugo-'))
@@ -45,10 +78,13 @@ async function downloadHugo(progress: (percent: number) => void): Promise<string
     const found = await run('find', [join(tmp, 'pkg'), '-type', 'f', '-name', 'hugo'])
     const bin = found.trim().split('\n')[0]
     if (!bin) throw new Error('The Hugo package holds no hugo binary')
-    const dest = ownHugo()
+    const dest = ownBinary(hugoVersion)
     await fs.mkdir(join(dest, '..'), { recursive: true })
     await fs.copyFile(bin, dest)
     await fs.chmod(dest, 0o755)
+    for (const old of await fs.readdir(ownDir())) {
+      if (old !== hugoVersion) await fs.rm(join(ownDir(), old), { recursive: true, force: true })
+    }
     return dest
   } finally {
     await fs.rm(tmp, { recursive: true, force: true })
@@ -66,13 +102,17 @@ function run(cmd: string, args: string[]): Promise<string> {
 
 export class HugoServer {
   private proc: ChildProcess | null = null
+  private bin: string | null = null
+  private repo: string | null = null
   status: HugoStatus = { state: 'stopped' }
 
   constructor(private onStatus: (status: HugoStatus) => void) {}
 
   async start(repo: string): Promise<void> {
     this.stop()
+    this.repo = repo
     const bin = await findHugo(repo)
+    this.bin = bin
     if (!bin) {
       this.set({ state: 'error', message: 'Hugo is not installed.', missing: true })
       return
@@ -105,20 +145,34 @@ export class HugoServer {
 
   async install(repo: string): Promise<void> {
     this.stop()
-    this.set({ state: 'starting', message: `Downloading Hugo ${hugoVersion}…` })
+    this.set({ state: 'starting', message: 'Looking up the latest Hugo…' })
     try {
-      await downloadHugo((percent) =>
-        this.set({ state: 'starting', message: `Downloading Hugo ${hugoVersion}… ${percent}%` })
+      const version = await latestHugo()
+      await downloadHugo(version, (percent) =>
+        this.set({ state: 'starting', message: `Downloading Hugo ${version}… ${percent}%` })
       )
     } catch (err) {
-      this.set({
-        state: 'error',
-        message: err instanceof Error ? err.message : String(err),
-        missing: true
-      })
+      const message = err instanceof Error ? err.message : String(err)
+      this.set({ state: 'error', message, missing: true })
       return
     }
     await this.start(repo)
+  }
+
+  // Once a week, when the preview runs on Galley's own download, fetch a newer Hugo and
+  // restart on it. Other installations are left to whoever manages them.
+  async refresh(): Promise<void> {
+    const own = await ownHugo()
+    if (!own || this.bin !== own.path || !this.repo) return
+    if (Date.now() - (loadSettings().hugoChecked ?? 0) < week) return
+    try {
+      const latest = await latestHugo()
+      if (!isNewer(latest, own.version)) return
+      await downloadHugo(latest, () => {})
+      await this.start(this.repo)
+    } catch {
+      // Offline or GitHub unavailable; the installed copy keeps working.
+    }
   }
 
   stop(): void {
