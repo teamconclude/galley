@@ -11,14 +11,17 @@ the git steps needed to get a change reviewed.
 
 You need a Mac with Apple silicon and access to the `teamconclude` organisation on GitHub.
 
-1. Download the `.dmg` from the [latest release](https://github.com/teamconclude/galley/releases/latest),
-   open it, and drag Galley to Applications.
-2. The first start is blocked, because the app is not yet signed with an Apple developer
-   certificate. Close the warning, open System Settings › Privacy & Security, scroll down and
-   click **Open Anyway**. This is needed once.
-3. If Galley was started from another folder it offers to move itself to Applications.
-   Accept, otherwise it cannot update itself later.
-4. On first start Galley shows what it is setting up. It downloads what the Mac lacks and
+1. Open **Terminal**: press ⌘ Space, type `Terminal`, press Return.
+2. Paste this line and press Return:
+
+   ```sh
+   curl -fsSL https://github.com/teamconclude/galley/releases/latest/download/install.sh | sh
+   ```
+
+   It downloads the latest Galley into Applications and opens it. Run the same line again
+   any time to update by hand; Galley also updates itself.
+
+3. On first start Galley shows what it is setting up. It downloads what the Mac lacks and
    asks for the two things only you can do:
    - **git** and **Hugo**, the site generator, are used from the Mac when installed, from
      Homebrew for example, and otherwise downloaded into Galley's own folder. Galley's own
@@ -32,8 +35,12 @@ You need a Mac with Apple silicon and access to the `teamconclude` organisation 
 
    The Setup entry in the Galley menu shows this list again at any time.
 
-Galley checks for new releases when it starts and offers them in the title bar. **Update**
-downloads the release, **Restart to update** installs it.
+If you prefer to install by hand, download the `.dmg` from the
+[latest release](https://github.com/teamconclude/galley/releases/latest) and drag Galley to
+Applications. Because the app is not yet signed with an Apple developer certificate, macOS
+blocks the first start: close the warning, open System Settings › Privacy & Security, scroll
+down and click **Open Anyway**. The Terminal line above avoids this, since macOS only checks
+files that a browser downloaded.
 
 ## Using Galley
 
