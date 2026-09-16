@@ -131,14 +131,16 @@ export function SwitchBranchDialog(props: SwitchBranchProps): React.JSX.Element 
 }
 
 interface IdentityProps {
+  // What to suggest, e.g. the GitHub profile.
+  initial?: Partial<Identity>
   onSubmit: (identity: Identity) => void
   onCancel: () => void
 }
 
-export function IdentityDialog({ onSubmit, onCancel }: IdentityProps): React.JSX.Element {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const valid = name.trim() !== '' && /^[^@\s]+@[^@\s]+$/.test(email.trim())
+export function IdentityDialog({ initial, onSubmit, onCancel }: IdentityProps): React.JSX.Element {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [email, setEmail] = useState(initial?.email ?? '')
+  const valid = name.trim() !== '' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())
   return (
     <Frame
       title="Who is committing?"

@@ -401,6 +401,19 @@ export default function App(): React.JSX.Element | null {
     return window.api.git.onStatus(setGitStatus)
   }, [repoPath])
 
+  // Without a commit identity, the checkout asks for one on opening, once setup is not
+  // busy: signing in to GitHub during setup provides it by itself.
+  const setupBusy = setup?.steps.some((s) => ['running', 'action'].includes(s.state)) ?? true
+  const identityChecked = useRef<string | null>(null)
+  useEffect(() => {
+    if (!repoPath || setupBusy || identityChecked.current === repoPath) return
+    identityChecked.current = repoPath
+    void window.api.git.identity().then((found) => {
+      if (found) setIdentity(found)
+      else setGitDialog((d) => d ?? 'identity')
+    })
+  }, [repoPath, setupBusy])
+
   const gitAction = async (fn: () => Promise<void>): Promise<void> => {
     try {
       await fn()
@@ -1000,6 +1013,7 @@ export default function App(): React.JSX.Element | null {
         )}
         {gitDialog === 'identity' && (
           <IdentityDialog
+            initial={setup?.user && { name: setup.user.name ?? '', email: setup.user.email ?? '' }}
             onCancel={() => {
               setGitDialog(null)
               setPendingCommit(null)

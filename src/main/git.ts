@@ -377,10 +377,11 @@ export class Git {
     return this.git(['diff', '--no-color', '-U3', 'HEAD', '--', path])
   }
 
+  // Null unless both a name and something shaped like an email address are configured.
   async identity(): Promise<Identity | null> {
     const name = (await this.git(['config', 'user.name']).catch(() => '')).trim()
     const email = (await this.git(['config', 'user.email']).catch(() => '')).trim()
-    return name && email ? { name, email } : null
+    return name && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? { name, email } : null
   }
 
   async setIdentity({ name, email }: Identity): Promise<void> {
