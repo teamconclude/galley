@@ -758,12 +758,17 @@ body.dragging .terminal-host {
 .terminal-host {
   flex: 1;
   min-height: 0;
-  background: #1e1e1e;
+  background: var(--bg);
   padding: 4px 0 0 6px;
 }
 
 .terminal-host .xterm {
   height: 100%;
+}
+
+/* xterm's stylesheet paints the scroll area black regardless of the theme. */
+.terminal-host .xterm-viewport {
+  background-color: var(--bg) !important;
 }
 
 .terminal-exited {

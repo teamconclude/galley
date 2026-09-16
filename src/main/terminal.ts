@@ -19,6 +19,8 @@ export class ClaudeTerminal {
     }
     env.TERM = 'xterm-256color'
     env.COLORTERM = 'truecolor'
+    // The pane is white on white; Claude Code reads this to pick its light theme.
+    env.COLORFGBG = '0;15'
     env.LANG ||= 'en_US.UTF-8'
     Object.assign(env, await gitEnv())
     const git = await findGit()
