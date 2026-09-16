@@ -135,6 +135,11 @@ export interface ReplaceResult {
   matches: number
 }
 
+// Where the preview should scroll to: a top-level content block, or the element whose
+// text starts with a snippet of the body.
+export type PreviewTarget =
+  { kind: 'block'; index: number } | { kind: 'text'; snippet: string; heading: boolean }
+
 export interface SearchResults {
   files: SearchFile[]
   total: number

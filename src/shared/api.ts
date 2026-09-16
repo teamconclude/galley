@@ -8,6 +8,7 @@ import type {
   Layout,
   MenuCommand,
   Preferences,
+  PreviewTarget,
   PublishResult,
   RepoInfo,
   ReplaceResult,
@@ -76,8 +77,8 @@ export interface Api {
     detach: (url: string) => void
     reload: () => void
     attach: () => void
-    // Scrolls a detached preview to a content block.
-    showBlock: (index: number) => void
+    // Scrolls a detached preview to a block or a piece of text.
+    show: (target: PreviewTarget) => void
     onClosed: (cb: () => void) => Unsubscribe
   }
   terminal: {

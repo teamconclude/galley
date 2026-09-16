@@ -20,6 +20,7 @@ import type {
   Layout,
   MenuCommand,
   Preferences,
+  PreviewTarget,
   SearchOptions,
   SetupStepId
 } from '../shared/types'
@@ -29,7 +30,7 @@ import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
 import { replace, search } from './search'
-import { showBlockScript } from '../shared/previewScript'
+import { previewScript } from '../shared/previewScript'
 import { loadSettings, prefs, saveSettings } from './settings'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
@@ -37,6 +38,8 @@ import { Updater } from './updater'
 
 let win: BrowserWindow | null = null
 let previewWin: BrowserWindow | null = null
+// Where the detached preview should scroll to, until its page has found it.
+let previewTarget: PreviewTarget | null = null
 let repo: Repo | null = null
 let git: Git | null = null
 
@@ -156,6 +159,17 @@ function createWindow(): void {
   }
 }
 
+function showInDetached(): void {
+  const target = previewTarget
+  if (!target || !previewWin) return
+  void previewWin.webContents
+    .executeJavaScript(previewScript(target))
+    .then((found) => {
+      if (found === true && previewTarget === target) previewTarget = null
+    })
+    .catch(() => {})
+}
+
 function detachPreview(url: string): void {
   if (previewWin) {
     if (previewWin.webContents.getURL() !== url) void previewWin.loadURL(url)
@@ -176,6 +190,7 @@ function detachPreview(url: string): void {
     previewWin = null
     send('preview:closed')
   })
+  previewWin.webContents.on('did-finish-load', showInDetached)
   void previewWin.loadURL(url)
 }
 
@@ -269,8 +284,9 @@ function registerIpc(): void {
   ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
-  ipcMain.on('preview:showBlock', (_e, index: number) => {
-    void previewWin?.webContents.executeJavaScript(showBlockScript(index)).catch(() => {})
+  ipcMain.on('preview:show', (_e, target: PreviewTarget) => {
+    previewTarget = target
+    showInDetached()
   })
   ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
     if (repo) void terminal.start(repo.path, cols, rows)

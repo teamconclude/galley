@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
+import type { EditorView } from '@codemirror/view'
 import { Document, isMap, parseDocument } from 'yaml'
 import { pageField } from '../lib/schema'
 import { FieldFor } from './Blocks'
 import { EditContext, type EditFn, useSchemas } from '../lib/contexts'
 import Editor, { type Selection } from './Editor'
+import { YamlFollower } from './PreviewFollow'
 
 interface Props {
   text: string
@@ -44,6 +46,7 @@ function visibility(data: Record<string, unknown>): { label: string; kind: strin
 export default function Frontmatter(props: Props): React.JSX.Element {
   const { text, onChange, grow, height, select } = props
   const [raw, setRaw] = useState(false)
+  const [yamlView, setYamlView] = useState<EditorView | null>(null)
   const [selected, setSelected] = useState(0)
   if (select && select.tick !== selected) {
     setSelected(select.tick)
@@ -78,7 +81,14 @@ export default function Frontmatter(props: Props): React.JSX.Element {
       </div>
       {raw || broken ? (
         <div className="frontmatter-raw">
-          <Editor filename="frontmatter.yaml" value={text} onChange={onChange} select={select} />
+          <Editor
+            filename="frontmatter.yaml"
+            value={text}
+            onChange={onChange}
+            select={select}
+            onView={setYamlView}
+          />
+          <YamlFollower view={yamlView} doc={doc} />
         </div>
       ) : (
         <EditContext.Provider value={edit}>

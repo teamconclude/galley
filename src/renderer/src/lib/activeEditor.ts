@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import type { EditorView } from '@codemirror/view'
 
 // The markdown editor that last had focus, so one toolbar can serve the body editor and
@@ -10,11 +10,11 @@ interface Active {
 }
 
 let active: Active = { view: null, tick: 0 }
-const listeners = new Set<(state: Active) => void>()
+const listeners = new Set<() => void>()
 
 function publish(view: EditorView | null): void {
   active = { view, tick: active.tick + 1 }
-  for (const listener of listeners) listener(active)
+  for (const listener of listeners) listener()
 }
 
 export function setActiveEditor(view: EditorView | null): void {
@@ -29,15 +29,17 @@ export function editorChanged(view: EditorView): void {
   if (active.view === view) publish(view)
 }
 
+const subscribe = (listener: () => void): (() => void) => {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+// Read through a store subscription, so a change published while a component was still
+// mounting is not missed.
 export function useActiveEditorState(): Active {
-  const [state, setState] = useState(active)
-  useEffect(() => {
-    listeners.add(setState)
-    return () => {
-      listeners.delete(setState)
-    }
-  }, [])
-  return state
+  return useSyncExternalStore(subscribe, () => active)
 }
 
 export function useActiveEditor(): EditorView | null {

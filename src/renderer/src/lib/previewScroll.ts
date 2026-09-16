@@ -1,22 +1,42 @@
-// Tells the preview, in the window or detached, to scroll to a content block.
-const listeners = new Set<(index: number) => void>()
-let last = -1
+import type { PreviewTarget } from '../../../shared/types'
 
-export function showBlock(index: number): void {
-  if (index === last) return
-  last = index
-  for (const l of listeners) l(index)
-  window.api.preview.showBlock(index)
+// Tells the preview, in the window or detached, where to scroll to.
+const listeners = new Set<(target: PreviewTarget) => void>()
+let last = ''
+
+export function showInPreview(target: PreviewTarget): void {
+  const key = JSON.stringify(target)
+  if (key === last) return
+  last = key
+  for (const l of listeners) l(target)
+  window.api.preview.show(target)
 }
+
+export const showBlock = (index: number): void => showInPreview({ kind: 'block', index })
 
 // A new page starts over, so its first block gets scrolled to as well.
-export function forgetBlock(): void {
-  last = -1
+export function forgetTarget(): void {
+  last = ''
 }
 
-export function onShowBlock(listener: (index: number) => void): () => void {
+export function onShow(listener: (target: PreviewTarget) => void): () => void {
   listeners.add(listener)
   return () => {
     listeners.delete(listener)
   }
+}
+
+// The words of a markdown line as the page shows them, roughly: marks, links, tags and
+// shortcodes removed, whitespace collapsed.
+export function plainText(line: string): string {
+  return line
+    .replace(/\{\{[<%][\s\S]*?[>%]\}\}/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+\.\s+)/, '')
+    .replace(/[*_~`]+/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import type { HugoStatus } from '../../../shared/types'
+import type { HugoStatus, PreviewTarget } from '../../../shared/types'
 import type { WebviewElement } from '../env'
-import { showBlockScript } from '../../../shared/previewScript'
-import { onShowBlock } from '../lib/previewScroll'
+import { previewScript } from '../../../shared/previewScript'
+import { onShow } from '../lib/previewScroll'
 
 interface Props {
   status: HugoStatus
@@ -18,13 +18,34 @@ export default function Preview({ status, url, reloadKey, onDetach }: Props): Re
     if (reloadKey) view.current?.reload()
   }, [reloadKey])
 
+  // A target stays pending until the page has found it, so one asked for while Hugo is
+  // still starting or the page is still loading is applied once the page has loaded.
+  const pending = useRef<PreviewTarget | null>(null)
+  const run = (target: PreviewTarget): void => {
+    void view.current
+      ?.executeJavaScript(previewScript(target))
+      .then((found) => {
+        if (found === true && pending.current === target) pending.current = null
+      })
+      .catch(() => {})
+  }
   useEffect(
     () =>
-      onShowBlock((index) => {
-        void view.current?.executeJavaScript(showBlockScript(index)).catch(() => {})
+      onShow((target) => {
+        pending.current = target
+        run(target)
       }),
     []
   )
+  useEffect(() => {
+    const el = view.current
+    if (!el) return
+    const onLoad = (): void => {
+      if (pending.current) run(pending.current)
+    }
+    el.addEventListener('did-finish-load', onLoad)
+    return () => el.removeEventListener('did-finish-load', onLoad)
+  }, [url])
 
   return (
     <div className="preview">

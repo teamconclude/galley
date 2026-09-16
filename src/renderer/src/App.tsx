@@ -31,9 +31,10 @@ import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import SearchPanel, { type SearchRequest } from './components/SearchPanel'
+import { BodyFollower } from './components/PreviewFollow'
 import Splitter from './components/Splitter'
 import { openFind } from './lib/findPanel'
-import { forgetBlock } from './lib/previewScroll'
+import { forgetTarget } from './lib/previewScroll'
 import { loadLayout, saveLayout } from './lib/layout'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
@@ -576,7 +577,7 @@ export default function App(): React.JSX.Element | null {
 
   const filePath = file?.path ?? null
   useEffect(() => {
-    forgetBlock()
+    forgetTarget()
     if (!filePath) return
     let live = true
     void window.api.repo.pageUrl(filePath).then((url) => {
@@ -856,6 +857,7 @@ export default function App(): React.JSX.Element | null {
                     {showBody && (
                       <>
                         {isMarkdown && <Toolbar view={bodyView} />}
+                        {isMarkdown && <BodyFollower view={bodyView} />}
                         <Editor
                           key={`body:${file.path}`}
                           filename={file.path}
