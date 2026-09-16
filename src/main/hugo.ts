@@ -112,6 +112,7 @@ export class HugoServer {
   private proc: ChildProcess | null = null
   private bin: string | null = null
   private repo: string | null = null
+  private recovering = false
   status: HugoStatus = { state: 'stopped' }
 
   constructor(private onStatus: (status: HugoStatus) => void) {}
@@ -145,6 +146,7 @@ export class HugoServer {
       // Hugo prints "//localhost:1313/" when the configured baseURL has no scheme.
       const m = output.match(/available at (?:https?:)?(\/\/[^\s/]+)/)
       if (m && this.status.state !== 'running') this.set({ state: 'running', url: `http:${m[1]}` })
+      if (/runtime error:|panic:/.test(chunk.toString())) this.recover(proc, repo)
     }
     proc.stdout?.on('data', onOutput)
     proc.stderr?.on('data', onOutput)
@@ -159,6 +161,18 @@ export class HugoServer {
       this.proc = null
       this.set({ state: 'error', message: err.message })
     })
+  }
+
+  // A file read while another program was still writing it can crash Hugo's parser. The
+  // server then shows the crash until the next change to any file, which may never come,
+  // so Galley starts it afresh once the writer has had a moment to finish.
+  private recover(proc: ChildProcess, repo: string): void {
+    if (this.recovering) return
+    this.recovering = true
+    setTimeout(() => {
+      this.recovering = false
+      if (this.proc === proc) void this.start(repo)
+    }, 1500)
   }
 
   async install(repo: string): Promise<void> {

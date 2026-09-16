@@ -1,6 +1,6 @@
 import { execFile } from 'child_process'
 import { FSWatcher, existsSync, promises as fs, watch } from 'fs'
-import { basename, extname, join, resolve, sep } from 'path'
+import { basename, dirname, extname, join, resolve, sep } from 'path'
 import { parse as parseYaml } from 'yaml'
 import type {
   ComponentLibrary,
@@ -28,6 +28,7 @@ export class Repo {
   private componentCache: ComponentLibrary | null = null
   private dataCache: DataLists | null = null
   private imageCache: string[] | null = null
+  private ownRenames = new Set<string>()
 
   constructor(
     readonly path: string,
@@ -73,8 +74,13 @@ export class Repo {
     return fs.readFile(this.absolute(rel), 'utf8')
   }
 
-  write(rel: string, text: string): Promise<void> {
-    return fs.writeFile(this.absolute(rel), text)
+  // The file appears in one step, so a watcher such as Hugo's never reads it half written.
+  async write(rel: string, text: string): Promise<void> {
+    const abs = this.absolute(rel)
+    const tmp = join(dirname(abs), `.${basename(abs)}.galley~`)
+    await fs.writeFile(tmp, text)
+    this.ownRenames.add(rel)
+    await fs.rename(tmp, abs)
   }
 
   async pageUrl(rel: string): Promise<string | null> {
@@ -212,9 +218,12 @@ export class Repo {
   watch(): void {
     this.watcher = watch(this.path, { recursive: true }, (event, file) => {
       const rel = file?.toString()
-      if (!rel || ignoredChanges.test(rel)) return
+      if (!rel || ignoredChanges.test(rel) || rel.endsWith('.galley~')) return
       this.pending.add(rel)
-      if (event === 'rename' && rel.startsWith('content/')) this.structureChanged = true
+      // Galley's own saves arrive as renames too, but move no page.
+      if (event === 'rename' && rel.startsWith('content/') && !this.ownRenames.has(rel)) {
+        this.structureChanged = true
+      }
       if (this.timer) clearTimeout(this.timer)
       this.timer = setTimeout(() => this.flush(), 300)
     })
@@ -223,6 +232,7 @@ export class Repo {
   private flush(): void {
     const paths = [...this.pending]
     this.pending.clear()
+    this.ownRenames.clear()
     if (this.structureChanged) {
       this.structureChanged = false
       void this.refreshPages()
