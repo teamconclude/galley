@@ -5,8 +5,10 @@ import { LanguageDescription } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { markdown } from '@codemirror/lang-markdown'
 import { yaml } from '@codemirror/lang-yaml'
+import { search } from '@codemirror/search'
 import { basicSetup } from 'codemirror'
 import { clearActiveEditor, editorChanged, setActiveEditor } from '../lib/activeEditor'
+import { FindPanel } from '../lib/findPanel'
 import { markdownStyle } from '../lib/markdownStyle'
 
 interface Props {
@@ -18,6 +20,14 @@ interface Props {
   importImages?: (files: File[]) => Promise<string[]>
   // A writing surface: proportional type, no line numbers.
   prose?: boolean
+  // A range to select and scroll to, e.g. a search hit; a new tick selects again.
+  select?: Selection
+}
+
+export interface Selection {
+  from: number
+  to: number
+  tick: number
 }
 
 const markdownFile = /\.(md|markdown)$/i
@@ -25,7 +35,7 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 // Remount (change the React key) to open a different file.
 export default function Editor(props: Props): React.JSX.Element {
-  const { filename, value, onChange, onSave, importImages, prose } = props
+  const { filename, value, onChange, onSave, importImages, prose, select } = props
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
@@ -45,6 +55,7 @@ export default function Editor(props: Props): React.JSX.Element {
         doc: value,
         extensions: [
           basicSetup,
+          search({ top: true, createPanel: (v) => new FindPanel(v) }),
           EditorView.lineWrapping,
           language.of([]),
           keymap.of([
@@ -59,7 +70,8 @@ export default function Editor(props: Props): React.JSX.Element {
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString())
           }),
-          isMarkdown ? [trackFocus(), markdownStyle] : [],
+          trackFocus(),
+          isMarkdown ? markdownStyle : [],
           importImages ? dropImages(importImagesRef) : []
         ]
       }),
@@ -84,10 +96,23 @@ export default function Editor(props: Props): React.JSX.Element {
     }
   }, [value])
 
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view || !select) return
+    const to = Math.min(select.to, view.state.doc.length)
+    const from = Math.min(select.from, to)
+    view.dispatch({
+      selection: { anchor: from, head: to },
+      effects: EditorView.scrollIntoView(from, { y: 'center' })
+    })
+    view.focus()
+  }, [select])
+
   return <div className={prose ? 'editor prose' : 'editor'} ref={host} />
 }
 
-// Focus moving to the toolbar keeps the editor active so its buttons can act on it.
+// The editor that has focus is the one the toolbar and the Find command act on; focus
+// moving to the toolbar keeps it active so its buttons can act on it.
 function trackFocus(): Extension {
   return [
     EditorView.domEventHandlers({

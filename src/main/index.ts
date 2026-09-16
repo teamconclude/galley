@@ -13,14 +13,22 @@ import {
 import { basename } from 'path'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
-import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { electronApp } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import type { Identity, Layout, MenuCommand, SetupStepId, Preferences } from '../shared/types'
+import type {
+  Identity,
+  Layout,
+  MenuCommand,
+  Preferences,
+  SearchOptions,
+  SetupStepId
+} from '../shared/types'
 import { isDev } from './env'
 import { clone, Git } from './git'
 import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
+import { replace, search } from './search'
 import { loadSettings, prefs, saveSettings } from './settings'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
@@ -192,6 +200,12 @@ function registerIpc(): void {
   ipcMain.handle('repo:rename', (_e, from: string, to: string) => current().rename(from, to))
   ipcMain.handle('repo:trash', (_e, rel: string) => shell.trashItem(current().absolute(rel)))
   ipcMain.handle('repo:newest', (_e, dir: string) => current().newest(dir))
+  ipcMain.handle('repo:search', (_e, query: string, options: SearchOptions) =>
+    search(current().path, query, options)
+  )
+  ipcMain.handle('repo:replace', (_e, query: string, options: SearchOptions, replacement: string) =>
+    replace(current().path, query, options, replacement)
+  )
   ipcMain.handle('repo:importImage', async (_e, dir: string) => {
     const result = await dialog.showOpenDialog({
       title: 'Add image',
@@ -327,7 +341,6 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('io.conclude.galley')
   // The packaged app carries its own icon; in development the Dock shows Electron's.
   if (isDev) app.dock?.setIcon(icon)
-  app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   Menu.setApplicationMenu(
     buildMenu({
       openRepo: () => void chooseRepo(),

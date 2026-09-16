@@ -25,6 +25,9 @@ const api: Api = {
     rename: (from, to) => ipcRenderer.invoke('repo:rename', from, to),
     trash: (rel) => ipcRenderer.invoke('repo:trash', rel),
     newest: (dir) => ipcRenderer.invoke('repo:newest', dir),
+    search: (query, options) => ipcRenderer.invoke('repo:search', query, options),
+    replace: (query, options, replacement) =>
+      ipcRenderer.invoke('repo:replace', query, options, replacement),
     onOpened: (cb) => on('repo:opened', cb),
     onChanged: (cb) => on('repo:changed', cb)
   },

@@ -8,14 +8,18 @@ import type {
   Identity,
   RepoInfo,
   ReleaseStep,
-  Preferences
+  Preferences,
+  SearchMatch,
+  SearchOptions,
+  SidebarTab
 } from '../../shared/types'
+import { EditorView } from '@codemirror/view'
 import ChangesPanel from './components/ChangesPanel'
 import ClaudePane from './components/ClaudePane'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
 import { NewPageDialog, PromptDialog } from './components/Dialogs'
 import DiffView from './components/DiffView'
-import Editor from './components/Editor'
+import Editor, { type Selection } from './components/Editor'
 import FileTree from './components/FileTree'
 import {
   ConfirmDialog,
@@ -26,7 +30,9 @@ import {
 import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
+import SearchPanel, { type SearchRequest } from './components/SearchPanel'
 import Splitter from './components/Splitter'
+import { openFind } from './lib/findPanel'
 import { loadLayout, saveLayout } from './lib/layout'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
@@ -40,6 +46,18 @@ interface OpenFile {
   path: string
   text: string
   saved: string
+}
+
+interface SearchHit {
+  path: string
+  line: number
+  column: number
+}
+
+// Text to select after opening a file: in the page body or in its settings as YAML.
+interface Target extends Selection {
+  path: string
+  part: 'body' | 'frontmatter'
 }
 
 type DialogState =
@@ -58,6 +76,22 @@ const inDir = (dir: string, name: string): string => (dir ? `${dir}/${name}` : n
 // File and folder names stay lowercase with hyphens, as the site's URLs expect.
 const normalizeName = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, '-')
 const copyName = (name: string): string => name.replace(/(\.[^.]+)?$/, '-copy$1')
+const editorAt = (el: Element | null | undefined): EditorView | null =>
+  el ? EditorView.findFromDOM(el as HTMLElement) : null
+const focusedEditor = (): EditorView | null =>
+  editorAt(document.activeElement?.closest('.cm-editor'))
+const bodyEditor = (): EditorView | null =>
+  editorAt(document.querySelector('.editor-column > .editor .cm-editor'))
+const yamlEditor = (): EditorView | null =>
+  editorAt(document.querySelector('.frontmatter-raw .cm-editor'))
+// One line of selected text in the focused editor, to seed a search with.
+const selectedText = (): string | null => {
+  const view = focusedEditor()
+  if (!view) return null
+  const { from, to } = view.state.selection.main
+  const text = view.state.sliceDoc(from, to)
+  return text !== '' && !text.includes('\n') ? text : null
+}
 // Errors from the main process arrive wrapped by Electron's IPC.
 const fail = (e: unknown): void =>
   window.alert(
@@ -92,7 +126,10 @@ export default function App(): React.JSX.Element | null {
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null)
   const [identity, setIdentity] = useState<Identity | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>(layout.sidebarTab)
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(layout.sidebarTab)
+  const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null)
+  const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
+  const [select, setSelect] = useState<Target | null>(null)
   const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
   const [gitDialog, setGitDialog] = useState<
     'new-branch' | 'switch-branch' | 'identity' | 'merge' | null
@@ -173,15 +210,39 @@ export default function App(): React.JSX.Element | null {
     saveTimer.current = window.setTimeout(() => void save(), 800)
   }
 
-  const open = async (path: string): Promise<void> => {
+  const open = async (path: string): Promise<string | null> => {
     await save()
     setDiff(null)
     if (imageFile.test(path) || binaryFile.test(path)) {
       setFile({ path, text: '', saved: '' })
-      return
+      return null
     }
     const text = await window.api.repo.read(path)
     setFile({ path, text, saved: text })
+    return text
+  }
+
+  // A hit is selected in the page body, or in the page settings shown as YAML.
+  const openMatch = async (path: string, match: SearchMatch): Promise<void> => {
+    setSearchHit({ path, line: match.line, column: match.column })
+    const text = await open(path)
+    if (text === null) return
+    const lines = text.split('\n')
+    const offset = lines.slice(0, match.line - 1).reduce((n, l) => n + l.length + 1, 0)
+    const at = offset + match.column
+    const tick = Date.now()
+    const parts = markdownFile.test(path) ? split(text) : null
+    if (!parts) return setSelect({ path, part: 'body', from: at, to: at + match.length, tick })
+    const bodyStart = text.length - parts.body.length
+    if (at >= bodyStart) {
+      const from = at - bodyStart
+      return setSelect({ path, part: 'body', from, to: from + match.length, tick })
+    }
+    if (parts.frontmatter === null) return
+    const fmStart = text.match(/^---\r?\n/)?.[0].length ?? 0
+    const from = at - fmStart
+    if (from < 0 || from + match.length > parts.frontmatter.length) return
+    setSelect({ path, part: 'frontmatter', from, to: from + match.length, tick })
   }
 
   const toggleDir = (path: string): void =>
@@ -300,6 +361,37 @@ export default function App(): React.JSX.Element | null {
           { label: 'Duplicate…', onClick: () => setDialog({ kind: 'duplicate', entry }) },
           { label: 'Move to Trash', danger: true, onClick: () => void trashEntry(entry) }
         ]
+
+  // Find works in the editor with focus, else in the page body or the settings as YAML;
+  // without any editor, it searches the site.
+  const findInSite = useCallback((replace: boolean): void => {
+    setSidebarTab('search')
+    setSearchRequest({ tick: Date.now(), text: selectedText(), replace })
+  }, [])
+
+  const find = useCallback(
+    (replace: boolean): void => {
+      const view = focusedEditor() ?? bodyEditor() ?? yamlEditor()
+      if (view) openFind(view, replace)
+      else findInSite(replace)
+    },
+    [findInSite]
+  )
+
+  // Every hit in the site is rewritten; the open page is read back afterwards.
+  const replaceAll = async (
+    query: string,
+    options: SearchOptions,
+    replacement: string
+  ): Promise<void> => {
+    await save()
+    try {
+      await window.api.repo.replace(query, options, replacement)
+    } catch (e) {
+      fail(e)
+    }
+    if (file) await reopen(file.path)
+  }
 
   const repoPath = repo?.path
   useEffect(() => {
@@ -562,9 +654,21 @@ export default function App(): React.JSX.Element | null {
           case 'reload-preview':
             setReloadKey((k) => k + 1)
             break
+          case 'find':
+            find(false)
+            break
+          case 'replace':
+            find(true)
+            break
+          case 'find-in-site':
+            findInSite(false)
+            break
+          case 'replace-in-site':
+            findInSite(true)
+            break
         }
       }),
-    [save, toggleDetached]
+    [save, toggleDetached, find, findInSite]
   )
 
   if (repo === undefined) return null
@@ -580,6 +684,8 @@ export default function App(): React.JSX.Element | null {
     parts.body.trim() === ''
   const showBody = !blocksPage || bodyShownFor === file?.path
   const newPageDir = file?.path.startsWith('content/') ? parentOf(file.path) : 'content/blog'
+  const selectIn = (part: Target['part']): Selection | undefined =>
+    select && select.path === file?.path && select.part === part ? select : undefined
 
   return (
     <SchemaProvider repoPath={repo.path}>
@@ -631,8 +737,21 @@ export default function App(): React.JSX.Element | null {
                   <span className="badge">{gitStatus.changes.length}</span>
                 )}
               </button>
+              <button
+                className={sidebarTab === 'search' ? 'on' : ''}
+                onClick={() => setSidebarTab('search')}
+              >
+                Search
+              </button>
             </div>
-            {sidebarTab === 'files' ? (
+            <SearchPanel
+              hidden={sidebarTab !== 'search'}
+              request={searchRequest}
+              selected={searchHit}
+              onOpen={(path, match) => void openMatch(path, match)}
+              onReplaceAll={replaceAll}
+            />
+            {sidebarTab === 'search' ? null : sidebarTab === 'files' ? (
               <FileTree
                 name={repo.name}
                 selected={file?.path ?? null}
@@ -702,6 +821,7 @@ export default function App(): React.JSX.Element | null {
                         onChange={(fm) => changeText(join(fm, parts.body))}
                         grow={blocksPage}
                         height={blocksPage ? undefined : frontmatterHeight}
+                        select={selectIn('frontmatter')}
                       />
                     )}
                     {parts && parts.frontmatter !== null && !blocksPage && (
@@ -730,6 +850,7 @@ export default function App(): React.JSX.Element | null {
                           onSave={() => void save()}
                           importImages={isMarkdown ? importImages : undefined}
                           prose={isMarkdown}
+                          select={selectIn('body')}
                         />
                       </>
                     )}

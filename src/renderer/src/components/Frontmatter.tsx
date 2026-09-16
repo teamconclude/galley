@@ -3,13 +3,15 @@ import { Document, isMap, parseDocument } from 'yaml'
 import { pageField } from '../lib/schema'
 import { FieldFor } from './Blocks'
 import { EditContext, type EditFn, useSchemas } from '../lib/contexts'
-import Editor from './Editor'
+import Editor, { type Selection } from './Editor'
 
 interface Props {
   text: string
   onChange: (text: string) => void
   grow?: boolean
   height?: number
+  // A range of the YAML to show selected, e.g. a search hit; it switches to the YAML view.
+  select?: Selection
 }
 
 // The default 80-column folding and single quotes match how existing pages are written.
@@ -39,8 +41,14 @@ function visibility(data: Record<string, unknown>): { label: string; kind: strin
   return null
 }
 
-export default function Frontmatter({ text, onChange, grow, height }: Props): React.JSX.Element {
+export default function Frontmatter(props: Props): React.JSX.Element {
+  const { text, onChange, grow, height, select } = props
   const [raw, setRaw] = useState(false)
+  const [selected, setSelected] = useState(0)
+  if (select && select.tick !== selected) {
+    setSelected(select.tick)
+    setRaw(true)
+  }
   const { lists } = useSchemas()
   const doc = useMemo(() => parseDocument(text), [text])
   const broken = doc.errors.length > 0 || !isMap(doc.contents)
@@ -70,7 +78,7 @@ export default function Frontmatter({ text, onChange, grow, height }: Props): Re
       </div>
       {raw || broken ? (
         <div className="frontmatter-raw">
-          <Editor filename="frontmatter.yaml" value={text} onChange={onChange} />
+          <Editor filename="frontmatter.yaml" value={text} onChange={onChange} select={select} />
         </div>
       ) : (
         <EditContext.Provider value={edit}>

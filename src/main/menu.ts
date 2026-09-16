@@ -45,7 +45,33 @@ export function buildMenu(actions: Actions): Menu {
         { role: 'close' }
       ]
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => actions.command('find') },
+        { label: 'Replace', accelerator: 'CmdOrCtrl+R', click: () => actions.command('replace') },
+        {
+          label: 'Find in site',
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click: () => actions.command('find-in-site')
+        },
+        {
+          label: 'Replace in site',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: () => actions.command('replace-in-site')
+        }
+      ]
+    },
     {
       label: 'View',
       submenu: [
@@ -66,7 +92,7 @@ export function buildMenu(actions: Actions): Menu {
         },
         {
           label: 'Reload preview',
-          accelerator: 'CmdOrCtrl+R',
+          accelerator: 'CmdOrCtrl+Alt+R',
           click: () => actions.command('reload-preview')
         },
         { type: 'separator' },

@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom'
 
 interface Props {
   text: string
-  children: React.ReactElement<{ onMouseEnter?: () => void; onMouseLeave?: () => void }>
+  children: React.ReactElement<{
+    onMouseEnter?: () => void
+    onMouseLeave?: () => void
+    onMouseDown?: (e: React.MouseEvent<HTMLElement>) => void
+  }>
 }
 
 // A tooltip drawn above the element in a layer of its own, so the fixed-height rows and
@@ -24,7 +28,10 @@ export default function Tip({ text, children }: Props): React.JSX.Element {
           setAt(null)
           child.props.onMouseLeave?.()
         }}
-        onMouseDown={() => setAt(null)}
+        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+          setAt(null)
+          child.props.onMouseDown?.(e)
+        }}
       />
       {at &&
         createPortal(

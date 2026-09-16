@@ -10,6 +10,9 @@ import type {
   Preferences,
   PublishResult,
   RepoInfo,
+  ReplaceResult,
+  SearchOptions,
+  SearchResults,
   SetupStatus,
   SetupStepId,
   UpdateStatus
@@ -35,6 +38,8 @@ export interface Api {
     rename: (from: string, to: string) => Promise<void>
     trash: (rel: string) => Promise<void>
     newest: (dir: string) => Promise<string | null>
+    search: (query: string, options: SearchOptions) => Promise<SearchResults>
+    replace: (query: string, options: SearchOptions, replacement: string) => Promise<ReplaceResult>
     onOpened: (cb: () => void) => Unsubscribe
     onChanged: (cb: (paths: string[]) => void) => Unsubscribe
   }

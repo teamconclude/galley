@@ -104,8 +104,42 @@ export interface Layout {
   previewWidth: number
   claudeHeight: number
   frontmatterHeight: number
-  sidebarTab: 'files' | 'changes'
+  sidebarTab: SidebarTab
   showAllFiles: boolean
+}
+
+export type SidebarTab = 'files' | 'changes' | 'search'
+
+export interface SearchOptions {
+  ignoreCase: boolean
+  regex: boolean
+  // Only pages under content/, not templates, styles or data.
+  contentOnly: boolean
+}
+
+// One hit: the line it is on (1-based) and the match's offset and length in that line.
+export interface SearchMatch {
+  line: number
+  column: number
+  length: number
+  text: string
+}
+
+export interface SearchFile {
+  path: string
+  matches: SearchMatch[]
+}
+
+export interface ReplaceResult {
+  files: number
+  matches: number
+}
+
+export interface SearchResults {
+  files: SearchFile[]
+  total: number
+  // The search stopped early because the cap on matches was reached.
+  truncated: boolean
 }
 
 export interface GitHubUser {
@@ -150,6 +184,10 @@ export type MenuCommand =
   | 'detach-preview'
   | 'setup'
   | 'settings'
+  | 'find'
+  | 'replace'
+  | 'find-in-site'
+  | 'replace-in-site'
 
 // Git conveniences for editors who are not git users; both on unless turned off.
 export interface Preferences {
