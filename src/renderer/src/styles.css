@@ -513,6 +513,7 @@ body.dragging .terminal-host {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
+  background: var(--bg-muted);
   border-bottom: 1px solid var(--border);
 }
 
@@ -520,6 +521,10 @@ body.dragging .terminal-host {
   flex: none;
   min-width: 30px;
   padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
 }
 
 .toolbar select {
@@ -539,6 +544,21 @@ body.dragging .terminal-host {
 
 .toolbar-gap {
   width: 8px;
+}
+
+.toolbar.compact {
+  padding: 3px 6px;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.toolbar.compact button {
+  min-width: 26px;
+  padding: 1px 6px;
+}
+
+.toolbar.compact .toolbar-block {
+  min-width: 110px;
 }
 
 .editor {
@@ -1191,16 +1211,6 @@ body.dragging .terminal-host {
   cursor: default;
 }
 
-.toolbar-hint {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  margin-left: 6px;
-}
-
 .tree-item.drop-target {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
@@ -1278,6 +1288,29 @@ body.dragging .terminal-host {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.dialog-row {
+  display: flex;
+  gap: 6px;
+}
+
+.dialog-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-row button {
+  flex: none;
+}
+
+.dialog-preview {
+  max-height: 160px;
+  max-width: 100%;
+  object-fit: contain;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .dialog-buttons {

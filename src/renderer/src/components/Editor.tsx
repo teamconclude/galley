@@ -3,7 +3,7 @@ import { Compartment, EditorState, Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { LanguageDescription } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
-import { markdown } from '@codemirror/lang-markdown'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { yaml } from '@codemirror/lang-yaml'
 import { search } from '@codemirror/search'
 import { basicSetup } from 'codemirror'
@@ -22,6 +22,8 @@ interface Props {
   prose?: boolean
   // A range to select and scroll to, e.g. a search hit; a new tick selects again.
   select?: Selection
+  // Hands out the CodeMirror view once mounted, and null when it goes away.
+  onView?: (view: EditorView | null) => void
 }
 
 export interface Selection {
@@ -35,16 +37,18 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 // Remount (change the React key) to open a different file.
 export default function Editor(props: Props): React.JSX.Element {
-  const { filename, value, onChange, onSave, importImages, prose, select } = props
+  const { filename, value, onChange, onSave, importImages, prose, select, onView } = props
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
   const importImagesRef = useRef(importImages)
+  const onViewRef = useRef(onView)
   useEffect(() => {
     onChangeRef.current = onChange
     onSaveRef.current = onSave
     importImagesRef.current = importImages
+    onViewRef.current = onView
   })
 
   useEffect(() => {
@@ -78,10 +82,12 @@ export default function Editor(props: Props): React.JSX.Element {
       parent: host.current!
     })
     viewRef.current = view
+    onViewRef.current?.(view)
     void languageFor(filename).then((ext) => {
       if (viewRef.current === view) view.dispatch({ effects: language.reconfigure(ext) })
     })
     return () => {
+      onViewRef.current?.(null)
       clearActiveEditor(view)
       view.destroy()
       viewRef.current = null
@@ -111,8 +117,8 @@ export default function Editor(props: Props): React.JSX.Element {
   return <div className={prose ? 'editor prose' : 'editor'} ref={host} />
 }
 
-// The editor that has focus is the one the toolbar and the Find command act on; focus
-// moving to the toolbar keeps it active so its buttons can act on it.
+// The editor that has focus is the one the Find command acts on and whose toolbar shows;
+// focus moving to a toolbar or one of its dialogs keeps it active.
 function trackFocus(): Extension {
   return [
     EditorView.domEventHandlers({
@@ -122,7 +128,7 @@ function trackFocus(): Extension {
       },
       blur: (event, view) => {
         const target = event.relatedTarget as Element | null
-        if (!target?.closest('.toolbar')) clearActiveEditor(view)
+        if (!target?.closest('.toolbar, .modal-backdrop')) clearActiveEditor(view)
         return false
       }
     }),
@@ -161,7 +167,10 @@ function dropImages(importImages: React.RefObject<Props['importImages']>): Exten
 }
 
 async function languageFor(filename: string): Promise<Extension> {
-  if (markdownFile.test(filename)) return markdown({ codeLanguages: languages })
+  // GitHub flavoured, like Hugo's Goldmark: strikethrough, tables and task lists parse.
+  if (markdownFile.test(filename)) {
+    return markdown({ base: markdownLanguage, codeLanguages: languages })
+  }
   if (/\.ya?ml$/i.test(filename)) return yaml()
   const desc = LanguageDescription.matchFilename(languages, filename)
   return desc ? await desc.load() : []

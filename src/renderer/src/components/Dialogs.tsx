@@ -10,7 +10,7 @@ interface DialogProps {
   children: React.ReactNode
 }
 
-function Dialog(props: DialogProps): React.JSX.Element {
+export function Dialog(props: DialogProps): React.JSX.Element {
   const { title, submitLabel, canSubmit, onSubmit, onCancel, children } = props
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {

@@ -130,6 +130,7 @@ export default function App(): React.JSX.Element | null {
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null)
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [select, setSelect] = useState<Target | null>(null)
+  const [bodyView, setBodyView] = useState<EditorView | null>(null)
   const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
   const [gitDialog, setGitDialog] = useState<
     'new-branch' | 'switch-branch' | 'identity' | 'merge' | null
@@ -826,7 +827,6 @@ export default function App(): React.JSX.Element | null {
                   <div className="pane-empty">This file cannot be edited here.</div>
                 ) : (
                   <>
-                    {isMarkdown && <Toolbar />}
                     {parts && parts.frontmatter !== null && (
                       <Frontmatter
                         key={`settings:${file.path}`}
@@ -853,6 +853,7 @@ export default function App(): React.JSX.Element | null {
                     )}
                     {showBody && (
                       <>
+                        {isMarkdown && <Toolbar view={bodyView} />}
                         <Editor
                           key={`body:${file.path}`}
                           filename={file.path}
@@ -864,6 +865,7 @@ export default function App(): React.JSX.Element | null {
                           importImages={isMarkdown ? importImages : undefined}
                           prose={isMarkdown}
                           select={selectIn('body')}
+                          onView={isMarkdown ? setBodyView : undefined}
                         />
                       </>
                     )}

@@ -1,7 +1,18 @@
+import { useState } from 'react'
+import { CodeXml } from 'lucide-react'
 import { syntaxTree } from '@codemirror/language'
 import type { SyntaxNode } from '@lezer/common'
 import type { EditorView } from '@codemirror/view'
-import { useActiveEditor } from '../lib/activeEditor'
+import { useActiveEditorState } from '../lib/activeEditor'
+import {
+  type ImageValues,
+  imageMarkdown,
+  type LinkValues,
+  linkMarkdown,
+  parseImage,
+  parseLink
+} from '../lib/inline'
+import { ImageDialog, LinkDialog } from './InsertDialogs'
 
 // Wrapping a selection that is already wrapped unwraps it, so the buttons toggle.
 function wrap(view: EditorView, before: string, after = before): void {
@@ -148,15 +159,72 @@ const snippets: Record<string, string> = {
 const inlineStyles: Record<string, string> = {
   StrongEmphasis: 'bold',
   Emphasis: 'italic',
+  Strikethrough: 'strike',
   InlineCode: 'code',
   Link: 'link',
   Image: 'image'
+}
+
+// The link or image at the cursor, as the range of its markdown, so it can be edited.
+function inlineAt(view: EditorView, name: 'Link' | 'Image'): { from: number; to: number } | null {
+  const pos = view.state.selection.main.head
+  for (let n: SyntaxNode | null = syntaxTree(view.state).resolveInner(pos, -1); n; n = n.parent) {
+    if (n.name === name) return { from: n.from, to: n.to }
+  }
+  return null
+}
+
+// What the dialogs edit: an existing link or image, else the selection as the text.
+interface Pending {
+  kind: 'link' | 'image'
+  view: EditorView
+  from: number
+  to: number
+  link: LinkValues
+  image: ImageValues
+}
+
+function pendingFor(view: EditorView, kind: Pending['kind']): Pending {
+  const existing = inlineAt(view, kind === 'link' ? 'Link' : 'Image')
+  const range = existing ?? view.state.selection.main
+  const source = view.state.sliceDoc(range.from, range.to)
+  const parsedLink = existing ? parseLink(source) : null
+  const parsedImage = existing ? parseImage(source) : null
+  return {
+    kind,
+    view,
+    from: range.from,
+    to: range.to,
+    link: parsedLink ?? { text: existing ? '' : source, url: '', newTab: false },
+    image: parsedImage ?? { path: '', alt: existing ? '' : source }
+  }
+}
+
+function replaceRange(pending: Pending, text: string): void {
+  const { view, from, to } = pending
+  view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length } })
+  view.focus()
+}
+
+interface Props {
+  // The editor the buttons act on; null renders the toolbar disabled.
+  view: EditorView | null
+  compact?: boolean
+}
+
+// Markdown has no underline; the site allows raw HTML, so <u> does the job.
+function underlined(view: EditorView, pos: number): boolean {
+  const line = view.state.doc.lineAt(pos)
+  const before = line.text.slice(0, pos - line.from)
+  const open = before.lastIndexOf('<u>')
+  return open >= 0 && !before.slice(open).includes('</u>')
 }
 
 // Styles in effect at the cursor: line markers from the text, inline ones from the tree.
 function activeStyles(view: EditorView): Set<string> {
   const styles = new Set<string>()
   const pos = view.state.selection.main.head
+  if (underlined(view, pos)) styles.add('underline')
   for (let node = syntaxTree(view.state).resolveInner(pos, -1); node.parent; node = node.parent) {
     const style = inlineStyles[node.name]
     if (style) styles.add(style)
@@ -164,8 +232,10 @@ function activeStyles(view: EditorView): Set<string> {
   return styles
 }
 
-export default function Toolbar(): React.JSX.Element {
-  const view = useActiveEditor()
+export default function Toolbar({ view, compact }: Props): React.JSX.Element {
+  // Selection and document changes in the active editor re-render the styles in effect.
+  useActiveEditorState()
+  const [pending, setPending] = useState<Pending | null>(null)
   const styles = view ? activeStyles(view) : new Set<string>()
   const block = view ? blockAt(view) : 'p'
   const keepFocus = (e: React.MouseEvent): void => e.preventDefault()
@@ -186,7 +256,7 @@ export default function Toolbar(): React.JSX.Element {
     </button>
   )
   return (
-    <div className="toolbar">
+    <div className={compact ? 'toolbar compact' : 'toolbar'}>
       <select
         className="toolbar-block"
         title="Paragraph style"
@@ -203,27 +273,51 @@ export default function Toolbar(): React.JSX.Element {
       <span className="toolbar-gap" />
       {action('bold', 'Bold', <b>B</b>, (v) => wrap(v, '**'))}
       {action('italic', 'Italic', <i>I</i>, (v) => wrap(v, '_'))}
-      {action('code', 'Code', 'Code', (v) => wrap(v, '`'))}
+      {action('underline', 'Underline', <u>U</u>, (v) => wrap(v, '<u>', '</u>'))}
+      {action('strike', 'Strikethrough', <s>S</s>, (v) => wrap(v, '~~'))}
+      {action('code', 'Code', <CodeXml size={15} />, (v) => wrap(v, '`'))}
       <span className="toolbar-gap" />
-      {action('link', 'Link', 'Link', (v) => wrap(v, '[', '](https://)'))}
-      {action('image', 'Image', 'Image', (v) => insert(v, '![Description](/images/…)'))}
       <select
         className="toolbar-insert"
         value=""
-        title="Insert a shortcode"
+        title="Insert a link, an image or a shortcode"
         disabled={!view}
         onChange={(e) => {
-          const text = snippets[e.target.value]
-          if (text && view) insert(view, text)
+          if (!view) return
+          const choice = e.target.value
+          if (choice === 'link' || choice === 'image') setPending(pendingFor(view, choice))
+          else if (snippets[choice]) insert(view, snippets[choice])
         }}
       >
         <option value="">Insert…</option>
+        <option value="link">{styles.has('link') ? 'Edit link…' : 'Link…'}</option>
+        <option value="image">{styles.has('image') ? 'Edit image…' : 'Image…'}</option>
+        <option disabled>──────</option>
         <option value="screenshot">Screenshot</option>
         <option value="youtube">YouTube video</option>
         <option value="quote">Customer quote</option>
         <option value="tooltip">Tooltip</option>
       </select>
-      {!view && <span className="toolbar-hint">Click into a text to format it</span>}
+      {pending?.kind === 'link' && (
+        <LinkDialog
+          initial={pending.link}
+          onCancel={() => setPending(null)}
+          onSubmit={(values) => {
+            setPending(null)
+            replaceRange(pending, linkMarkdown(values))
+          }}
+        />
+      )}
+      {pending?.kind === 'image' && (
+        <ImageDialog
+          initial={pending.image}
+          onCancel={() => setPending(null)}
+          onSubmit={(values) => {
+            setPending(null)
+            replaceRange(pending, imageMarkdown(values))
+          }}
+        />
+      )}
     </div>
   )
 }

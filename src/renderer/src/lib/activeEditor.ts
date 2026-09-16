@@ -29,7 +29,7 @@ export function editorChanged(view: EditorView): void {
   if (active.view === view) publish(view)
 }
 
-export function useActiveEditor(): EditorView | null {
+export function useActiveEditorState(): Active {
   const [state, setState] = useState(active)
   useEffect(() => {
     listeners.add(setState)
@@ -37,5 +37,9 @@ export function useActiveEditor(): EditorView | null {
       listeners.delete(setState)
     }
   }, [])
-  return state.view
+  return state
+}
+
+export function useActiveEditor(): EditorView | null {
+  return useActiveEditorState().view
 }

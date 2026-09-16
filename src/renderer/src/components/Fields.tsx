@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { setValue, type Path } from '../lib/yamlEdit'
 import { useEdit } from '../lib/contexts'
+import type { EditorView } from '@codemirror/view'
+import { useActiveEditor } from '../lib/activeEditor'
 import Editor from './Editor'
 import ImagePicker from './ImagePicker'
+import Toolbar from './Toolbar'
 
 interface ControlProps {
   path: Path
@@ -11,6 +14,17 @@ interface ControlProps {
 
 const asText = (value: unknown): string =>
   value === null || value === undefined ? '' : String(value)
+
+function MarkdownField(props: { text: string; onChange: (v: string) => void }): React.JSX.Element {
+  const [view, setView] = useState<EditorView | null>(null)
+  const active = useActiveEditor()
+  return (
+    <div className="field-editor">
+      {view && active === view && <Toolbar view={view} compact />}
+      <Editor filename="field.md" value={props.text} onChange={props.onChange} onView={setView} />
+    </div>
+  )
+}
 
 export function TextControl({
   path,
@@ -26,13 +40,7 @@ export function TextControl({
   const edit = useEdit()
   const text = asText(value)
   const set = (v: string): void => edit((doc) => setValue(doc, path, v))
-  if (markdown) {
-    return (
-      <div className="field-editor">
-        <Editor filename="field.md" value={text} onChange={set} />
-      </div>
-    )
-  }
+  if (markdown) return <MarkdownField text={text} onChange={set} />
   if (multiline || text.includes('\n')) {
     const rows = Math.min(10, Math.max(2, text.split('\n').length + 1))
     return (
