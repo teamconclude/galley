@@ -523,11 +523,18 @@ body.dragging .terminal-host {
 }
 
 .toolbar select {
-  margin-left: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 2px 6px;
   background: var(--bg);
+}
+
+.toolbar-block {
+  min-width: 130px;
+}
+
+.toolbar-insert {
+  margin-left: auto;
 }
 
 .toolbar-gap {

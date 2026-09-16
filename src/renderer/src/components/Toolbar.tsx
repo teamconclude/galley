@@ -1,4 +1,5 @@
 import { syntaxTree } from '@codemirror/language'
+import type { SyntaxNode } from '@lezer/common'
 import type { EditorView } from '@codemirror/view'
 import { useActiveEditor } from '../lib/activeEditor'
 
@@ -27,18 +28,108 @@ function wrap(view: EditorView, before: string, after = before): void {
   view.focus()
 }
 
-// Replaces any existing marker of the same family and removes it when already applied.
-function toggleLine(view: EditorView, prefix: string, family: RegExp): void {
-  const line = view.state.doc.lineAt(view.state.selection.main.from)
-  const current = line.text.match(family)?.[0] ?? ''
-  const insert = current === prefix ? '' : prefix
-  view.dispatch({ changes: { from: line.from, to: line.from + current.length, insert } })
-  view.focus()
+// How a line is set: a paragraph, a heading, a list item, a quote or code.
+type Block = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'ul' | 'ol' | 'quote' | 'code'
+
+const blockMarker = /^(?:#{1,6} |[-*] |\d+\. |> )/
+const blockNames: [Block, string][] = [
+  ['p', 'Paragraph'],
+  ['h1', 'Heading 1'],
+  ['h2', 'Heading 2'],
+  ['h3', 'Heading 3'],
+  ['h4', 'Heading 4'],
+  ['ul', 'Bullet list'],
+  ['ol', 'Numbered list'],
+  ['quote', 'Quote'],
+  ['code', 'Code block']
+]
+
+function blockOf(text: string): Block {
+  const marker = text.match(blockMarker)?.[0] ?? ''
+  if (marker.startsWith('#')) {
+    const level = marker.length - 1
+    return level <= 4 ? (`h${level}` as Block) : 'p'
+  }
+  if (/^[-*] /.test(marker)) return 'ul'
+  if (/^\d/.test(marker)) return 'ol'
+  return marker === '> ' ? 'quote' : 'p'
 }
 
-const heading = /^#{1,6} /
-const bullet = /^[-*] /
-const quote = /^> /
+const markerFor = (block: Block, n: number): string =>
+  block === 'p'
+    ? ''
+    : block === 'ul'
+      ? '- '
+      : block === 'ol'
+        ? `${n}. `
+        : block === 'quote'
+          ? '> '
+          : '#'.repeat(Number(block[1])) + ' '
+
+// The fenced code block around a position, if any.
+function fenceAt(view: EditorView, pos: number): SyntaxNode | null {
+  for (let n: SyntaxNode | null = syntaxTree(view.state).resolveInner(pos, -1); n; n = n.parent) {
+    if (n.name === 'FencedCode') return n
+  }
+  return null
+}
+
+function blockAt(view: EditorView): Block {
+  const pos = view.state.selection.main.head
+  return fenceAt(view, pos) ? 'code' : blockOf(view.state.doc.lineAt(pos).text)
+}
+
+// Sets every line the selection touches; list items are numbered in order, blank lines
+// in a selection stay blank. A code block is fenced as a whole and unfenced again.
+function setBlock(view: EditorView, block: Block): void {
+  const { doc } = view.state
+  const { from, to } = view.state.selection.main
+  const fence = fenceAt(view, from)
+  // Markers inserted at the cursor land before it, so the cursor is moved past them.
+  const apply = (): void => {
+    const set = view.state.changes(changes)
+    const { anchor, head } = view.state.selection.main
+    view.dispatch({
+      changes: set,
+      selection: { anchor: set.mapPos(anchor, 1), head: set.mapPos(head, 1) }
+    })
+    view.focus()
+  }
+  let first = doc.lineAt(from).number
+  let last = doc.lineAt(to).number
+  const changes: { from: number; to: number; insert: string }[] = []
+  if (fence) {
+    const open = doc.lineAt(fence.from)
+    const close = doc.lineAt(fence.to)
+    const closed = close.number > open.number && /^\s*(`{3,}|~{3,})\s*$/.test(close.text)
+    changes.push({ from: open.from, to: Math.min(open.to + 1, doc.length), insert: '' })
+    if (closed) changes.push({ from: close.from - 1, to: close.to, insert: '' })
+    first = open.number + 1
+    last = closed ? close.number - 1 : close.number
+    if (block === 'code' || last < first) {
+      apply()
+      return
+    }
+  } else if (block === 'code') {
+    changes.push({ from: doc.line(first).from, to: doc.line(first).from, insert: '```\n' })
+    changes.push({ from: doc.line(last).to, to: doc.line(last).to, insert: '\n```' })
+    // The selection stays on the fenced lines, shifted past the opening fence.
+    const { anchor, head } = view.state.selection.main
+    view.dispatch({ changes, selection: { anchor: anchor + 4, head: head + 4 } })
+    view.focus()
+    return
+  }
+  let item = 0
+  for (let n = first; n <= last; n++) {
+    const line = doc.line(n)
+    const current = line.text.match(blockMarker)?.[0] ?? ''
+    const blank = line.text.slice(current.length).trim() === '' && first !== last
+    const insert = blank ? '' : markerFor(block, ++item)
+    if (current !== insert)
+      changes.push({ from: line.from, to: line.from + current.length, insert })
+  }
+  apply()
+}
 
 function insert(view: EditorView, text: string): void {
   const { from, to } = view.state.selection.main
@@ -66,11 +157,6 @@ const inlineStyles: Record<string, string> = {
 function activeStyles(view: EditorView): Set<string> {
   const styles = new Set<string>()
   const pos = view.state.selection.main.head
-  const text = view.state.doc.lineAt(pos).text
-  if (text.startsWith('## ')) styles.add('h2')
-  if (text.startsWith('### ')) styles.add('h3')
-  if (bullet.test(text)) styles.add('list')
-  if (quote.test(text)) styles.add('quote')
   for (let node = syntaxTree(view.state).resolveInner(pos, -1); node.parent; node = node.parent) {
     const style = inlineStyles[node.name]
     if (style) styles.add(style)
@@ -81,6 +167,7 @@ function activeStyles(view: EditorView): Set<string> {
 export default function Toolbar(): React.JSX.Element {
   const view = useActiveEditor()
   const styles = view ? activeStyles(view) : new Set<string>()
+  const block = view ? blockAt(view) : 'p'
   const keepFocus = (e: React.MouseEvent): void => e.preventDefault()
   const action = (
     key: string,
@@ -100,18 +187,28 @@ export default function Toolbar(): React.JSX.Element {
   )
   return (
     <div className="toolbar">
+      <select
+        className="toolbar-block"
+        title="Paragraph style"
+        value={block}
+        disabled={!view}
+        onChange={(e) => view && setBlock(view, e.target.value as Block)}
+      >
+        {blockNames.map(([key, name]) => (
+          <option key={key} value={key}>
+            {name}
+          </option>
+        ))}
+      </select>
+      <span className="toolbar-gap" />
       {action('bold', 'Bold', <b>B</b>, (v) => wrap(v, '**'))}
       {action('italic', 'Italic', <i>I</i>, (v) => wrap(v, '_'))}
-      {action('h2', 'Heading', 'H2', (v) => toggleLine(v, '## ', heading))}
-      {action('h3', 'Subheading', 'H3', (v) => toggleLine(v, '### ', heading))}
+      {action('code', 'Code', 'Code', (v) => wrap(v, '`'))}
       <span className="toolbar-gap" />
       {action('link', 'Link', 'Link', (v) => wrap(v, '[', '](https://)'))}
       {action('image', 'Image', 'Image', (v) => insert(v, '![Description](/images/…)'))}
-      {action('code', 'Code', 'Code', (v) => wrap(v, '`'))}
-      <span className="toolbar-gap" />
-      {action('list', 'Bullet list', 'List', (v) => toggleLine(v, '- ', bullet))}
-      {action('quote', 'Quote block', 'Quote', (v) => toggleLine(v, '> ', quote))}
       <select
+        className="toolbar-insert"
         value=""
         title="Insert a shortcode"
         disabled={!view}
