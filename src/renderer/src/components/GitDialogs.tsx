@@ -64,18 +64,16 @@ export function ConfirmDialog(props: ConfirmProps): React.JSX.Element {
 interface NewBranchProps {
   base: string
   prefix: string
+  // Edits are pending, so the branch starts where the checkout stands.
+  dirty: boolean
   onSubmit: (name: string) => void
   onCancel: () => void
 }
 
 const branchName = /^[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$/
 
-export function NewBranchDialog({
-  base,
-  prefix,
-  onSubmit,
-  onCancel
-}: NewBranchProps): React.JSX.Element {
+export function NewBranchDialog(props: NewBranchProps): React.JSX.Element {
+  const { base, prefix, dirty, onSubmit, onCancel } = props
   const [name, setName] = useState(prefix)
   const valid = branchName.test(name) && !name.includes('..') && name !== prefix
   return (
@@ -91,7 +89,9 @@ export function NewBranchDialog({
         <input autoFocus value={name} onChange={(e) => setName(e.target.value.trim())} />
       </label>
       <p className="dialog-note">
-        Starts from the latest {base} on GitHub. Changes you have not committed come along.
+        {dirty
+          ? `Your uncommitted changes come along. After the commit, Update brings the branch to the latest ${base}.`
+          : `Starts from the latest ${base} on GitHub.`}
       </p>
     </Frame>
   )

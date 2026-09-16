@@ -933,6 +933,7 @@ export default function App(): React.JSX.Element | null {
           <NewBranchDialog
             base={gitStatus.base}
             prefix={branchPrefix}
+            dirty={gitStatus.changes.length > 0}
             onCancel={() => setGitDialog(null)}
             onSubmit={(name) => {
               setGitDialog(null)

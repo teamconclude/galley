@@ -212,10 +212,17 @@ export class Git {
     return [...new Set([...local, ...remote])].sort()
   }
 
+  // A new branch starts from the latest base on GitHub. With edits in progress it starts
+  // where the checkout stands instead: moving to a newer commit could not keep edits to
+  // files that changed there too, and Update brings the branch forward after the commit.
   createBranch(name: string): Promise<void> {
     return this.op('Creating branch…', async () => {
       await this.git(['check-ref-format', '--branch', name])
-      const { base } = await this.status()
+      const { base, changes } = await this.status()
+      if (changes.length > 0) {
+        await this.git(['switch', '-c', name])
+        return
+      }
       await this.git(['fetch', 'origin', base]).catch(() => undefined)
       await this.git(['switch', '-c', name, `origin/${base}`, '--no-track'])
     })
