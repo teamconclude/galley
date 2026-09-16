@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import type { HugoStatus } from '../../../shared/types'
 import type { WebviewElement } from '../env'
+import { showBlockScript } from '../../../shared/previewScript'
+import { onShowBlock } from '../lib/previewScroll'
 
 interface Props {
   status: HugoStatus
@@ -15,6 +17,14 @@ export default function Preview({ status, url, reloadKey, onDetach }: Props): Re
   useEffect(() => {
     if (reloadKey) view.current?.reload()
   }, [reloadKey])
+
+  useEffect(
+    () =>
+      onShowBlock((index) => {
+        void view.current?.executeJavaScript(showBlockScript(index)).catch(() => {})
+      }),
+    []
+  )
 
   return (
     <div className="preview">

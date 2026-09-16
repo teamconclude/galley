@@ -29,6 +29,7 @@ import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
 import { replace, search } from './search'
+import { showBlockScript } from '../shared/previewScript'
 import { loadSettings, prefs, saveSettings } from './settings'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
@@ -268,6 +269,9 @@ function registerIpc(): void {
   ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
+  ipcMain.on('preview:showBlock', (_e, index: number) => {
+    void previewWin?.webContents.executeJavaScript(showBlockScript(index)).catch(() => {})
+  })
   ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
     if (repo) void terminal.start(repo.path, cols, rows)
   })

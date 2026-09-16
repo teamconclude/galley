@@ -14,6 +14,7 @@ import {
 } from '../lib/schema'
 import { deleteAt, insertAt, moveItem, setValue, type Path } from '../lib/yamlEdit'
 import { useEdit } from '../lib/contexts'
+import { showBlock } from '../lib/previewScroll'
 import {
   BooleanControl,
   ChoiceControl,
@@ -197,13 +198,25 @@ function CardList({ path, items, titleOf, bodyOf, addControl }: CardListProps): 
     remap((i) => (i >= index ? i + 1 : i))
     setOpen((prev) => new Set(prev).add(index))
   }
+  // The preview follows the page's top-level blocks; a nested list belongs to the block
+  // its path starts in.
+  const topLevel = (index: number): number | null =>
+    path[0] !== 'content_blocks' ? null : path.length === 1 ? index : Number(path[1])
+  const follow = (index: number): void => {
+    const top = topLevel(index)
+    if (top !== null && !Number.isNaN(top)) showBlock(top)
+  }
   return (
     <div className="block-list">
       {items.map((item, index) => {
         const isOpen = open.has(index)
         const summary = isRecord(item) ? summaryOf(item) : String(item ?? '')
         return (
-          <div key={index} className={'block-card' + (isOpen ? ' open' : '')}>
+          <div
+            key={index}
+            className={'block-card' + (isOpen ? ' open' : '')}
+            onMouseDownCapture={() => follow(index)}
+          >
             <div
               className="block-head"
               onClick={() =>

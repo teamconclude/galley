@@ -76,6 +76,8 @@ export interface Api {
     detach: (url: string) => void
     reload: () => void
     attach: () => void
+    // Scrolls a detached preview to a content block.
+    showBlock: (index: number) => void
     onClosed: (cb: () => void) => Unsubscribe
   }
   terminal: {
