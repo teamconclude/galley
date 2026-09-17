@@ -71,6 +71,7 @@ type DialogState =
 const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 const binaryFile = /\.(pdf|zip|gz|woff2?|ttf|otf|eot|mp4|mov|webm|mp3)$/i
 const markdownFile = /\.(md|markdown)$/i
+const llmsSource = 'data/llms.yaml'
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 const parentOf = (path: string): string =>
   path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
@@ -122,6 +123,7 @@ export default function App(): React.JSX.Element | null {
   const [claudeHeight, setClaudeHeight] = useState(layout.claudeHeight)
   const [frontmatterHeight, setFrontmatterHeight] = useState(layout.frontmatterHeight)
   const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
+  const [previewMode, setPreviewMode] = useState(layout.previewMode)
   const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
@@ -579,6 +581,7 @@ export default function App(): React.JSX.Element | null {
   useEffect(() => {
     forgetTarget()
     if (!filePath) return
+    if (filePath === llmsSource) return
     let live = true
     void window.api.repo.pageUrl(filePath).then((url) => {
       if (live && url) setPagePath(url)
@@ -588,7 +591,9 @@ export default function App(): React.JSX.Element | null {
     }
   }, [filePath])
 
-  const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + pagePath : null
+  // The llms.txt index is generated from one data file, previewed as that text.
+  const shownPath = filePath === llmsSource ? '/llms.txt' : pagePath
+  const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + shownPath : null
 
   // The setup dialog appears by itself only when a step downloads, fails or needs the
   // user; quick checks that pass leave it closed.
@@ -612,7 +617,8 @@ export default function App(): React.JSX.Element | null {
       claudeHeight,
       frontmatterHeight,
       sidebarTab,
-      showAllFiles
+      showAllFiles,
+      previewMode
     })
   }, [
     showPreview,
@@ -623,7 +629,8 @@ export default function App(): React.JSX.Element | null {
     claudeHeight,
     frontmatterHeight,
     sidebarTab,
-    showAllFiles
+    showAllFiles,
+    previewMode
   ])
 
   // A preview that was in its own window when Galley closed reopens there.
@@ -888,6 +895,9 @@ export default function App(): React.JSX.Element | null {
                       url={previewUrl}
                       reloadKey={reloadKey}
                       onDetach={toggleDetached}
+                      mode={previewMode}
+                      onMode={setPreviewMode}
+                      content={file?.text ?? ''}
                     />
                   </section>
                 </>

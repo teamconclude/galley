@@ -36,6 +36,8 @@
     "codemirror": "^6.0.2",
     "lucide-react": "^1.46.0",
     "node-pty": "^1.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "yaml": "^2.9.1"
   },
   "devDependencies": {

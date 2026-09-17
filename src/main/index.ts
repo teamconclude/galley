@@ -284,6 +284,11 @@ function registerIpc(): void {
   ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
+  ipcMain.handle('preview:fetch', async (_e, url: string) => {
+    const res = await net.fetch(url, { cache: 'no-store' })
+    if (!res.ok) throw new Error(String(res.status))
+    return res.text()
+  })
   ipcMain.on('preview:show', (_e, target: PreviewTarget) => {
     previewTarget = target
     showInDetached()

@@ -774,6 +774,128 @@ body.dragging .terminal-host {
   min-height: 0;
 }
 
+.text-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 28px 40px;
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--bg);
+}
+
+.text-preview > * {
+  max-width: 760px;
+}
+
+.text-preview h1 {
+  font-size: 1.7em;
+  margin: 0.4em 0 0.6em;
+}
+
+.text-preview h2 {
+  font-size: 1.35em;
+  margin: 1.4em 0 0.5em;
+}
+
+.text-preview h3 {
+  font-size: 1.15em;
+  margin: 1.2em 0 0.4em;
+}
+
+.text-preview h4,
+.text-preview h5,
+.text-preview h6 {
+  font-size: 1em;
+  margin: 1em 0 0.3em;
+}
+
+.text-preview p,
+.text-preview ul,
+.text-preview ol,
+.text-preview blockquote,
+.text-preview pre,
+.text-preview table {
+  margin: 0 0 0.9em;
+}
+
+.text-preview a {
+  color: var(--accent-text);
+}
+
+.text-preview img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.text-preview blockquote {
+  margin-left: 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--gray3);
+  color: var(--text-muted);
+}
+
+.text-preview code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--gray1);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.text-preview pre {
+  padding: 10px 12px;
+  background: var(--gray1);
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.text-preview pre code {
+  padding: 0;
+  background: none;
+}
+
+.text-preview table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.text-preview th,
+.text-preview td {
+  border: 1px solid var(--gray3);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.text-preview th {
+  background: var(--gray1);
+}
+
+.text-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.4em 0;
+}
+
+.segmented {
+  display: inline-flex;
+}
+
+.segmented button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
 .claude {
   flex: 1;
   display: flex;
@@ -1239,6 +1361,32 @@ body.dragging .terminal-host {
 .context-menu button:hover {
   background: var(--accent);
   color: white;
+}
+
+.context-menu.described {
+  min-width: 300px;
+  max-width: 380px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.context-menu button small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: normal;
+}
+
+.context-menu button:hover small {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.block-description {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .context-menu button.danger {

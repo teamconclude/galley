@@ -106,7 +106,11 @@ export interface Layout {
   frontmatterHeight: number
   sidebarTab: SidebarTab
   showAllFiles: boolean
+  // The rendered page, or its markdown twin for LLMs.
+  previewMode: PreviewMode
 }
+
+export type PreviewMode = 'html' | 'markdown'
 
 export type SidebarTab = 'files' | 'changes' | 'search'
 

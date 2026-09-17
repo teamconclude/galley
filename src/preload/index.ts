@@ -65,6 +65,7 @@ const api: Api = {
     reload: () => ipcRenderer.send('preview:reload'),
     attach: () => ipcRenderer.send('preview:attach'),
     show: (target) => ipcRenderer.send('preview:show', target),
+    fetchText: (url) => ipcRenderer.invoke('preview:fetch', url),
     onClosed: (cb) => on('preview:closed', cb)
   },
   terminal: {

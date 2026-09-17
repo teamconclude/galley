@@ -79,6 +79,9 @@ export interface Api {
     attach: () => void
     // Scrolls a detached preview to a block or a piece of text.
     show: (target: PreviewTarget) => void
+    // The text at a preview server URL, e.g. a page's markdown twin; throws with the
+    // HTTP status when there is none.
+    fetchText: (url: string) => Promise<string>
     onClosed: (cb: () => void) => Unsubscribe
   }
   terminal: {

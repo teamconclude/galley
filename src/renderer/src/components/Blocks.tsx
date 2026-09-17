@@ -24,6 +24,8 @@ import {
   NumberControl,
   TextControl
 } from './Fields'
+import ContextMenu from './ContextMenu'
+import Tip from './Tip'
 import { useSchemas } from '../lib/contexts'
 
 interface FieldForProps {
@@ -166,13 +168,16 @@ interface CardListProps {
   path: Path
   items: unknown[]
   titleOf: (item: unknown, index: number) => string
+  // What this kind of item is for, shown in the open card and on hover.
+  describe?: (item: unknown) => string | undefined
   bodyOf: (item: unknown, index: number) => React.ReactNode
   addControl: (insert: (value: unknown) => void) => React.ReactNode
 }
 
 // A list of collapsible cards with move, duplicate and delete. Open state follows the
 // item through moves and deletes.
-function CardList({ path, items, titleOf, bodyOf, addControl }: CardListProps): React.JSX.Element {
+function CardList(props: CardListProps): React.JSX.Element {
+  const { path, items, titleOf, describe, bodyOf, addControl } = props
   const edit = useEdit()
   const [open, setOpen] = useState<Set<number>>(() => new Set())
   const remap = (fn: (i: number) => number | null): void =>
@@ -211,6 +216,7 @@ function CardList({ path, items, titleOf, bodyOf, addControl }: CardListProps): 
       {items.map((item, index) => {
         const isOpen = open.has(index)
         const summary = isRecord(item) ? summaryOf(item) : String(item ?? '')
+        const description = describe?.(item)
         return (
           <div
             key={index}
@@ -229,7 +235,13 @@ function CardList({ path, items, titleOf, bodyOf, addControl }: CardListProps): 
               }
             >
               <span className="tree-arrow">{isOpen ? '▾' : '▸'}</span>
-              <span className="block-type">{titleOf(item, index)}</span>
+              {description ? (
+                <Tip text={description}>
+                  <span className="block-type">{titleOf(item, index)}</span>
+                </Tip>
+              ) : (
+                <span className="block-type">{titleOf(item, index)}</span>
+              )}
               <span className="block-summary">{summary}</span>
               <span className="block-actions" onClick={(e) => e.stopPropagation()}>
                 <button
@@ -254,7 +266,12 @@ function CardList({ path, items, titleOf, bodyOf, addControl }: CardListProps): 
                 </button>
               </span>
             </div>
-            {isOpen && <div className="block-body fields-grid">{bodyOf(item, index)}</div>}
+            {isOpen && (
+              <div className="block-body fields-grid">
+                {description && <p className="block-description">{description}</p>}
+                {bodyOf(item, index)}
+              </div>
+            )}
           </div>
         )
       })}
@@ -273,6 +290,9 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
   const { schemas, standalone } = useSchemas()
   const choices = allowed ? allowed.flatMap((name) => schemas.get(name) ?? []) : standalone
   const labels = labelsFor(choices)
+  const [menu, setMenu] = useState<{ x: number; y: number; insert: (v: unknown) => void } | null>(
+    null
+  )
   return (
     <CardList
       path={path}
@@ -281,6 +301,10 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
         const name = blockName(item)
         if (!name) return 'Block'
         return schemas.get(name)?.label ?? `Unknown block “${name}”`
+      }}
+      describe={(item) => {
+        const name = blockName(item)
+        return (name && schemas.get(name)?.description) || undefined
       }}
       bodyOf={(item, index) => {
         const obj = isRecord(item) ? item : {}
@@ -297,20 +321,28 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
         )
       }}
       addControl={(insert) => (
-        <select
-          value=""
-          onChange={(e) => {
-            const schema = schemas.get(e.target.value)
-            if (schema) insert(newBlock(schema))
-          }}
-        >
-          <option value="">Add block…</option>
-          {choices.map((s) => (
-            <option key={s.name} value={s.name} title={s.description}>
-              {labels.get(s.name)}
-            </option>
-          ))}
-        </select>
+        <>
+          <button
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setMenu({ x: r.left, y: r.bottom + 4, insert })
+            }}
+          >
+            Add block…
+          </button>
+          {menu && (
+            <ContextMenu
+              x={menu.x}
+              y={menu.y}
+              onClose={() => setMenu(null)}
+              items={choices.map((s) => ({
+                label: labels.get(s.name) ?? s.name,
+                description: s.description || undefined,
+                onClick: () => menu.insert(newBlock(s))
+              }))}
+            />
+          )}
+        </>
       )}
     />
   )

@@ -4,6 +4,8 @@ export interface MenuItem {
   label: string
   onClick: () => void
   danger?: boolean
+  // A second, muted line, e.g. what a block is for.
+  description?: string
 }
 
 interface Props {
@@ -29,10 +31,17 @@ export default function ContextMenu({ x, y, items, onClose }: Props): React.JSX.
     }
   }, [onClose])
 
-  const left = Math.min(x, window.innerWidth - 200)
-  const top = Math.min(y, window.innerHeight - items.length * 28 - 12)
+  const described = items.some((item) => item.description)
+  const rowHeight = described ? 46 : 28
+  const height = Math.min(items.length * rowHeight + 12, window.innerHeight * 0.7)
+  const left = Math.min(x, window.innerWidth - (described ? 320 : 200))
+  const top = Math.min(y, window.innerHeight - height - 12)
   return (
-    <div className="context-menu" style={{ left, top }} onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className={described ? 'context-menu described' : 'context-menu'}
+      style={{ left, top }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       {items.map((item) => (
         <button
           key={item.label}
@@ -43,6 +52,7 @@ export default function ContextMenu({ x, y, items, onClose }: Props): React.JSX.
           }}
         >
           {item.label}
+          {item.description && <small>{item.description}</small>}
         </button>
       ))}
     </div>
