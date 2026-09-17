@@ -20,6 +20,8 @@ import type {
   Layout,
   MenuCommand,
   Preferences,
+  PreviewMode,
+  PreviewState,
   PreviewTarget,
   SearchOptions,
   SetupStepId
@@ -30,7 +32,6 @@ import { HugoServer } from './hugo'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
 import { replace, search } from './search'
-import { previewScript } from '../shared/previewScript'
 import { loadSettings, prefs, saveSettings } from './settings'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
@@ -38,8 +39,8 @@ import { Updater } from './updater'
 
 let win: BrowserWindow | null = null
 let previewWin: BrowserWindow | null = null
-// Where the detached preview should scroll to, until its page has found it.
-let previewTarget: PreviewTarget | null = null
+// What the detached preview window shows; it asks on load and is told of changes.
+let previewState: PreviewState | null = null
 let repo: Repo | null = null
 let git: Git | null = null
 
@@ -159,29 +160,28 @@ function createWindow(): void {
   }
 }
 
-function showInDetached(): void {
-  const target = previewTarget
-  if (!target || !previewWin) return
-  void previewWin.webContents
-    .executeJavaScript(previewScript(target))
-    .then((found) => {
-      if (found === true && previewTarget === target) previewTarget = null
-    })
-    .catch(() => {})
-}
-
-function detachPreview(url: string): void {
+// The detached preview is Galley's own renderer page in preview mode, so it can show the
+// rendered page or the markdown twin alike and follow the cursor as the embedded one does.
+function detachPreview(state: PreviewState): void {
+  previewState = state
   if (previewWin) {
-    if (previewWin.webContents.getURL() !== url) void previewWin.loadURL(url)
+    previewWin.webContents.send('preview:state', state)
     return
   }
   previewWin = new BrowserWindow({
     width: 1100,
     height: 850,
     ...savedBounds('preview'),
-    title: 'Preview'
+    title: 'Preview',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      webviewTag: true
+    }
   })
   rememberBounds(previewWin, 'preview')
+  // The page is Galley's own; its title would otherwise replace "Preview".
+  previewWin.on('page-title-updated', (e) => e.preventDefault())
   previewWin.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
@@ -190,8 +190,11 @@ function detachPreview(url: string): void {
     previewWin = null
     send('preview:closed')
   })
-  previewWin.webContents.on('did-finish-load', showInDetached)
-  void previewWin.loadURL(url)
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+    void previewWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#preview')
+  } else {
+    void previewWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'preview' })
+  }
 }
 
 function registerIpc(): void {
@@ -281,7 +284,13 @@ function registerIpc(): void {
     if (!Repo.isSite(dest)) throw new Error(`${basename(dest)} is not a Hugo site checkout`)
     openRepo(dest)
   })
-  ipcMain.on('preview:detach', (_e, url: string) => detachPreview(url))
+  ipcMain.on('preview:detach', (_e, state: PreviewState) => detachPreview(state))
+  ipcMain.on('preview:update', (_e, state: PreviewState) => {
+    previewState = state
+    previewWin?.webContents.send('preview:state', state)
+  })
+  ipcMain.handle('preview:state', () => previewState)
+  ipcMain.on('preview:setMode', (_e, mode: PreviewMode) => send('preview:mode', mode))
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
   ipcMain.handle('preview:fetch', async (_e, url: string) => {
@@ -290,8 +299,7 @@ function registerIpc(): void {
     return res.text()
   })
   ipcMain.on('preview:show', (_e, target: PreviewTarget) => {
-    previewTarget = target
-    showInDetached()
+    previewWin?.webContents.send('preview:target', target)
   })
   ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
     if (repo) void terminal.start(repo.path, cols, rows)

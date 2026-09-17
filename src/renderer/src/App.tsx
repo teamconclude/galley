@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   Change,
   DirEntry,
@@ -34,7 +34,7 @@ import SearchPanel, { type SearchRequest } from './components/SearchPanel'
 import { BodyFollower } from './components/PreviewFollow'
 import Splitter from './components/Splitter'
 import { openFind } from './lib/findPanel'
-import { forgetTarget } from './lib/previewScroll'
+import { forgetTarget, onShow } from './lib/previewScroll'
 import { loadLayout, saveLayout } from './lib/layout'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
@@ -72,6 +72,12 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 const binaryFile = /\.(pdf|zip|gz|woff2?|ttf|otf|eot|mp4|mov|webm|mp3)$/i
 const markdownFile = /\.(md|markdown)$/i
 const llmsSource = 'data/llms.yaml'
+// A cheap fingerprint of a text, to notice changes without carrying the text around.
+function hashText(text: string): number {
+  let h = text.length
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0
+  return h
+}
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 const parentOf = (path: string): string =>
   path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
@@ -633,21 +639,27 @@ export default function App(): React.JSX.Element | null {
     previewMode
   ])
 
-  // A preview that was in its own window when Galley closed reopens there.
+  // The text view fetches again when the file's text changes.
+  const fileText = file?.text ?? ''
+  const contentVersion = useMemo(() => hashText(fileText), [fileText])
+  const previewState = useMemo(
+    () => ({ url: previewUrl, mode: previewMode, version: contentVersion, status: hugo }),
+    [previewUrl, previewMode, contentVersion, hugo]
+  )
+
+  // A preview in its own window follows what the bar in this window says; one that was
+  // detached when Galley closed reopens there.
   useEffect(() => {
-    if (detached && previewUrl) window.api.preview.detach(previewUrl)
-  }, [detached, previewUrl])
+    if (detached) window.api.preview.detach(previewState)
+  }, [detached, previewState])
 
   const toggleDetached = useCallback(() => {
-    if (detached) {
-      window.api.preview.attach()
-    } else if (previewUrl) {
-      window.api.preview.detach(previewUrl)
-      setDetached(true)
-    }
-  }, [detached, previewUrl])
+    if (detached) window.api.preview.attach()
+    else setDetached(true)
+  }, [detached])
 
   useEffect(() => window.api.preview.onClosed(() => setDetached(false)), [])
+  useEffect(() => window.api.preview.onMode(setPreviewMode), [])
 
   useEffect(() => {
     if (detached && reloadKey) window.api.preview.reload()
@@ -894,10 +906,13 @@ export default function App(): React.JSX.Element | null {
                       status={hugo}
                       url={previewUrl}
                       reloadKey={reloadKey}
-                      onDetach={toggleDetached}
                       mode={previewMode}
                       onMode={setPreviewMode}
-                      content={file?.text ?? ''}
+                      version={contentVersion}
+                      detached={false}
+                      onDetach={toggleDetached}
+                      onAttach={toggleDetached}
+                      targets={onShow}
                     />
                   </section>
                 </>

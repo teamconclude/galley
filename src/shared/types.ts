@@ -112,6 +112,15 @@ export interface Layout {
 
 export type PreviewMode = 'html' | 'markdown'
 
+// What the preview shows, also handed to the detached preview window.
+export interface PreviewState {
+  url: string | null
+  mode: PreviewMode
+  // Changes whenever the open file's text does; the text view fetches again.
+  version: number
+  status: HugoStatus
+}
+
 export type SidebarTab = 'files' | 'changes' | 'search'
 
 export interface SearchOptions {

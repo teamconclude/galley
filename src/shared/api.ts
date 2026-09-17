@@ -8,6 +8,8 @@ import type {
   Layout,
   MenuCommand,
   Preferences,
+  PreviewMode,
+  PreviewState,
   PreviewTarget,
   PublishResult,
   RepoInfo,
@@ -74,15 +76,24 @@ export interface Api {
     onCloneProgress: (cb: (line: string) => void) => Unsubscribe
   }
   preview: {
-    detach: (url: string) => void
+    // Opens the preview in its own window, showing this state; update keeps it current.
+    detach: (state: PreviewState) => void
+    update: (state: PreviewState) => void
     reload: () => void
     attach: () => void
-    // Scrolls a detached preview to a block or a piece of text.
+    // Scrolls the preview to a block or a piece of text.
     show: (target: PreviewTarget) => void
     // The text at a preview server URL, e.g. a page's markdown twin; throws with the
     // HTTP status when there is none.
     fetchText: (url: string) => Promise<string>
     onClosed: (cb: () => void) => Unsubscribe
+    // For the detached window: what to show, where to scroll, and its mode switch.
+    state: () => Promise<PreviewState | null>
+    onState: (cb: (state: PreviewState) => void) => Unsubscribe
+    onTarget: (cb: (target: PreviewTarget) => void) => Unsubscribe
+    setMode: (mode: PreviewMode) => void
+    // The main window hears of a mode chosen in the detached window.
+    onMode: (cb: (mode: PreviewMode) => void) => Unsubscribe
   }
   terminal: {
     start: (cols: number, rows: number) => void

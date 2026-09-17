@@ -61,12 +61,18 @@ const api: Api = {
     onCloneProgress: (cb) => on('git:cloneProgress', cb)
   },
   preview: {
-    detach: (url) => ipcRenderer.send('preview:detach', url),
+    detach: (state) => ipcRenderer.send('preview:detach', state),
+    update: (state) => ipcRenderer.send('preview:update', state),
     reload: () => ipcRenderer.send('preview:reload'),
     attach: () => ipcRenderer.send('preview:attach'),
     show: (target) => ipcRenderer.send('preview:show', target),
     fetchText: (url) => ipcRenderer.invoke('preview:fetch', url),
-    onClosed: (cb) => on('preview:closed', cb)
+    onClosed: (cb) => on('preview:closed', cb),
+    state: () => ipcRenderer.invoke('preview:state'),
+    onState: (cb) => on('preview:state', cb),
+    onTarget: (cb) => on('preview:target', cb),
+    setMode: (mode) => ipcRenderer.send('preview:setMode', mode),
+    onMode: (cb) => on('preview:mode', cb)
   },
   terminal: {
     start: (cols, rows) => ipcRenderer.send('terminal:start', cols, rows),

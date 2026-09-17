@@ -4,17 +4,21 @@ import remarkGfm from 'remark-gfm'
 import type { HugoStatus, PreviewMode, PreviewTarget } from '../../../shared/types'
 import type { WebviewElement } from '../env'
 import { previewScript } from '../../../shared/previewScript'
-import { onShow } from '../lib/previewScroll'
 
 interface Props {
   status: HugoStatus
   url: string | null
   reloadKey: number
-  onDetach: () => void
   mode: PreviewMode
   onMode: (mode: PreviewMode) => void
-  // The open file's text; a change means the server is about to render anew.
-  content: string
+  // Changes whenever the open file's text does.
+  version: number
+  // Shown in the preview's own window: the last button brings it back.
+  detached: boolean
+  onDetach: () => void
+  onAttach: () => void
+  // Where scroll targets come from: the store in this window, or IPC in the detached one.
+  targets: (cb: (target: PreviewTarget) => void) => () => void
 }
 
 // A page's markdown twin lives at its URL plus index.html.md; llms.txt is text as it is.
@@ -22,11 +26,81 @@ function textUrlFor(url: string): string {
   return url.endsWith('.txt') ? url : url.replace(/\/?$/, '/') + 'index.html.md'
 }
 
+const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? false
+
 export default function Preview(props: Props): React.JSX.Element {
-  const { status, url, reloadKey, onDetach, mode, onMode, content } = props
-  const view = useRef<WebviewElement>(null)
-  const plainFile = url?.endsWith('.txt') ?? false
+  const { status, url, reloadKey, mode, onMode, version, detached } = props
+  const { onDetach, onAttach, targets } = props
+  const plainFile = isPlainFile(url)
   const textMode = plainFile || mode === 'markdown'
+  const shownUrl = url && textMode ? textUrlFor(url) : url
+  const [reloads, setReloads] = useState(0)
+
+  return (
+    <div className="preview">
+      <div className="pane-bar">
+        <span className={`dot ${status.state}`} />
+        <span className="pane-title">{shownUrl ?? statusText(status)}</span>
+        {url && !plainFile && (
+          <span className="segmented" title="The page as rendered, or its markdown for LLMs">
+            <button className={mode === 'html' ? 'on' : ''} onClick={() => onMode('html')}>
+              HTML
+            </button>
+            <button className={mode === 'markdown' ? 'on' : ''} onClick={() => onMode('markdown')}>
+              Markdown
+            </button>
+          </span>
+        )}
+        {url && <button onClick={() => setReloads((n) => n + 1)}>Reload</button>}
+        {shownUrl && (
+          <button onClick={() => window.api.openExternal(shownUrl)}>Open in browser</button>
+        )}
+        {url && !detached && (
+          <button onClick={onDetach} title="Move the preview into its own window">
+            Separate window
+          </button>
+        )}
+        {detached && (
+          <button onClick={onAttach} title="Bring the preview back into the main window">
+            Back into main window
+          </button>
+        )}
+        {status.state === 'error' && status.missing && (
+          <button className="primary" onClick={() => void window.api.hugo.install()}>
+            Install Hugo
+          </button>
+        )}
+        {status.state === 'error' && !status.missing && (
+          <button onClick={() => void window.api.hugo.restart()}>Restart Hugo</button>
+        )}
+      </div>
+      <PreviewContent
+        url={url}
+        mode={mode}
+        version={version}
+        reloadKey={reloadKey + reloads}
+        targets={targets}
+        empty={status.message ?? statusText(status)}
+      />
+    </div>
+  )
+}
+
+interface ContentProps {
+  url: string | null
+  mode: PreviewMode
+  version: number
+  reloadKey: number
+  // Where scroll targets come from: the store in this window, or IPC in the detached one.
+  targets: (cb: (target: PreviewTarget) => void) => () => void
+  empty: string
+}
+
+// The page in a webview, or its text rendered; shared by the pane and the detached window.
+export function PreviewContent(props: ContentProps): React.JSX.Element {
+  const { url, mode, version, reloadKey, targets, empty } = props
+  const view = useRef<WebviewElement>(null)
+  const textMode = isPlainFile(url) || mode === 'markdown'
   const shownUrl = url && textMode ? textUrlFor(url) : url
 
   useEffect(() => {
@@ -46,11 +120,11 @@ export default function Preview(props: Props): React.JSX.Element {
   }
   useEffect(
     () =>
-      onShow((target) => {
+      targets((target) => {
         pending.current = target
         run(target)
       }),
-    []
+    [targets]
   )
   useEffect(() => {
     const el = view.current
@@ -60,60 +134,23 @@ export default function Preview(props: Props): React.JSX.Element {
     }
     el.addEventListener('did-finish-load', onLoad)
     return () => el.removeEventListener('did-finish-load', onLoad)
-  }, [url])
+  }, [url, textMode])
 
-  return (
-    <div className="preview">
-      <div className="pane-bar">
-        <span className={`dot ${status.state}`} />
-        <span className="pane-title">{shownUrl ?? statusText(status)}</span>
-        {url && !plainFile && (
-          <span className="segmented" title="The page as rendered, or its markdown for LLMs">
-            <button className={mode === 'html' ? 'on' : ''} onClick={() => onMode('html')}>
-              HTML
-            </button>
-            <button className={mode === 'markdown' ? 'on' : ''} onClick={() => onMode('markdown')}>
-              Markdown
-            </button>
-          </span>
-        )}
-        {url && !textMode && <button onClick={() => view.current?.reload()}>Reload</button>}
-        {shownUrl && (
-          <button onClick={() => window.api.openExternal(shownUrl)}>Open in browser</button>
-        )}
-        {url && !textMode && (
-          <button onClick={onDetach} title="Move the preview into its own window">
-            Separate window
-          </button>
-        )}
-        {status.state === 'error' && status.missing && (
-          <button className="primary" onClick={() => void window.api.hugo.install()}>
-            Install Hugo
-          </button>
-        )}
-        {status.state === 'error' && !status.missing && (
-          <button onClick={() => void window.api.hugo.restart()}>Restart Hugo</button>
-        )}
-      </div>
-      {shownUrl && textMode ? (
-        <TextPreview url={shownUrl} content={content} reloadKey={reloadKey} />
-      ) : url ? (
-        <webview ref={view} src={url} className="webview" />
-      ) : (
-        <pre className="pane-empty">{status.message ?? statusText(status)}</pre>
-      )}
-    </div>
-  )
+  if (shownUrl && textMode) {
+    return <TextPreview url={shownUrl} version={version} reloadKey={reloadKey} />
+  }
+  if (url) return <webview ref={view} src={url} className="webview" />
+  return <pre className="pane-empty">{empty}</pre>
 }
 
 // The text the server serves at a URL, fetched again a moment after the file changes and
 // once more when Hugo has surely rebuilt.
 function TextPreview(props: {
   url: string
-  content: string
+  version: number
   reloadKey: number
 }): React.JSX.Element {
-  const { url, content, reloadKey } = props
+  const { url, version, reloadKey } = props
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const shownUrl = useRef<string | null>(null)
@@ -146,7 +183,7 @@ function TextPreview(props: {
       live = false
       timers.forEach((t) => window.clearTimeout(t))
     }
-  }, [url, content, reloadKey])
+  }, [url, version, reloadKey])
   if (error) return <div className="pane-empty">{error}</div>
   if (text === null) return <div className="pane-empty">Loading…</div>
   return <RenderedMarkdown text={text} base={new URL(url).origin} />

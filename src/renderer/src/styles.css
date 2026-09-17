@@ -142,7 +142,8 @@ button.primary {
   font-size: 14px;
 }
 
-.app {
+.app,
+.detached {
   display: flex;
   flex-direction: column;
   height: 100%;
