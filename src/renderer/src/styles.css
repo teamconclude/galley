@@ -390,6 +390,11 @@ body.dragging .terminal-host {
   white-space: nowrap;
 }
 
+.pane-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .pane-empty {
   flex: 1;
   display: flex;

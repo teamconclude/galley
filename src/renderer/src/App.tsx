@@ -867,7 +867,8 @@ export default function App(): React.JSX.Element | null {
                       <Frontmatter
                         key={`settings:${file.path}`}
                         text={parts.frontmatter}
-                        onChange={(fm) => changeText(join(fm, parts.body))}
+                        format={parts.format}
+                        onChange={(fm) => changeText(join(fm, parts.body, parts.format))}
                         grow={blocksPage}
                         height={blocksPage ? undefined : frontmatterHeight}
                         select={selectIn('frontmatter')}
@@ -896,7 +897,7 @@ export default function App(): React.JSX.Element | null {
                           filename={file.path}
                           value={parts ? parts.body : file.text}
                           onChange={(body) =>
-                            changeText(parts ? join(parts.frontmatter, body) : body)
+                            changeText(parts ? join(parts.frontmatter, body, parts.format) : body)
                           }
                           onSave={() => void save()}
                           importImages={isMarkdown ? importImages : undefined}

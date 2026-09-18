@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { EditorView } from '@codemirror/view'
 import { Document, isMap, parseDocument } from 'yaml'
+import { parse as parseToml } from 'smol-toml'
+import { isRecord } from '../../../shared/fields'
+import type { FrontmatterFormat } from '../lib/frontmatter'
 import { humanize, pageField } from '../lib/schema'
 import { FieldFor } from './Blocks'
 import { EditContext, type EditFn, useSchemas } from '../lib/contexts'
@@ -9,11 +12,23 @@ import { YamlFollower } from './PreviewFollow'
 
 interface Props {
   text: string
+  // YAML gets the form; TOML and JSON are shown as text with the badge.
+  format: FrontmatterFormat
   onChange: (text: string) => void
   grow?: boolean
   height?: number
   // A range of the YAML to show selected, e.g. a search hit; it switches to the YAML view.
   select?: Selection
+}
+
+// TOML or JSON settings, for the badge only; unparsable text is an empty page.
+function parseOther(text: string, format: FrontmatterFormat): Record<string, unknown> {
+  try {
+    const v: unknown = format === 'toml' ? parseToml(text) : JSON.parse(text)
+    return isRecord(v) ? v : {}
+  } catch {
+    return {}
+  }
 }
 
 // The default 80-column folding and single quotes match how existing pages are written.
@@ -44,7 +59,7 @@ function visibility(data: Record<string, unknown>): { label: string; kind: strin
 }
 
 export default function Frontmatter(props: Props): React.JSX.Element {
-  const { text, onChange, grow, height, select } = props
+  const { text, format, onChange, grow, height, select } = props
   const [raw, setRaw] = useState(false)
   const [yamlView, setYamlView] = useState<EditorView | null>(null)
   const [selected, setSelected] = useState(0)
@@ -64,7 +79,28 @@ export default function Frontmatter(props: Props): React.JSX.Element {
     },
     [doc, onChange]
   )
-  const badge = broken ? null : visibility(data)
+  const badge =
+    format === 'yaml' ? (broken ? null : visibility(data)) : visibility(parseOther(text, format))
+  if (format !== 'yaml') {
+    return (
+      <div className={'frontmatter' + (grow ? ' grow' : '')} style={{ height }}>
+        <div className="pane-bar">
+          <span className="pane-title">Page settings</span>
+          {badge && <span className={`page-badge ${badge.kind}`}>{badge.label}</span>}
+          <span className="pane-spacer" />
+          <span className="pane-note">{format.toUpperCase()} settings are edited as text</span>
+        </div>
+        <div className="frontmatter-raw">
+          <Editor
+            filename={`frontmatter.${format}`}
+            value={text}
+            onChange={onChange}
+            select={select}
+          />
+        </div>
+      </div>
+    )
+  }
   return (
     <div className={'frontmatter' + (grow ? ' grow' : '')} style={{ height }}>
       <div className="pane-bar">
