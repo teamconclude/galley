@@ -20,8 +20,9 @@ Done, in Galley 0.4.1 and on the web branch `lars/galley` (2026-09-18):
 - The web branch itself: Bookshop, CloudCannon and the vendored module removed, plain
   file names, 37 schemas with hand-written labels, placeholders and help.
 
-Next, in order: merge `lars/galley` into develop once CloudCannon is no longer needed,
-then phase 1 (the manifest), phase 2, the rest of phase 3, the template site.
+Next, in order: phase 1 (derive everything from the Hugo config and the repo), phase 2,
+the rest of phase 3, the template site; merging `lars/galley` into develop can happen any
+time after 0.4.1 is installed and CloudCannon is no longer needed.
 
 ## Goals and non-goals
 
@@ -66,8 +67,7 @@ The block model:
 
 - Components live in `components/<name>/<name>.yml`, with `component-library/components`
   as the Bookshop fallback; the list key is `blocks` and the type key `component`
-  (`content_blocks` and `_bookshop_name` for Bookshop). Both are chosen by the schema
-  format found, not yet by a manifest.
+  (`content_blocks` and `_bookshop_name` for Bookshop), chosen by the schema format found.
 - Preview scrolling to a block counts `<!--galley-block-->` comments and falls back to
   Bookshop's `<!--bookshop-live name(…)-->` (`src/shared/previewScript.ts`).
 - Text follow looks for `<main>` and a fixed `header`, `.navbar` or `nav`.
@@ -81,41 +81,44 @@ Environment:
 ## The site contract
 
 This is what Galley will document (as `docs/site-contract.md`) and what the template site
-implements. A site opts in with one file; everything in it is optional.
+implements. A site opts in by following it; there is no configuration file.
 
-### `galley.yaml` at the repository root
+### No configuration file
 
-```yaml
-name: Conclude website # shown in the title bar and the Welcome screen
-content: content # Hugo contentDir, read from the Hugo config when absent
-images:
-  dir: static/images # where the picker looks and drops copy to
-  url: /images # how pages refer to files in that folder
-components:
-  dir: components
-  listKey: blocks # the frontmatter list holding a page's blocks
-  typeKey: component # the key naming a block's component
-lists: # frontmatter key → data file with a list of maps with `name`
-  authors: data/authors.yaml
-  categories: data/categories.yaml
-snippets: # the Insert menu; label → text
-  Screenshot: '{{< screenshot "/images/…" "Description" >}}'
-  YouTube: '{{< youtube VIDEO_ID >}}'
-textPreviews: # editing this file previews that URL as text
-  data/llms.yaml: /llms.txt
-markdownTwin: index.html.md # appended to a page URL for the Markdown preview mode
-links:
-  newTabTitle: NewTab # link title the site's render hook turns into target=_blank
-git:
-  base: develop # where personal branches start
-  chain: [develop, staging, production]
-  pullRequestInto: [production] # hops that go through a pull request, the rest are merges
-claude: true # show the Claude pane and install Claude Code in setup
-```
+Everything Galley needs is in the Hugo config or follows from the repository, so a site
+declares nothing. Values with a source in the Hugo config, read from `hugo.{yaml,toml,json}`
+or `config.*`, at the root or under `config/_default/`:
 
-Defaults are today's values, so the conclude.io checkout needs no `galley.yaml`. With no
-component folder Galley runs in plain mode: no block cards, no Add block menu, the
-settings form still renders from the frontmatter.
+- The site name: `title`.
+- Folders: `contentDir` and `staticDir`, default `content` and `static`; images live in
+  `<staticDir>/images` and pages refer to them by the path under static.
+- The components folder: the source of the mount whose target is
+  `layouts/partials/components`, else `components/`, else Bookshop's
+  `component-library/components/`.
+- The Markdown preview mode: on when an output format has media type `text/markdown` and
+  a page kind lists it in `outputs`; the file to fetch is its `baseName` plus `.md`.
+- Text previews: a plain-text format that the home page outputs, whose name matches a
+  file in `data/`, previews that data file as the format's URL (`llms` and
+  `data/llms.yaml` today).
+
+Values that follow from the repository by convention:
+
+- Pickers: a frontmatter key with a same-named `data/<key>.yaml` holding a list of maps
+  with a `name` field.
+- Page keys: `blocks` and `component`, or the Bookshop pair when the schemas are Bookshop
+  files.
+- Snippets: the site's `layouts/shortcodes/*.html`, paired when the template uses
+  `.Inner`, with one empty argument per `.Get`, plus Hugo's embedded youtube, vimeo, x,
+  figure and details. A site shortcode of the same name wins, as in Hugo.
+- Git flow: the base branch from `origin/HEAD`, the chain from which of develop, staging,
+  production and main exist, a pull request on the last hop. Today's heuristic.
+- Links that open in a new tab carry the title `NewTab`; the template ships the render
+  hook. Not configurable for now.
+- A new page goes into the open page's folder, else the content root.
+
+Whether the Claude pane shows is the user's choice, so it moves into Galley's preferences.
+Should a site ever need to override one of these, an optional `galley.yaml` can be added
+later; its absence stays the normal case, and the template ships without one.
 
 ### Component schema
 
@@ -172,41 +175,36 @@ the body) below a fixed header; the contract asks for a `<main>` element, nothin
 
 ## Work items
 
-### Phase 1: the manifest and its defaults
+### Phase 1: read the Hugo config and the repository
 
-1. Add `SiteConfig` to `src/shared/types.ts` with the shape above, fully populated with
-   defaults in `src/main/site.ts` (rename of `shared/site.ts`, which loses the clone URL).
-   `Repo` loads `galley.yaml`, merges it over the defaults, and sends it with the
-   component library; `SchemaContext` exposes it to the renderer.
-2. Replace each literal with the config value: content and images dirs and URL prefix
-   (`repo.ts`, `Fields.tsx`, `ImagePicker.tsx`, `schema.ts`, `App.tsx`, `search.ts`),
-   component dir and keys (`repo.ts`, `schema.ts`, `Blocks.tsx`, `PreviewFollow.tsx`),
-   data lists (`DataLists` becomes `Record<string, string[]>` keyed by frontmatter key),
-   snippets (`Toolbar.tsx`), text previews and the markdown twin (`App.tsx`,
-   `Preview.tsx`), the new-tab title (`inline.ts`).
-3. Git flow from config: `sharedChain`, base branch, protected set (chain plus main and
-   master), and which hops open pull requests. The Publish and Merge wording follows
-   `pullRequestInto` instead of the name `production`.
-4. Reload the config when `galley.yaml` changes, like components and data today.
+1. A Hugo config reader in `src/main/hugoConfig.ts`: find the file in its five names and
+   two places, parse YAML, TOML (`smol-toml`) and JSON into one object, and read `title`,
+   `contentDir`, `staticDir`, `module.mounts`, `outputFormats`, `outputs` and
+   `markup.goldmark.renderer.unsafe`. `Repo.isSite` accepts any of the files.
+2. A `SiteInfo` in `src/shared/types.ts` with the derived values, computed once per
+   checkout, recomputed when the config or `layouts/shortcodes/` changes, and sent to the
+   renderer with the component library.
+3. Replace each literal with the derived value: content and images folders and URL prefix
+   (`repo.ts`, `Fields.tsx`, `ImagePicker.tsx`, `schema.ts`, `App.tsx`, `search.ts`), the
+   components folder (`repo.ts`), pickers from `data/` (`schema.ts`, `DataLists` becomes a
+   map keyed by frontmatter key), snippets (`Toolbar.tsx`), the markdown twin and text
+   previews (`App.tsx`, `Preview.tsx`), the new-page folder (`App.tsx`).
+4. Git flow: keep the heuristic, add `main` to the known names so a single-branch site
+   gets "Merge into main" and a pull request only when the branch is protected on GitHub.
+5. Claude pane: a preference in the settings dialog, default on; the setup step follows it.
 
-Verify: the existing playwright scripts pass against the conclude.io scratch clone with no
-manifest; a second scratch site with a manifest moving images to `assets/img` and the
-chain to `[main]` shows the picker, drops and a single "Merge into main" step.
+Verify: the playwright scripts pass against the conclude.io scratch clone; a stock
+`hugo new site` with `hugo.toml`, no components and no markdown output opens with the
+tree, the settings form, the preview and no Markdown mode; a scratch site with
+`staticDir: assets/public` shows the picker in the right place.
 
-### Phase 2: the rest of Hugo
+### Phase 2: frontmatter formats
 
-1. Site detection: any of `hugo.{yaml,yml,toml,json}`, `config.{yaml,yml,toml,json}` at
-   the root, or the same names under `config/_default/`. Read `contentDir` and
-   `staticDir` from it when the manifest does not set them; `@iarna/toml` or `smol-toml`
-   for TOML.
-2. Frontmatter: recognise `+++` TOML and `{` JSON fences. Form editing stays YAML only;
-   TOML and JSON pages show the badge and open in the raw editor, with a note. The YAML
-   library is already there; converting formats on save is not worth the surprise.
-3. New page templating and body image folders derive from `content` and `images` in the
-   config rather than from `content/` and `static/images`.
+1. Recognise `+++` TOML and `{` JSON fences. Form editing stays YAML only; TOML and JSON
+   pages show the badge and open in the raw editor, with a note. Converting formats on
+   save is not worth the surprise.
 
-Verify: a stock `hugo new site` with `hugo.toml` and a theme opens, previews, and the
-settings form appears for its YAML pages; a TOML-frontmatter page opens raw with a badge.
+Verify: a TOML-frontmatter page opens raw with the badge; a YAML page is unchanged.
 
 ### Phase 3: the component contract
 
@@ -235,7 +233,6 @@ Contents:
 - `hugo.yaml` with `unsafe: true` for Goldmark, the `markdown` output format for the
   twin, `enableGitInfo`, and `module.mounts` making `components`
   available as partials. No vendored modules, no Go needed.
-- `galley.yaml` with the defaults spelled out, so a new owner sees what can change.
 - Layouts: `baseof.html` with `<header>` and `<main>`, a home and a single page layout,
   `partials/content-blocks.html` with the marker, `partials/component.html`, a
   `render-link.html` hook honouring the new-tab title, and `home.llms.txt` as a starter.
@@ -251,8 +248,7 @@ Contents:
 In Galley:
 
 1. Welcome gets **New site…** next to Open and Clone: a name and a folder. Galley clones
-   the template tag, removes its history, writes the name into `hugo.yaml` and
-   `galley.yaml`, and commits "Start from the Galley template" on `main`. Pushing is left
+   the template tag, removes its history, writes the name into `hugo.yaml`, and commits "Start from the Galley template" on `main`. Pushing is left
    to the Changes tab once the user has created a remote; creating the GitHub repository
    from Galley (`POST /user/repos`) is a later addition, not part of the first version.
 2. **Clone the site…** accepts any repository URL; the conclude.io URL becomes the
@@ -268,8 +264,7 @@ added and scrolled to, and a commit on a personal branch that offers "Merge into
 1. Neutral wording everywhere the site is named: Welcome, open dialog, error boxes, the
    README's introduction and "Using Galley", the web repo's CLAUDE.md pointer. The
    conclude.io site becomes one example, and the appId stays as it is.
-2. Claude pane and setup step follow `claude` in the manifest with a preference to turn it
-   off regardless.
+2. Done in phase 1: the Claude pane and setup step follow a preference.
 3. Signing and notarisation with a Developer ID in the release workflow, replacing
    `scripts/adhoc-sign.cjs`. Without it nobody outside the team can start the app.
 4. `install.sh` and the updater are already generic; the README's install section only
@@ -277,16 +272,16 @@ added and scrolled to, and a commit on a personal branch that offers "Merge into
 
 ## Order and effort
 
-| Phase | Work                                                             | Estimate                       |
-| ----- | ---------------------------------------------------------------- | ------------------------------ |
-| 3.2   | Preview marker on both sides (done, 0.4.1)                       | half a day                     |
-| 1     | Manifest and defaults                                            | 2–3 days                       |
-| 2     | Hugo detection, TOML and JSON frontmatter, config-driven folders | 1–2 days                       |
-| 3     | Contract doc, plain mode, Bookshop removal later                 | 1–2 days                       |
-| 4     | Template repository and New site flow                            | 3–4 days                       |
-| 5     | Wording, optional Claude, signing                                | 1 day plus the Apple paperwork |
+| Phase | Work                                                                               | Estimate                       |
+| ----- | ---------------------------------------------------------------------------------- | ------------------------------ |
+| 3.2   | Preview marker on both sides (done, 0.4.1)                                         | half a day                     |
+| 1     | Derive folders, keys, pickers, snippets and previews from the Hugo config and repo | 2–3 days                       |
+| 2     | TOML and JSON frontmatter                                                          | half a day                     |
+| 3     | Contract doc, plain mode, Bookshop removal later                                   | 1–2 days                       |
+| 4     | Template repository and New site flow                                              | 3–4 days                       |
+| 5     | Wording, optional Claude, signing                                                  | 1 day plus the Apple paperwork |
 
-Phases 1 to 3 make Galley work on any site that follows the contract. Phase 4 is what
+Phases 1 to 3 make Galley work on any site that follows the contract, with no configuration file. Phase 4 is what
 lets someone start a project with it. Phase 5 is what lets them install it.
 
 ## Decisions taken
@@ -294,10 +289,12 @@ lets someone start a project with it. Phase 5 is what lets them install it.
 - Marker syntax: the `<!--galley-block-->` comment. It keeps the DOM and the CSS
   untouched.
 - Branches: the template ships a single `main` branch with pull requests into it. The
-  conclude.io three-branch flow stays a manifest setting for now, and the staging hop is to
+  conclude.io three-branch flow comes from the branches that exist, and the staging hop is to
   be cut from the site as well, so the default chain shrinks to two branches once the web
   repo has dropped `staging`.
 - New site is local first: clone the template, commit, open. Creating the repository on
   GitHub from Galley comes later, if at all.
-- `NewTab` stays the default link title for new-tab links and the template adopts it; a
-  site can override it in the manifest.
+- `NewTab` is the link title for new-tab links and the template ships the render hook.
+  Not configurable.
+- No `galley.yaml`: everything derives from the Hugo config and repository conventions.
+  An optional override file can come later if a site needs one (2026-09-18).
