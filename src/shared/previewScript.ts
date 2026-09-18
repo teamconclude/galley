@@ -49,20 +49,27 @@ function showTextScript(snippet: string, heading: boolean): string {
 })(${JSON.stringify(snippet)}, ${heading})`
 }
 
-// Bookshop wraps every component in <!--bookshop-live name(…)--> … <!--bookshop-live end-->
-// comments; the blocks are the components directly inside the page component.
+// A site marks each top-level block with a <!--galley-block--> comment before it; the
+// block is the next element. Bookshop instead wraps every component in
+// <!--bookshop-live name(…)--> … <!--bookshop-live end--> comments, and the blocks are the
+// components directly inside the page component.
 function showBlockScript(index: number): string {
   return `(function (wanted) {
   ${reveal}
   var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT)
-  var page = null
+  var page = null, marks = []
   for (var c = walker.nextNode(); c; c = walker.nextNode()) {
-    if (/^\\s*bookshop-live name\\(page\\)/.test(c.nodeValue)) {
-      for (var e = c.nextSibling; e; e = e.nextSibling) if (e.nodeType === 1) { page = e; break }
-      break
-    }
+    var text = c.nodeValue.trim()
+    if (text === 'galley-block') marks.push(c)
+    else if (!page && /^bookshop-live name\\(page\\)/.test(text)) page = c
+  }
+  if (marks.length > wanted) {
+    for (var m = marks[wanted].nextSibling; m; m = m.nextSibling) if (m.nodeType === 1) return reveal(m)
+    return false
   }
   if (!page) return false
+  for (var e = page.nextSibling; e; e = e.nextSibling) if (e.nodeType === 1) { page = e; break }
+  if (page.nodeType !== 1) return false
   var depth = 0, seen = -1, inside = false
   for (var n = page.firstChild; n; n = n.nextSibling) {
     if (n.nodeType === 8) {
