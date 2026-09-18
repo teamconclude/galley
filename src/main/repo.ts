@@ -9,15 +9,21 @@ import type {
   DirEntry,
   FieldDef,
   FieldType,
-  RepoInfo
+  RepoInfo,
+  SiteInfo
 } from '../shared/types'
 import { fieldTypes, humanize, inferField, isRecord } from '../shared/fields'
 import { findHugo, listPages } from './hugo'
+import { findConfig, siteInfo } from './hugoConfig'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
 export const componentDirs = ['components', 'component-library/components']
 export const isComponentFile = (rel: string): boolean =>
   componentDirs.some((d) => rel.startsWith(d + '/'))
+const isConfigFile = (rel: string): boolean =>
+  rel.startsWith('config/') ||
+  /^(hugo|config)\.(ya?ml|toml|json)$/.test(rel) ||
+  rel.startsWith('data/')
 const ignoredChanges = /^(public|resources|node_modules|\.git)(\/|$)/
 const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
@@ -28,6 +34,7 @@ export class Repo {
   private structureChanged = false
   private timer: NodeJS.Timeout | null = null
   private componentCache: ComponentLibrary | null = null
+  private siteCache: Promise<SiteInfo> | null = null
   private dataCache: DataLists | null = null
   private imageCache: string[] | null = null
   private ownRenames = new Set<string>()
@@ -38,7 +45,12 @@ export class Repo {
   ) {}
 
   static isSite(path: string): boolean {
-    return existsSync(join(path, 'config', '_default', 'hugo.yaml'))
+    return findConfig(path) !== null
+  }
+
+  async site(): Promise<SiteInfo> {
+    this.siteCache ??= siteInfo(this.path)
+    return this.siteCache
   }
 
   async info(): Promise<RepoInfo> {
@@ -247,6 +259,7 @@ export class Repo {
       void this.refreshPages()
     }
     if (paths.some(isComponentFile)) this.componentCache = null
+    if (paths.some(isConfigFile)) this.siteCache = null
     if (paths.some((p) => p.startsWith('data/'))) this.dataCache = null
     if (paths.some((p) => p.startsWith('static/images'))) this.imageCache = null
     this.onChange(paths)

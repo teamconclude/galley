@@ -88,7 +88,7 @@ async function chooseRepo(): Promise<boolean> {
   const path = result.filePaths[0]
   if (!path) return false
   if (!Repo.isSite(path)) {
-    dialog.showErrorBox('Not a site checkout', `${path} has no config/_default/hugo.yaml.`)
+    dialog.showErrorBox('Not a site checkout', `${path} has no Hugo configuration file.`)
     return false
   }
   openRepo(path)
@@ -208,6 +208,7 @@ function registerIpc(): void {
   ipcMain.handle('repo:read', (_e, rel: string) => current().read(rel))
   ipcMain.handle('repo:write', (_e, rel: string, text: string) => current().write(rel, text))
   ipcMain.handle('repo:pageUrl', (_e, rel: string) => current().pageUrl(rel))
+  ipcMain.handle('repo:site', () => current().site())
   ipcMain.handle('repo:components', () => current().components())
   ipcMain.handle('repo:data', () => current().data())
   ipcMain.handle('repo:images', () => current().images())

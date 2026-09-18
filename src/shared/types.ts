@@ -75,6 +75,22 @@ export interface DataLists {
   customercategories: string[]
 }
 
+// What Galley derives about a site from its Hugo config and checkout; see
+// docs/generalization-plan.md, "No configuration file".
+export interface SiteInfo {
+  name: string
+  contentDir: string
+  staticDir: string
+  // Where the image picker looks, and how pages refer to files in it.
+  imagesDir: string
+  imagesUrl: string
+  componentsDir: string
+  // Appended to a page URL for its markdown rendition, when the site outputs one.
+  markdownSuffix: string | null
+  // Data file to the plain-text URL the home page renders from it, e.g. /llms.txt.
+  textPreviews: Record<string, string>
+}
+
 export type ChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'
 
 export interface Change {

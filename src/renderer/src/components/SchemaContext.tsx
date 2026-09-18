@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ComponentSchema, DataLists } from '../../../shared/types'
+import type { ComponentSchema, DataLists, SiteInfo } from '../../../shared/types'
 import { emptyLists, SchemaContext, type Schemas } from '../lib/contexts'
+import { defaultSiteInfo } from '../../../shared/siteInfo'
 import { setKeys } from '../lib/schema'
 
 interface Props {
@@ -14,6 +15,7 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
   const [components, setComponents] = useState<ComponentSchema[]>([])
   const [lists, setLists] = useState<DataLists>(emptyLists)
   const [images, setImages] = useState<string[]>([])
+  const [site, setSite] = useState<SiteInfo>(defaultSiteInfo)
 
   useEffect(() => {
     let live = true
@@ -27,13 +29,19 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
     const loadLists = (): void => {
       void window.api.repo.data().then((d) => live && setLists(d))
     }
+    const loadSite = (): void => {
+      void window.api.repo.site().then((s) => live && setSite(s))
+    }
     const loadImages = (): void => {
       void window.api.repo.images().then((i) => live && setImages(i))
     }
+    loadSite()
     loadComponents()
     loadLists()
     loadImages()
     const off = window.api.repo.onChanged((paths) => {
+      if (paths.some((p) => /^(config\/|(hugo|config)\.(ya?ml|toml|json)$|data\/)/.test(p)))
+        loadSite()
       if (paths.some((p) => /^(components|component-library)\//.test(p))) loadComponents()
       if (paths.some((p) => p.startsWith('data/'))) loadLists()
       if (paths.some((p) => p.startsWith('static/images'))) loadImages()
@@ -46,6 +54,7 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
 
   const value = useMemo<Schemas>(
     () => ({
+      site,
       schemas: new Map(components.map((c) => [c.name, c])),
       standalone: components.filter((c) => c.standalone),
       lists,
@@ -56,7 +65,7 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
         return path
       }
     }),
-    [components, lists, images]
+    [site, components, lists, images]
   )
 
   return <SchemaContext.Provider value={value}>{children}</SchemaContext.Provider>

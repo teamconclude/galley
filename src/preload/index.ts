@@ -15,6 +15,7 @@ const api: Api = {
     read: (rel) => ipcRenderer.invoke('repo:read', rel),
     write: (rel, text) => ipcRenderer.invoke('repo:write', rel, text),
     pageUrl: (rel) => ipcRenderer.invoke('repo:pageUrl', rel),
+    site: () => ipcRenderer.invoke('repo:site'),
     components: () => ipcRenderer.invoke('repo:components'),
     data: () => ipcRenderer.invoke('repo:data'),
     images: () => ipcRenderer.invoke('repo:images'),

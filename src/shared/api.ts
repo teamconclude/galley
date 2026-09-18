@@ -2,6 +2,7 @@ import type {
   ComponentLibrary,
   DataLists,
   DirEntry,
+  SiteInfo,
   GitStatus,
   HugoStatus,
   Identity,
@@ -31,6 +32,7 @@ export interface Api {
     read: (rel: string) => Promise<string>
     write: (rel: string, text: string) => Promise<void>
     pageUrl: (rel: string) => Promise<string | null>
+    site: () => Promise<SiteInfo>
     components: () => Promise<ComponentLibrary>
     data: () => Promise<DataLists>
     images: () => Promise<string[]>
