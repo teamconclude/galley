@@ -9,7 +9,7 @@ import * as github from './github'
 import { ensureHugo } from './hugo'
 import { log } from './log'
 import { Repo } from './repo'
-import { loadSettings, saveSettings } from './settings'
+import { loadSettings, prefs, saveSettings } from './settings'
 import { downloadGit, findClaude, findGit, installClaude } from './tools'
 
 interface Deps {
@@ -102,6 +102,8 @@ export class Setup {
   }
 
   private async checkClaude(): Promise<void> {
+    if (!prefs().claude)
+      return this.set('claude', { state: 'skipped', detail: 'Turned off in Settings' })
     if (await findClaude()) return this.set('claude', { state: 'done' })
     this.set('claude', { state: 'running', detail: 'Installing…' })
     try {

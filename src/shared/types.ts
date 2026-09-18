@@ -259,4 +259,6 @@ export type MenuCommand =
 export interface Preferences {
   pushOnCommit: boolean
   deleteMergedBranch: boolean
+  // The Claude pane, and installing Claude Code during setup.
+  claude: boolean
 }

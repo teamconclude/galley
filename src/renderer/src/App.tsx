@@ -149,6 +149,7 @@ export default function App(): React.JSX.Element | null {
   >(null)
   const [releaseDialog, setReleaseDialog] = useState<ReleaseStep | null>(null)
   const [prefs, setPrefs] = useState<Preferences | null>(null)
+  const claudeOn = prefs?.claude !== false
   const [showSettings, setShowSettings] = useState(false)
   useEffect(() => {
     void window.api.prefs.get().then(setPrefs)
@@ -694,7 +695,7 @@ export default function App(): React.JSX.Element | null {
             toggleDetached()
             break
           case 'toggle-terminal':
-            setShowClaude((c) => !c)
+            if (claudeOn) setShowClaude((c) => !c)
             break
           case 'reload-preview':
             setReloadKey((k) => k + 1)
@@ -761,9 +762,11 @@ export default function App(): React.JSX.Element | null {
             >
               {detached ? 'Preview ↗' : 'Preview'}
             </button>
-            <button className={showClaude ? 'on' : ''} onClick={() => setShowClaude(!showClaude)}>
-              Claude
-            </button>
+            {claudeOn && (
+              <button className={showClaude ? 'on' : ''} onClick={() => setShowClaude(!showClaude)}>
+                Claude
+              </button>
+            )}
           </div>
         </header>
         <div className="body">
@@ -932,11 +935,15 @@ export default function App(): React.JSX.Element | null {
             </div>
             <Splitter
               direction="vertical"
-              hidden={!showClaude}
+              hidden={!showClaude || !claudeOn}
               onDrag={(d) => setClaudeHeight((h) => clamp(h - d, 120, 900))}
             />
-            <section className="claude-row" style={{ height: claudeHeight }} hidden={!showClaude}>
-              <ClaudePane repoPath={repo.path} />
+            <section
+              className="claude-row"
+              style={{ height: claudeHeight }}
+              hidden={!showClaude || !claudeOn}
+            >
+              {claudeOn && <ClaudePane repoPath={repo.path} />}
             </section>
           </div>
         </div>

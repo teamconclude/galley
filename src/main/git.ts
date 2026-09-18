@@ -284,7 +284,10 @@ export class Git {
       try {
         await this.git(['push', 'origin', `HEAD:${base}`])
       } catch (e) {
-        throw new Error(`${base} has changed on GitHub. Update this branch first. ${message(e)}`)
+        if (!/protected branch/i.test(message(e))) {
+          throw new Error(`${base} has changed on GitHub. Update this branch first. ${message(e)}`)
+        }
+        await this.pullRequestInto(branch, base)
       }
       this.lastFetch = Date.now()
       if (!prefs().deleteMergedBranch) return
@@ -329,11 +332,26 @@ export class Git {
     })
   }
 
-  // The last hop is protected on GitHub and only takes pull requests.
-  async publish(from: string, to: string): Promise<PublishResult> {
+  // A base branch that only takes pull requests gets one, merged right away.
+  private async pullRequestInto(branch: string, base: string): Promise<void> {
+    const result = await publish(await this.slug(), branch, base)
+    if (!result.merged) {
+      throw new Error(
+        `${base} only takes pull requests. One is open at ${result.url}; ${result.error ?? 'merge it on GitHub'}.`
+      )
+    }
+  }
+
+  private async slug(): Promise<string> {
     const { remoteUrl } = await this.status()
     const slug = remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
     if (!slug) throw new Error('The repository is not on GitHub')
+    return slug
+  }
+
+  // The last hop is protected on GitHub and only takes pull requests.
+  async publish(from: string, to: string): Promise<PublishResult> {
+    const slug = await this.slug()
     return this.op(`Publishing ${from} to ${to}…`, async () => {
       const result = await publish(slug, from, to)
       await this.git(['fetch', 'origin', to]).catch(() => undefined)

@@ -41,6 +41,17 @@ export default function SettingsDialog({ prefs, onChange, onClose }: Props): Rea
             <small>After merging you continue on the shared branch.</small>
           </span>
         </label>
+        <label className="dialog-check">
+          <input
+            type="checkbox"
+            checked={prefs.claude}
+            onChange={(e) => onChange({ ...prefs, claude: e.target.checked })}
+          />
+          <span>
+            Claude Code pane
+            <small>Opens Claude Code in the checkout. Off, setup does not install it.</small>
+          </span>
+        </label>
         <div className="dialog-buttons">
           <button type="button" className="primary" onClick={onClose}>
             Done
