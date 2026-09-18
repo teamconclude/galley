@@ -88,6 +88,12 @@ npm run build:unpack # packaged app in dist/mac-arm64, for trying the packaged b
 npm run build:mac    # .dmg and .zip in dist/
 ```
 
+Galley reads the site's Hugo config, `hugo.*` or `config.*` in YAML, TOML or JSON, for the
+site name, the content and static folders, the components mount, the markdown output
+format behind the Markdown preview and the plain-text home outputs it previews from their
+data files. Pickers come from every `data/*.yaml` that lists maps with a `name`, the
+Insert menu from `layouts/shortcodes/`. There is no Galley configuration file.
+
 The page forms are generated from the component schemas in the site checkout,
 `components/<name>/<name>.yml` (label, description and a `fields` map of
 type, label, placeholder, help and default per key), or from `<name>.bookshop.yml` while a

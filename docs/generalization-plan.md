@@ -20,9 +20,14 @@ Done, in Galley 0.4.1 and on the web branch `lars/galley` (2026-09-18):
 - The web branch itself: Bookshop, CloudCannon and the vendored module removed, plain
   file names, 37 schemas with hand-written labels, placeholders and help.
 
-Next, in order: phase 1 (derive everything from the Hugo config and the repo), phase 2,
-the rest of phase 3, the template site; merging `lars/galley` into develop can happen any
-time after 0.4.1 is installed and CloudCannon is no longer needed.
+Done on Galley develop after 0.4.1, unreleased: phase 1. Galley reads the Hugo config in
+any of its forms and derives the site name, folders, components mount, markdown rendition
+and text previews from it, pickers from every data list, snippets from the shortcodes,
+and the Claude pane is a preference. A stock `hugo new site` opens and previews.
+
+Next, in order: phase 2, the rest of phase 3, the template site; merging `lars/galley`
+into develop can happen any time after 0.4.1 is installed and CloudCannon is no longer
+needed.
 
 ## Goals and non-goals
 
