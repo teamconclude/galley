@@ -25,12 +25,14 @@ export interface InputHint {
   options?: { allow_empty?: boolean; values?: unknown[] }
 }
 
-// The key naming a block's component: fieldGroup in the new component library,
-// _bookshop_name while the site still uses Bookshop and CloudCannon.
-export type BlockKey = 'fieldGroup' | '_bookshop_name'
+// The key naming a block's component and the page key holding the block list: component
+// and blocks in the component library, the Bookshop names while a site still uses that.
+export type BlockKey = 'component' | '_bookshop_name'
+export type ListKey = 'blocks' | 'content_blocks'
 
 export interface ComponentLibrary {
   blockKey: BlockKey
+  listKey: ListKey
   components: ComponentSchema[]
 }
 

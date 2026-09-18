@@ -110,8 +110,12 @@ export class Repo {
     const own = await load('.yml')
     this.componentCache =
       own.length > 0
-        ? { blockKey: 'fieldGroup', components: own.map(fromSchema) }
-        : { blockKey: '_bookshop_name', components: fromBookshop(await load('.bookshop.yml')) }
+        ? { blockKey: 'component', listKey: 'blocks', components: own.map(fromSchema) }
+        : {
+            blockKey: '_bookshop_name',
+            listKey: 'content_blocks',
+            components: fromBookshop(await load('.bookshop.yml'))
+          }
     return this.componentCache
   }
 

@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view'
 import { type Document, isSeq } from 'yaml'
 import { useActiveEditorState } from '../lib/activeEditor'
 import { plainText, showBlock, showInPreview } from '../lib/previewScroll'
+import { currentListKey } from '../lib/schema'
 
 const settle = 300
 
@@ -44,7 +45,7 @@ export function YamlFollower({ view, doc }: YamlProps): React.JSX.Element | null
 }
 
 function blockAt(doc: Document, pos: number): number | null {
-  const blocks = doc.get('content_blocks', true)
+  const blocks = doc.get(currentListKey(), true)
   if (!isSeq(blocks)) return null
   const starts = blocks.items.map((item) =>
     item && typeof item === 'object' && 'range' in item && item.range ? item.range[0] : null

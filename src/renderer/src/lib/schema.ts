@@ -1,4 +1,10 @@
-import type { BlockKey, ComponentSchema, DataLists, InputHint } from '../../../shared/types'
+import type {
+  BlockKey,
+  ListKey,
+  ComponentSchema,
+  DataLists,
+  InputHint
+} from '../../../shared/types'
 
 export type FieldSpec =
   | { kind: 'blocks'; allowed: string[] | null }
@@ -16,13 +22,16 @@ export type FieldSpec =
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
-let blockKey: BlockKey = 'fieldGroup'
+let blockKey: BlockKey = 'component'
+let listKey: ListKey = 'blocks'
 
-export function setBlockKey(key: BlockKey): void {
-  blockKey = key
+export function setKeys(block: BlockKey, list: ListKey): void {
+  blockKey = block
+  listKey = list
 }
 
 export const currentBlockKey = (): BlockKey => blockKey
+export const currentListKey = (): ListKey => listKey
 
 // The component a block names, or null when the value is not a block.
 export function blockName(v: unknown): string | null {
@@ -104,7 +113,7 @@ export function resolveField(
 
 // Top-level page fields have no blueprint; a few keys get pickers from the data files.
 export function pageField(key: string, value: unknown, lists: DataLists): FieldSpec {
-  if (key === 'content_blocks') return { kind: 'blocks', allowed: null }
+  if (key === listKey) return { kind: 'blocks', allowed: null }
   if (key === 'authors' || key === 'categories' || key === 'customercategories') {
     return { kind: 'choicelist', options: lists[key] }
   }

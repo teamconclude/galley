@@ -4,6 +4,7 @@ import {
   blankItem,
   blockName,
   currentBlockKey,
+  currentListKey,
   humanize,
   isRecord,
   labelsFor,
@@ -206,7 +207,7 @@ function CardList(props: CardListProps): React.JSX.Element {
   // The preview follows the page's top-level blocks; a nested list belongs to the block
   // its path starts in.
   const topLevel = (index: number): number | null =>
-    path[0] !== 'content_blocks' ? null : path.length === 1 ? index : Number(path[1])
+    path[0] !== currentListKey() ? null : path.length === 1 ? index : Number(path[1])
   const follow = (index: number): void => {
     const top = topLevel(index)
     if (top !== null && !Number.isNaN(top)) showBlock(top)

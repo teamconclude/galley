@@ -51,7 +51,7 @@ Hugo assumed narrower than Hugo is:
 The block model:
 
 - Components live in `component-library/components/<name>/<name>.yml`; the list key is
-  `content_blocks`; the type key is `fieldGroup` (or `_bookshop_name` for Bookshop).
+  `blocks` and the type key `component` (`content_blocks` and `_bookshop_name` for Bookshop).
 - Preview scrolling to a block counts Bookshop's `<!--bookshop-live name(…)-->` comments
   (`src/shared/previewScript.ts`). The editor-environment branch emits none, so on that
   branch block follow does nothing. This is the one regression to fix first.
@@ -78,8 +78,8 @@ images:
   url: /images # how pages refer to files in that folder
 components:
   dir: component-library/components
-  listKey: content_blocks # the frontmatter list holding a page's blocks
-  typeKey: fieldGroup # the key naming a block's component
+  listKey: blocks # the frontmatter list holding a page's blocks
+  typeKey: component # the key naming a block's component
 lists: # frontmatter key → data file with a list of maps with `name`
   authors: data/authors.yaml
   categories: data/categories.yaml
@@ -105,7 +105,7 @@ settings form still renders from the frontmatter.
 ### Component schema
 
 One folder per component under `components.dir`, holding `<name>.yml` and the Hugo
-partial `<name>.hugo.html`. The schema is the format already on the editor-environment
+partial `<name>.html`. The schema is the format already on the editor-environment
 branch:
 
 ```yaml
@@ -134,7 +134,7 @@ image, checkbox, switch, number, array, select. The spec says so, because the we
 The partial that renders the block list emits one comment before each top-level block:
 
 ```html
-{{ range .content_blocks }}<!--galley-block-->{{ partial "component" . }}{{ end }}
+{{ range .blocks }}<!--galley-block-->{{ partial "component" . }}{{ end }}
 ```
 
 Galley counts these to find the block being edited. The Bookshop comment stays accepted
@@ -211,7 +211,7 @@ Contents:
   `render-link.html` hook honouring the new-tab title, and `home.llms.txt` as a starter.
 - Six components covering every field type: hero (text, image, nested button row),
   section (markdown), image-with-text, faq (list of objects), button (select, checkbox),
-  markdown. Each with `.yml`, `.hugo.html` and `.scss`.
+  markdown. Each with `.yml`, `.html` and `.scss`.
 - Content: a block-built home page, an `about` page, a `blog` section with one post and
   `data/authors.yaml`, so new-page templating and the author dropdown work from the start.
 - `static/images/` with two placeholder images, a minimal `assets/scss/style.scss`, a

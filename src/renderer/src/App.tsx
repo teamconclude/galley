@@ -43,6 +43,7 @@ import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
 import { newPageText } from './lib/newPage'
+import { currentListKey } from './lib/schema'
 
 interface OpenFile {
   path: string
@@ -716,7 +717,7 @@ export default function App(): React.JSX.Element | null {
   // Pages built from components have no prose, so the settings form gets the whole column.
   const blocksPage =
     parts?.frontmatter != null &&
-    /^content_blocks:/m.test(parts.frontmatter) &&
+    new RegExp(`^${currentListKey()}:`, 'm').test(parts.frontmatter) &&
     parts.body.trim() === ''
   const showBody = !blocksPage || bodyShownFor === file?.path
   const newPageDir = file?.path.startsWith('content/') ? parentOf(file.path) : 'content/blog'
