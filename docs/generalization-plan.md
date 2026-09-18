@@ -4,10 +4,24 @@ Galley was built around the conclude.io site and the way that repository is laid
 plan lists where that shows in the code, defines the contract a site has to meet instead,
 and describes a template site so a new project can start with Galley on day one.
 
-The starting point is the web repository's `lars/editor-environment` branch, which replaces
-Bookshop and CloudCannon with a plain schema file per component and a Hugo partial per
-block. Galley already reads that format (`fromSchema` in `src/main/repo.ts`), so the block
-editor no longer depends on Bookshop. What remains is everything else that names our site.
+The starting point is the web repository's `lars/galley` branch, which replaces Bookshop
+and CloudCannon with a schema file per component under `components/` and a Hugo partial
+per block. Galley 0.4.1 reads that format, so the block editor no longer depends on
+Bookshop. What remains is everything else that names our site.
+
+## Status
+
+Done, in Galley 0.4.1 and on the web branch `lars/galley` (2026-09-18):
+
+- The component contract below: `components/<name>/<name>.yml` with `fields`, the
+  `blocks` and `component` page keys, the `<!--galley-block-->` preview marker. Galley
+  reads Bookshop sites into the same model, so develop keeps working until the branch
+  merges.
+- The web branch itself: Bookshop, CloudCannon and the vendored module removed, plain
+  file names, 37 schemas with hand-written labels, placeholders and help.
+
+Next, in order: merge `lars/galley` into develop once CloudCannon is no longer needed,
+then phase 1 (the manifest), phase 2, the rest of phase 3, the template site.
 
 ## Goals and non-goals
 
@@ -50,11 +64,12 @@ Hugo assumed narrower than Hugo is:
 
 The block model:
 
-- Components live in `components/<name>/<name>.yml`; the list key is
-  `blocks` and the type key `component` (`content_blocks` and `_bookshop_name` for Bookshop).
-- Preview scrolling to a block counts Bookshop's `<!--bookshop-live name(…)-->` comments
-  (`src/shared/previewScript.ts`). The editor-environment branch emits none, so on that
-  branch block follow does nothing. This is the one regression to fix first.
+- Components live in `components/<name>/<name>.yml`, with `component-library/components`
+  as the Bookshop fallback; the list key is `blocks` and the type key `component`
+  (`content_blocks` and `_bookshop_name` for Bookshop). Both are chosen by the schema
+  format found, not yet by a manifest.
+- Preview scrolling to a block counts `<!--galley-block-->` comments and falls back to
+  Bookshop's `<!--bookshop-live name(…)-->` (`src/shared/previewScript.ts`).
 - Text follow looks for `<main>` and a fixed `header`, `.navbar` or `nav`.
 
 Environment:
@@ -197,13 +212,14 @@ settings form appears for its YAML pages; a TOML-frontmatter page opens raw with
 
 1. Write `docs/site-contract.md` from the section above; link it from the README and from
    the web repo's CLAUDE.md, replacing the Galley section there with a pointer.
-2. Preview markers: `showBlockScript` counts `<!--galley-block-->` comments and falls back
-   to the Bookshop comments. On the web repo's editor-environment branch,
-   `layouts/partials/content-blocks.html` emits the marker.
+2. Done in 0.4.1: `showBlockScript` counts `<!--galley-block-->` comments and falls back
+   to the Bookshop comments; `layouts/partials/content-blocks.html` on `lars/galley` emits
+   the marker through `safeHTML` (Go templates strip plain comments).
 3. Plain mode: with no component folder, `Blocks.tsx` renders the block list as an
    objects list, the Add block menu is hidden, and nothing asks for a schema.
-4. Once the web repo has dropped Bookshop: delete `fromBookshop`, the `_bookshop_name`
-   key, the Bookshop marker fallback and the `.bookshop.yml` mention in the README.
+4. Once `lars/galley` has merged: delete `fromBookshop`, the `_bookshop_name` and
+   `content_blocks` keys, the `component-library` fallback, the Bookshop marker fallback
+   and the `.bookshop.yml` mention in the README.
 
 Verify: on a checkout of the editor-environment branch, clicking a block card scrolls the
 preview to it; on a plain Hugo site the block list still edits as YAML objects.
@@ -263,7 +279,7 @@ added and scrolled to, and a commit on a personal branch that offers "Merge into
 
 | Phase | Work                                                             | Estimate                       |
 | ----- | ---------------------------------------------------------------- | ------------------------------ |
-| 3.2   | Preview marker on both sides, before the web branch merges       | half a day                     |
+| 3.2   | Preview marker on both sides (done, 0.4.1)                       | half a day                     |
 | 1     | Manifest and defaults                                            | 2–3 days                       |
 | 2     | Hugo detection, TOML and JSON frontmatter, config-driven folders | 1–2 days                       |
 | 3     | Contract doc, plain mode, Bookshop removal later                 | 1–2 days                       |
