@@ -29,7 +29,12 @@ export function humanize(name: string): string {
 const imageKey = /^image$|^image_path$|Img$|^logo$|^icon$|^thumbnail$/
 
 // A field guessed from a value, for keys no schema declares.
-export function inferField(key: string, value: unknown, blockKey: string): FieldDef {
+export function inferField(
+  key: string,
+  value: unknown,
+  blockKey: string,
+  imagesUrl = '/images'
+): FieldDef {
   const base = { key, label: humanize(key) }
   if (typeof value === 'boolean') return { ...base, type: 'boolean' }
   if (typeof value === 'number') return { ...base, type: 'number' }
@@ -37,22 +42,26 @@ export function inferField(key: string, value: unknown, blockKey: string): Field
     const first: unknown = value[0]
     if (isRecord(first)) {
       if (typeof first[blockKey] === 'string') return { ...base, type: 'blocks' }
-      return { ...base, type: 'list', fields: inferFields(first, blockKey) }
+      return { ...base, type: 'list', fields: inferFields(first, blockKey, imagesUrl) }
     }
     return { ...base, type: 'list' }
   }
   if (isRecord(value)) {
     const name = value[blockKey]
     if (typeof name === 'string') return { ...base, type: 'block', component: name }
-    return { ...base, type: 'object', fields: inferFields(value, blockKey) }
+    return { ...base, type: 'object', fields: inferFields(value, blockKey, imagesUrl) }
   }
   const s = typeof value === 'string' ? value : ''
-  if (s.startsWith('/images/') || imageKey.test(key)) return { ...base, type: 'image' }
+  if (s.startsWith(imagesUrl + '/') || imageKey.test(key)) return { ...base, type: 'image' }
   return { ...base, type: s.includes('\n') || s.length > 80 ? 'textarea' : 'text' }
 }
 
-export function inferFields(obj: Record<string, unknown>, blockKey: string): FieldDef[] {
+export function inferFields(
+  obj: Record<string, unknown>,
+  blockKey: string,
+  imagesUrl = '/images'
+): FieldDef[] {
   return Object.entries(obj)
     .filter(([k]) => k !== blockKey)
-    .map(([k, v]) => inferField(k, v, blockKey))
+    .map(([k, v]) => inferField(k, v, blockKey, imagesUrl))
 }

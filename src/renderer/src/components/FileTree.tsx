@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import FileIcon from './FileIcon'
 import Tip from './Tip'
+import { useSchemas } from '../lib/contexts'
 
 interface Props {
   name: string
@@ -28,9 +29,6 @@ interface Props {
   onToggleShowAll: () => void
   version: number
 }
-
-// What an editor works in: pages, images and downloads, and the menus and authors.
-const editorRoots = new Set(['content', 'static', 'data'])
 
 const indent = 12
 const rowStart = 6
@@ -101,6 +99,9 @@ function Children(props: ChildrenProps): React.JSX.Element {
   const { path, depth, expanded, onToggle, selected, onSelect, version } = props
   const { onContextMenu, onDropFiles, dropTarget, setDropTarget, showAll } = props
   const [entries, setEntries] = useState<DirEntry[]>([])
+  // What an editor works in: pages, images and downloads, and the menus and authors.
+  const { site } = useSchemas()
+  const editorRoots = new Set([site.contentDir, site.staticDir.split('/')[0], 'data'])
   useEffect(() => {
     let live = true
     window.api.repo
@@ -113,7 +114,8 @@ function Children(props: ChildrenProps): React.JSX.Element {
     return () => {
       live = false
     }
-  }, [path, version, showAll])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, version, showAll, site])
   return (
     <>
       {entries.map((entry) => {

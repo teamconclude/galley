@@ -14,12 +14,13 @@ const maxLineLength = 1000
 export async function search(
   root: string,
   query: string,
-  options: SearchOptions
+  options: SearchOptions,
+  contentDir = 'content'
 ): Promise<SearchResults> {
   const results: SearchResults = { files: [], total: 0, truncated: false }
   if (query === '') return results
   const pattern = compile(query, options)
-  const files = await listFiles(root, options.contentOnly ? ['content'] : [''])
+  const files = await listFiles(root, options.contentOnly ? [contentDir] : [''])
   for (const rel of files) {
     const text = await readText(join(root, rel))
     if (text === null) continue
@@ -41,12 +42,13 @@ export async function replace(
   root: string,
   query: string,
   options: SearchOptions,
-  replacement: string
+  replacement: string,
+  contentDir = 'content'
 ): Promise<ReplaceResult> {
   const result: ReplaceResult = { files: 0, matches: 0 }
   if (query === '') return result
   const pattern = compile(query, options)
-  const files = await listFiles(root, options.contentOnly ? ['content'] : [''])
+  const files = await listFiles(root, options.contentOnly ? [contentDir] : [''])
   for (const rel of files) {
     const path = join(root, rel)
     const text = await readText(path)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { setValue, type Path } from '../lib/yamlEdit'
-import { useEdit } from '../lib/contexts'
+import { useEdit, useSchemas } from '../lib/contexts'
+import { imageFolder, imagePath, imageUrl, isImageUrl } from '../lib/site'
 import type { EditorView } from '@codemirror/view'
 import { useActiveEditor } from '../lib/activeEditor'
 import Editor from './Editor'
@@ -171,33 +172,37 @@ export function ChoiceListControl({
 export function ImageControl({ path, value }: ControlProps): React.JSX.Element {
   const edit = useEdit()
   const [open, setOpen] = useState(false)
+  const { site } = useSchemas()
   const text = asText(value)
   const set = (v: string): void => edit((doc) => setValue(doc, path, v))
-  const folder = text.startsWith('/images/') ? text.slice(0, text.lastIndexOf('/')) : '/images'
+  const folder = imageFolder(site, text)
   const drop = async (e: React.DragEvent): Promise<void> => {
     const file = [...e.dataTransfer.files].find((f) =>
       /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(f.name)
     )
     if (!file) return
     e.preventDefault()
-    const rel = await window.api.repo.importFile(window.api.files.pathFor(file), `static${folder}`)
-    set('/' + rel.replace(/^static\//, ''))
+    const rel = await window.api.repo.importFile(
+      window.api.files.pathFor(file),
+      imagePath(site, folder)
+    )
+    set(imageUrl(site, rel))
   }
   return (
     <div
       className="image-control"
-      title={`Drop an image here to copy it into static${folder}`}
+      title={`Drop an image here to copy it into ${imagePath(site, folder)}`}
       onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
       onDrop={(e) => void drop(e)}
     >
-      {text.startsWith('/images/') && (
-        <img className="image-preview" src={`galley://repo/static${text}`} alt="" />
+      {isImageUrl(site, text) && (
+        <img className="image-preview" src={`galley://repo/${imagePath(site, text)}`} alt="" />
       )}
       <div className="image-row">
         <input
           type="text"
           value={text}
-          placeholder="/images/…"
+          placeholder={`${site.imagesUrl}/…`}
           onChange={(e) => set(e.target.value)}
         />
         <button onClick={() => setOpen(true)}>Choose…</button>

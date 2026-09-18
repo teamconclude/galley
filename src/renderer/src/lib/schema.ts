@@ -18,10 +18,15 @@ export type FieldSpec =
 
 let blockKey: BlockKey = 'component'
 let listKey: ListKey = 'blocks'
+let imagesUrl = '/images'
 
 export function setKeys(block: BlockKey, list: ListKey): void {
   blockKey = block
   listKey = list
+}
+
+export function setImagesUrl(url: string): void {
+  imagesUrl = url
 }
 
 export const currentBlockKey = (): BlockKey => blockKey
@@ -70,7 +75,7 @@ export function fieldsFor(declared: FieldDef[], obj: Record<string, unknown>): F
   const known = new Set(declared.map((f) => f.key))
   const extra = Object.keys(obj)
     .filter((k) => !known.has(k) && k !== blockKey)
-    .map((k) => inferField(k, obj[k], blockKey))
+    .map((k) => inferField(k, obj[k], blockKey, imagesUrl))
   return [...declared, ...extra]
 }
 
@@ -81,7 +86,7 @@ export function pageField(key: string, value: unknown, lists: DataLists): FieldS
     return { kind: 'choicelist', options: lists[key] }
   }
   if (key === 'description' || key === 'summary') return { kind: 'string', multiline: true }
-  return specFor(inferField(key, value, blockKey))
+  return specFor(inferField(key, value, blockKey, imagesUrl))
 }
 
 // The value a new field starts with: its default, else empty for its type. A nested

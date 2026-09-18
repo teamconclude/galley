@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSchemas } from '../lib/contexts'
+import { imageFolder, imagePath } from '../lib/site'
 
 interface Props {
   value: string
@@ -10,7 +11,7 @@ interface Props {
 const limit = 300
 
 export default function ImagePicker({ value, onPick, onClose }: Props): React.JSX.Element {
-  const { images, importImage } = useSchemas()
+  const { site, images, importImage } = useSchemas()
   const [query, setQuery] = useState('')
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   const matching = images.filter((p) => words.every((w) => p.toLowerCase().includes(w)))
   const shown = matching.slice(0, limit)
-  const folder = value.startsWith('/images/') ? value.slice(0, value.lastIndexOf('/')) : '/images'
+  const folder = imageFolder(site, value)
 
   const add = async (): Promise<void> => {
     const path = await importImage(folder)
@@ -42,7 +43,10 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button onClick={() => void add()} title={`Copies the file into static${folder}`}>
+          <button
+            onClick={() => void add()}
+            title={`Copies the file into ${imagePath(site, folder)}`}
+          >
             Add from disk…
           </button>
           <button onClick={onClose}>Close</button>
@@ -55,8 +59,8 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
               title={path}
               onClick={() => onPick(path)}
             >
-              <img src={`galley://repo/static${path}`} loading="lazy" alt="" />
-              <span>{path.replace(/^\/images\//, '')}</span>
+              <img src={`galley://repo/${imagePath(site, path)}`} loading="lazy" alt="" />
+              <span>{path.slice(site.imagesUrl.length + 1)}</span>
             </button>
           ))}
         </div>

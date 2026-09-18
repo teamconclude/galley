@@ -220,11 +220,13 @@ function registerIpc(): void {
   ipcMain.handle('repo:rename', (_e, from: string, to: string) => current().rename(from, to))
   ipcMain.handle('repo:trash', (_e, rel: string) => shell.trashItem(current().absolute(rel)))
   ipcMain.handle('repo:newest', (_e, dir: string) => current().newest(dir))
-  ipcMain.handle('repo:search', (_e, query: string, options: SearchOptions) =>
-    search(current().path, query, options)
+  ipcMain.handle('repo:search', async (_e, query: string, options: SearchOptions) =>
+    search(current().path, query, options, (await current().site()).contentDir)
   )
-  ipcMain.handle('repo:replace', (_e, query: string, options: SearchOptions, replacement: string) =>
-    replace(current().path, query, options, replacement)
+  ipcMain.handle(
+    'repo:replace',
+    async (_e, query: string, options: SearchOptions, replacement: string) =>
+      replace(current().path, query, options, replacement, (await current().site()).contentDir)
   )
   ipcMain.handle('repo:importImage', async (_e, dir: string) => {
     const result = await dialog.showOpenDialog({

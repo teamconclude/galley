@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ImageValues, LinkValues } from '../lib/inline'
 import { Dialog } from './Dialogs'
 import ImagePicker from './ImagePicker'
+import { useSchemas } from '../lib/contexts'
 
 interface LinkProps {
   initial: LinkValues
@@ -53,6 +54,7 @@ interface ImageProps {
 }
 
 export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.JSX.Element {
+  const { site } = useSchemas()
   const [path, setPath] = useState(initial.path)
   const [alt, setAlt] = useState(initial.alt)
   const [picking, setPicking] = useState(false)
@@ -70,7 +72,7 @@ export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.
           <span className="dialog-row">
             <input
               autoFocus={!path}
-              placeholder="/images/…"
+              placeholder={`${site.imagesUrl}/…`}
               value={path}
               spellCheck={false}
               onChange={(e) => setPath(e.target.value)}

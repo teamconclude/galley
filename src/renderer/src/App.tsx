@@ -30,6 +30,7 @@ import {
 import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
+import { imageUrl, useSiteInfo } from './lib/site'
 import SearchPanel, { type SearchRequest } from './components/SearchPanel'
 import { BodyFollower } from './components/PreviewFollow'
 import Splitter from './components/Splitter'
@@ -72,7 +73,6 @@ type DialogState =
 const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 const binaryFile = /\.(pdf|zip|gz|woff2?|ttf|otf|eot|mp4|mov|webm|mp3)$/i
 const markdownFile = /\.(md|markdown)$/i
-const llmsSource = 'data/llms.yaml'
 // A cheap fingerprint of a text, to notice changes without carrying the text around.
 function hashText(text: string): number {
   let h = text.length
@@ -132,6 +132,7 @@ export default function App(): React.JSX.Element | null {
   const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
   const [previewMode, setPreviewMode] = useState(layout.previewMode)
   const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
+  const site = useSiteInfo(repo?.path ?? null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -342,17 +343,17 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
-  // Images dropped into a page body land in static/images/<section> of that page.
+  // Images dropped into a page body land in the images folder under the page's section.
   const importImages = async (files: File[]): Promise<string[]> => {
     const parts = file?.path.split('/') ?? []
-    const section = parts[0] === 'content' && parts.length > 2 ? parts[1] : 'pages'
+    const section = parts[0] === site.contentDir && parts.length > 2 ? parts[1] : 'pages'
     const urls: string[] = []
     for (const f of files) {
       const rel = await window.api.repo.importFile(
         window.api.files.pathFor(f),
-        `static/images/${section}`
+        `${site.imagesDir}/${section}`
       )
-      urls.push('/' + rel.replace(/^static\//, ''))
+      urls.push(imageUrl(site, rel))
     }
     return urls
   }
@@ -585,10 +586,11 @@ export default function App(): React.JSX.Element | null {
   )
 
   const filePath = file?.path ?? null
+  const textPreview = filePath ? site.textPreviews[filePath] : undefined
   useEffect(() => {
     forgetTarget()
     if (!filePath) return
-    if (filePath === llmsSource) return
+    if (textPreview) return
     let live = true
     void window.api.repo.pageUrl(filePath).then((url) => {
       if (live && url) setPagePath(url)
@@ -596,10 +598,10 @@ export default function App(): React.JSX.Element | null {
     return () => {
       live = false
     }
-  }, [filePath])
+  }, [filePath, textPreview])
 
-  // The llms.txt index is generated from one data file, previewed as that text.
-  const shownPath = filePath === llmsSource ? '/llms.txt' : pagePath
+  // A data file the home page renders as text, e.g. llms.txt, is previewed as that text.
+  const shownPath = textPreview ?? pagePath
   const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + shownPath : null
 
   // The setup dialog appears by itself only when a step downloads, fails or needs the
@@ -720,12 +722,14 @@ export default function App(): React.JSX.Element | null {
     new RegExp(`^${currentListKey()}:`, 'm').test(parts.frontmatter) &&
     parts.body.trim() === ''
   const showBody = !blocksPage || bodyShownFor === file?.path
-  const newPageDir = file?.path.startsWith('content/') ? parentOf(file.path) : 'content/blog'
+  const newPageDir = file?.path.startsWith(site.contentDir + '/')
+    ? parentOf(file.path)
+    : site.contentDir
   const selectIn = (part: Target['part']): Selection | undefined =>
     select && select.path === file?.path && select.part === part ? select : undefined
 
   return (
-    <SchemaProvider repoPath={repo.path}>
+    <SchemaProvider repoPath={repo.path} site={site}>
       <div
         className="app"
         onDragOver={(e) => e.preventDefault()}

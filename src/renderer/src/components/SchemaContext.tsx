@@ -1,24 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ComponentSchema, DataLists, SiteInfo } from '../../../shared/types'
 import { emptyLists, SchemaContext, type Schemas } from '../lib/contexts'
-import { defaultSiteInfo } from '../../../shared/siteInfo'
-import { setKeys } from '../lib/schema'
+import { setImagesUrl, setKeys } from '../lib/schema'
 
 interface Props {
   repoPath: string
+  site: SiteInfo
   children: React.ReactNode
 }
 
 // Loads the component schemas, data pickers and image list from the checkout and keeps
 // them current when those files change.
-export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element {
+export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.Element {
   const [components, setComponents] = useState<ComponentSchema[]>([])
   const [lists, setLists] = useState<DataLists>(emptyLists)
   const [images, setImages] = useState<string[]>([])
-  const [site, setSite] = useState<SiteInfo>(defaultSiteInfo)
 
   useEffect(() => {
     let live = true
+    setImagesUrl(site.imagesUrl)
     const loadComponents = (): void => {
       void window.api.repo.components().then((lib) => {
         if (!live) return
@@ -29,28 +29,22 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
     const loadLists = (): void => {
       void window.api.repo.data().then((d) => live && setLists(d))
     }
-    const loadSite = (): void => {
-      void window.api.repo.site().then((s) => live && setSite(s))
-    }
     const loadImages = (): void => {
       void window.api.repo.images().then((i) => live && setImages(i))
     }
-    loadSite()
     loadComponents()
     loadLists()
     loadImages()
     const off = window.api.repo.onChanged((paths) => {
-      if (paths.some((p) => /^(config\/|(hugo|config)\.(ya?ml|toml|json)$|data\/)/.test(p)))
-        loadSite()
       if (paths.some((p) => /^(components|component-library)\//.test(p))) loadComponents()
       if (paths.some((p) => p.startsWith('data/'))) loadLists()
-      if (paths.some((p) => p.startsWith('static/images'))) loadImages()
+      if (paths.some((p) => p.startsWith(site.imagesDir))) loadImages()
     })
     return () => {
       live = false
       off()
     }
-  }, [repoPath])
+  }, [repoPath, site.imagesDir, site.imagesUrl])
 
   const value = useMemo<Schemas>(
     () => ({

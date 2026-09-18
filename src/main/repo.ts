@@ -15,6 +15,7 @@ import type {
 import { fieldTypes, humanize, inferField, isRecord } from '../shared/fields'
 import { findHugo, listPages } from './hugo'
 import { findConfig, siteInfo } from './hugoConfig'
+import { defaultSiteInfo } from '../shared/siteInfo'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
 export const componentDirs = ['components', 'component-library/components']
@@ -35,6 +36,8 @@ export class Repo {
   private timer: NodeJS.Timeout | null = null
   private componentCache: ComponentLibrary | null = null
   private siteCache: Promise<SiteInfo> | null = null
+  // The folders in use, for the watcher and cache invalidation.
+  private folders = defaultSiteInfo
   private dataCache: DataLists | null = null
   private imageCache: string[] | null = null
   private ownRenames = new Set<string>()
@@ -49,7 +52,7 @@ export class Repo {
   }
 
   async site(): Promise<SiteInfo> {
-    this.siteCache ??= siteInfo(this.path)
+    this.siteCache ??= siteInfo(this.path).then((s) => (this.folders = s))
     return this.siteCache
   }
 
@@ -98,9 +101,10 @@ export class Repo {
   }
 
   async pageUrl(rel: string): Promise<string | null> {
-    if (!rel.startsWith('content/')) return null
+    const { contentDir } = await this.site()
+    if (!rel.startsWith(contentDir + '/')) return null
     if (this.pages.size === 0) await this.refreshPages()
-    return this.pages.get(rel) ?? guessUrl(rel)
+    return this.pages.get(rel) ?? guessUrl(rel.slice(contentDir.length + 1))
   }
 
   // A checkout has either <name>.yml files under components/ or, while the site still
@@ -167,7 +171,8 @@ export class Repo {
         else if (imageFile.test(e.name)) out.push(`${rel}/${e.name}`)
       }
     }
-    await walk(join(this.path, 'static', 'images'), '/images')
+    const { imagesDir, imagesUrl } = await this.site()
+    await walk(join(this.path, imagesDir), imagesUrl)
     this.imageCache = out.sort()
     return this.imageCache
   }
@@ -185,14 +190,15 @@ export class Repo {
     let name = base + ext
     for (let i = 2; existsSync(join(folder, name)); i++) name = `${base}-${i}${ext}`
     await fs.copyFile(src, join(folder, name))
-    if (dir.startsWith('static/images')) this.imageCache = null
+    if (dir.startsWith(this.folders.imagesDir)) this.imageCache = null
     return `${dir}/${name}`
   }
 
-  // Same, for an image addressed by its URL path under static/.
+  // Same, for an image addressed by the URL path of its folder.
   async importImage(src: string, dir: string): Promise<string> {
-    const rel = await this.importFile(src, join('static', dir))
-    return '/' + rel.replace(/^static\//, '')
+    const { imagesDir, imagesUrl } = await this.site()
+    const rel = await this.importFile(src, imagesDir + dir.slice(imagesUrl.length))
+    return imagesUrl + rel.slice(imagesDir.length)
   }
 
   async create(rel: string, text: string): Promise<void> {
@@ -242,7 +248,8 @@ export class Repo {
       if (!rel || ignoredChanges.test(rel) || rel.endsWith('.galley~')) return
       this.pending.add(rel)
       // Galley's own saves arrive as renames too, but move no page.
-      if (event === 'rename' && rel.startsWith('content/') && !this.ownRenames.has(rel)) {
+      const inContent = rel.startsWith(this.folders.contentDir + '/')
+      if (event === 'rename' && inContent && !this.ownRenames.has(rel)) {
         this.structureChanged = true
       }
       if (this.timer) clearTimeout(this.timer)
@@ -261,7 +268,7 @@ export class Repo {
     if (paths.some(isComponentFile)) this.componentCache = null
     if (paths.some(isConfigFile)) this.siteCache = null
     if (paths.some((p) => p.startsWith('data/'))) this.dataCache = null
-    if (paths.some((p) => p.startsWith('static/images'))) this.imageCache = null
+    if (paths.some((p) => p.startsWith(this.folders.imagesDir))) this.imageCache = null
     this.onChange(paths)
   }
 
@@ -272,10 +279,7 @@ export class Repo {
 }
 
 function guessUrl(rel: string): string {
-  const path = rel
-    .replace(/^content\//, '')
-    .replace(/\.md$/, '')
-    .replace(/\/?_?index$/, '')
+  const path = rel.replace(/\.md$/, '').replace(/\/?_?index$/, '')
   return path ? `/${path}/` : '/'
 }
 
