@@ -10,11 +10,13 @@ import type {
   FieldDef,
   FieldType,
   RepoInfo,
-  SiteInfo
+  SiteInfo,
+  Snippet
 } from '../shared/types'
 import { fieldTypes, humanize, inferField, isRecord } from '../shared/fields'
 import { findHugo, listPages } from './hugo'
 import { findConfig, parse, siteInfo } from './hugoConfig'
+import { snippets } from './snippets'
 import { defaultSiteInfo } from '../shared/siteInfo'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
@@ -36,6 +38,7 @@ export class Repo {
   // The folders in use, for the watcher and cache invalidation.
   private folders = defaultSiteInfo
   private dataCache: DataLists | null = null
+  private snippetCache: Promise<Snippet[]> | null = null
   private imageCache: string[] | null = null
   private ownRenames = new Set<string>()
 
@@ -158,6 +161,11 @@ export class Repo {
     return this.dataCache
   }
 
+  snippets(): Promise<Snippet[]> {
+    this.snippetCache ??= snippets(this.path)
+    return this.snippetCache
+  }
+
   async images(): Promise<string[]> {
     if (this.imageCache) return this.imageCache
     const out: string[] = []
@@ -266,6 +274,7 @@ export class Repo {
       this.componentCache = null
     if (paths.some(isConfigFile)) this.siteCache = null
     if (paths.some((p) => p.startsWith('data/'))) this.dataCache = null
+    if (paths.some((p) => p.startsWith('layouts/shortcodes/'))) this.snippetCache = null
     if (paths.some((p) => p.startsWith(this.folders.imagesDir))) this.imageCache = null
     this.onChange(paths)
   }

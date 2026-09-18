@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ComponentSchema, DataLists, SiteInfo } from '../../../shared/types'
+import type { ComponentSchema, DataLists, SiteInfo, Snippet } from '../../../shared/types'
 import { emptyLists, SchemaContext, type Schemas } from '../lib/contexts'
 import { setImagesUrl, setKeys } from '../lib/schema'
 
@@ -15,6 +15,7 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
   const [components, setComponents] = useState<ComponentSchema[]>([])
   const [lists, setLists] = useState<DataLists>(emptyLists)
   const [images, setImages] = useState<string[]>([])
+  const [snippets, setSnippets] = useState<Snippet[]>([])
 
   useEffect(() => {
     let live = true
@@ -29,15 +30,20 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
     const loadLists = (): void => {
       void window.api.repo.data().then((d) => live && setLists(d))
     }
+    const loadSnippets = (): void => {
+      void window.api.repo.snippets().then((s) => live && setSnippets(s))
+    }
     const loadImages = (): void => {
       void window.api.repo.images().then((i) => live && setImages(i))
     }
     loadComponents()
     loadLists()
+    loadSnippets()
     loadImages()
     const off = window.api.repo.onChanged((paths) => {
       if (paths.some((p) => p.startsWith(site.componentsDir + '/'))) loadComponents()
       if (paths.some((p) => p.startsWith('data/'))) loadLists()
+      if (paths.some((p) => p.startsWith('layouts/shortcodes/'))) loadSnippets()
       if (paths.some((p) => p.startsWith(site.imagesDir))) loadImages()
     })
     return () => {
@@ -52,6 +58,7 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
       schemas: new Map(components.map((c) => [c.name, c])),
       standalone: components.filter((c) => c.standalone),
       lists,
+      snippets,
       images,
       importImage: async (dir) => {
         const path = await window.api.repo.importImage(dir)
@@ -59,7 +66,7 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
         return path
       }
     }),
-    [site, components, lists, images]
+    [site, components, lists, snippets, images]
   )
 
   return <SchemaContext.Provider value={value}>{children}</SchemaContext.Provider>

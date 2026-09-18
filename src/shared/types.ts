@@ -69,6 +69,13 @@ export interface ComponentSchema {
   fields: FieldDef[]
 }
 
+// A shortcode the Insert menu offers, from layouts/shortcodes or Hugo's embedded ones.
+export interface Snippet {
+  name: string
+  label: string
+  text: string
+}
+
 // Frontmatter key to the names in data/<key>.*, for every data file that is a list of
 // maps with a `name` field.
 export type DataLists = Record<string, string[]>

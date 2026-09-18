@@ -211,6 +211,7 @@ function registerIpc(): void {
   ipcMain.handle('repo:site', () => current().site())
   ipcMain.handle('repo:components', () => current().components())
   ipcMain.handle('repo:data', () => current().data())
+  ipcMain.handle('repo:snippets', () => current().snippets())
   ipcMain.handle('repo:images', () => current().images())
   ipcMain.handle('repo:importFile', (_e, src: string, dir: string) =>
     current().importFile(src, dir)

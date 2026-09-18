@@ -1,3 +1,4 @@
+import { useSchemas } from '../lib/contexts'
 import { useState } from 'react'
 import { CodeXml } from 'lucide-react'
 import { syntaxTree } from '@codemirror/language'
@@ -148,13 +149,6 @@ function insert(view: EditorView, text: string): void {
   view.focus()
 }
 
-const snippets: Record<string, string> = {
-  screenshot: '{{< screenshot "/images/…" "Description of the picture" >}}',
-  youtube: '{{< youtube VIDEO_ID >}}',
-  quote: '{{< quote "What the customer said." "Name, Title" >}}',
-  tooltip: '{{< tooltip "Explanation shown on hover" >}}term{{< /tooltip >}}'
-}
-
 // Acts on whichever markdown editor has focus: the page body or a markdown field.
 const inlineStyles: Record<string, string> = {
   StrongEmphasis: 'bold',
@@ -233,6 +227,7 @@ function activeStyles(view: EditorView): Set<string> {
 }
 
 export default function Toolbar({ view, compact }: Props): React.JSX.Element {
+  const { snippets } = useSchemas()
   // Selection and document changes in the active editor re-render the styles in effect.
   useActiveEditorState()
   const [pending, setPending] = useState<Pending | null>(null)
@@ -286,17 +281,21 @@ export default function Toolbar({ view, compact }: Props): React.JSX.Element {
           if (!view) return
           const choice = e.target.value
           if (choice === 'link' || choice === 'image') setPending(pendingFor(view, choice))
-          else if (snippets[choice]) insert(view, snippets[choice])
+          else {
+            const snippet = snippets.find((s) => s.name === choice)
+            if (snippet) insert(view, snippet.text)
+          }
         }}
       >
         <option value="">Insert…</option>
         <option value="link">{styles.has('link') ? 'Edit link…' : 'Link…'}</option>
         <option value="image">{styles.has('image') ? 'Edit image…' : 'Image…'}</option>
-        <option disabled>──────</option>
-        <option value="screenshot">Screenshot</option>
-        <option value="youtube">YouTube video</option>
-        <option value="quote">Customer quote</option>
-        <option value="tooltip">Tooltip</option>
+        {snippets.length > 0 && <option disabled>──────</option>}
+        {snippets.map((s) => (
+          <option key={s.name} value={s.name}>
+            {s.label}
+          </option>
+        ))}
       </select>
       {pending?.kind === 'link' && (
         <LinkDialog

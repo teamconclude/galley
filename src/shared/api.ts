@@ -3,6 +3,7 @@ import type {
   DataLists,
   DirEntry,
   SiteInfo,
+  Snippet,
   GitStatus,
   HugoStatus,
   Identity,
@@ -35,6 +36,7 @@ export interface Api {
     site: () => Promise<SiteInfo>
     components: () => Promise<ComponentLibrary>
     data: () => Promise<DataLists>
+    snippets: () => Promise<Snippet[]>
     images: () => Promise<string[]>
     importImage: (dir: string) => Promise<string | null>
     importFile: (src: string, dir: string) => Promise<string>

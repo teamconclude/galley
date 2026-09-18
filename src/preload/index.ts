@@ -18,6 +18,7 @@ const api: Api = {
     site: () => ipcRenderer.invoke('repo:site'),
     components: () => ipcRenderer.invoke('repo:components'),
     data: () => ipcRenderer.invoke('repo:data'),
+    snippets: () => ipcRenderer.invoke('repo:snippets'),
     images: () => ipcRenderer.invoke('repo:images'),
     importImage: (dir) => ipcRenderer.invoke('repo:importImage', dir),
     importFile: (src, dir) => ipcRenderer.invoke('repo:importFile', src, dir),
