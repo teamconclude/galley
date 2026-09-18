@@ -14,7 +14,7 @@ import type {
 } from '../shared/types'
 import { fieldTypes, humanize, inferField, isRecord } from '../shared/fields'
 import { findHugo, listPages } from './hugo'
-import { findConfig, siteInfo } from './hugoConfig'
+import { findConfig, parse, siteInfo } from './hugoConfig'
 import { defaultSiteInfo } from '../shared/siteInfo'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
@@ -135,24 +135,26 @@ export class Repo {
     return this.componentCache
   }
 
+  // Every data file that is a list of maps with a `name` field fills the picker of the
+  // frontmatter key of the same name, e.g. data/authors.yaml for `authors`.
   async data(): Promise<DataLists> {
     if (this.dataCache) return this.dataCache
-    const names = async (file: string): Promise<string[]> => {
+    const dir = join(this.path, 'data')
+    const lists: DataLists = {}
+    for (const entry of await fs.readdir(dir).catch(() => [] as string[])) {
+      const ext = extname(entry)
+      if (!/^\.(ya?ml|json|toml)$/.test(ext)) continue
+      let list: unknown
       try {
-        const list: unknown = parseYaml(await fs.readFile(join(this.path, 'data', file), 'utf8'))
-        if (!Array.isArray(list)) return []
-        return list
-          .map((e) => (isRecord(e) ? e.name : undefined))
-          .filter((n): n is string => typeof n === 'string')
+        list = parse(entry, await fs.readFile(join(dir, entry), 'utf8'))
       } catch {
-        return []
+        continue
       }
+      if (!Array.isArray(list) || list.length === 0) continue
+      const names = list.map((e) => (isRecord(e) ? e.name : undefined))
+      if (names.every((n) => typeof n === 'string')) lists[basename(entry, ext)] = names as string[]
     }
-    this.dataCache = {
-      authors: await names('authors.yaml'),
-      categories: await names('categories.yaml'),
-      customercategories: await names('customercategories.yaml')
-    }
+    this.dataCache = lists
     return this.dataCache
   }
 

@@ -69,11 +69,9 @@ export interface ComponentSchema {
   fields: FieldDef[]
 }
 
-export interface DataLists {
-  authors: string[]
-  categories: string[]
-  customercategories: string[]
-}
+// Frontmatter key to the names in data/<key>.*, for every data file that is a list of
+// maps with a `name` field.
+export type DataLists = Record<string, string[]>
 
 // What Galley derives about a site from its Hugo config and checkout; see
 // docs/generalization-plan.md, "No configuration file".

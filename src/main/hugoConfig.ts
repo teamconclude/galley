@@ -21,7 +21,7 @@ export function findConfig(root: string): string | null {
   return null
 }
 
-function parse(file: string, text: string): unknown {
+export function parse(file: string, text: string): unknown {
   switch (extname(file)) {
     case '.toml':
       return parseToml(text)

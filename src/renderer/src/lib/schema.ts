@@ -82,9 +82,7 @@ export function fieldsFor(declared: FieldDef[], obj: Record<string, unknown>): F
 // Top-level page fields have no schema; a few keys get pickers from the data files.
 export function pageField(key: string, value: unknown, lists: DataLists): FieldSpec {
   if (key === listKey) return { kind: 'blocks', allowed: null }
-  if (key === 'authors' || key === 'categories' || key === 'customercategories') {
-    return { kind: 'choicelist', options: lists[key] }
-  }
+  if (key in lists) return { kind: 'choicelist', options: lists[key] }
   if (key === 'description' || key === 'summary') return { kind: 'string', multiline: true }
   return specFor(inferField(key, value, blockKey, imagesUrl))
 }

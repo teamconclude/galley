@@ -19,7 +19,7 @@ export interface Schemas {
   importImage: (dir: string) => Promise<string | null>
 }
 
-export const emptyLists: DataLists = { authors: [], categories: [], customercategories: [] }
+export const emptyLists: DataLists = {}
 
 export const SchemaContext = createContext<Schemas>({
   site: defaultSiteInfo,
