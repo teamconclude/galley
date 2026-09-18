@@ -34,7 +34,7 @@ export function SchemaProvider({ repoPath, children }: Props): React.JSX.Element
     loadLists()
     loadImages()
     const off = window.api.repo.onChanged((paths) => {
-      if (paths.some((p) => p.startsWith('component-library/'))) loadComponents()
+      if (paths.some((p) => /^(components|component-library)\//.test(p))) loadComponents()
       if (paths.some((p) => p.startsWith('data/'))) loadLists()
       if (paths.some((p) => p.startsWith('static/images'))) loadImages()
     })

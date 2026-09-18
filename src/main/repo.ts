@@ -15,6 +15,9 @@ import { fieldTypes, humanize, inferField, isRecord } from '../shared/fields'
 import { findHugo, listPages } from './hugo'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
+export const componentDirs = ['components', 'component-library/components']
+export const isComponentFile = (rel: string): boolean =>
+  componentDirs.some((d) => rel.startsWith(d + '/'))
 const ignoredChanges = /^(public|resources|node_modules|\.git)(\/|$)/
 const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
@@ -88,11 +91,14 @@ export class Repo {
     return this.pages.get(rel) ?? guessUrl(rel)
   }
 
-  // A checkout has either <name>.yml files or, while the site still uses Bookshop,
-  // <name>.bookshop.yml files; the latter are normalised to the same shape.
+  // A checkout has either <name>.yml files under components/ or, while the site still
+  // uses Bookshop, <name>.bookshop.yml files under component-library/components/; the
+  // latter are normalised to the same shape.
   async components(): Promise<ComponentLibrary> {
     if (this.componentCache) return this.componentCache
-    const dir = join(this.path, 'component-library', 'components')
+    const dir =
+      componentDirs.map((d) => join(this.path, d)).find((d) => existsSync(d)) ??
+      join(this.path, componentDirs[0])
     const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
     const names = entries
       .filter((e) => e.isDirectory())
@@ -240,7 +246,7 @@ export class Repo {
       this.structureChanged = false
       void this.refreshPages()
     }
-    if (paths.some((p) => p.startsWith('component-library/'))) this.componentCache = null
+    if (paths.some(isComponentFile)) this.componentCache = null
     if (paths.some((p) => p.startsWith('data/'))) this.dataCache = null
     if (paths.some((p) => p.startsWith('static/images'))) this.imageCache = null
     this.onChange(paths)

@@ -50,7 +50,7 @@ Hugo assumed narrower than Hugo is:
 
 The block model:
 
-- Components live in `component-library/components/<name>/<name>.yml`; the list key is
+- Components live in `components/<name>/<name>.yml`; the list key is
   `blocks` and the type key `component` (`content_blocks` and `_bookshop_name` for Bookshop).
 - Preview scrolling to a block counts Bookshop's `<!--bookshop-live name(…)-->` comments
   (`src/shared/previewScript.ts`). The editor-environment branch emits none, so on that
@@ -77,7 +77,7 @@ images:
   dir: static/images # where the picker looks and drops copy to
   url: /images # how pages refer to files in that folder
 components:
-  dir: component-library/components
+  dir: components
   listKey: blocks # the frontmatter list holding a page's blocks
   typeKey: component # the key naming a block's component
 lists: # frontmatter key → data file with a list of maps with `name`
@@ -217,7 +217,7 @@ a Galley release, and Galley stays small. Galley pins the tag it clones.
 Contents:
 
 - `hugo.yaml` with `unsafe: true` for Goldmark, the `markdown` output format for the
-  twin, `enableGitInfo`, and `module.mounts` making `component-library/components`
+  twin, `enableGitInfo`, and `module.mounts` making `components`
   available as partials. No vendored modules, no Go needed.
 - `galley.yaml` with the defaults spelled out, so a new owner sees what can change.
 - Layouts: `baseof.html` with `<header>` and `<main>`, a home and a single page layout,
