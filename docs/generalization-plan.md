@@ -25,7 +25,9 @@ any of its forms and derives the site name, folders, components mount, markdown 
 and text previews from it, pickers from every data list, snippets from the shortcodes,
 and the Claude pane is a preference. A stock `hugo new site` opens and previews.
 
-Next, in order: phase 2, the rest of phase 3, the template site; merging `lars/galley`
+Phase 2 is done too: TOML and JSON frontmatter open as text with the badge.
+
+Next, in order: the rest of phase 3, the template site; merging `lars/galley`
 into develop can happen any time after 0.4.1 is installed and CloudCannon is no longer
 needed.
 
