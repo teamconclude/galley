@@ -646,8 +646,14 @@ export default function App(): React.JSX.Element | null {
   const fileText = file?.text ?? ''
   const contentVersion = useMemo(() => hashText(fileText), [fileText])
   const previewState = useMemo(
-    () => ({ url: previewUrl, mode: previewMode, version: contentVersion, status: hugo }),
-    [previewUrl, previewMode, contentVersion, hugo]
+    () => ({
+      url: previewUrl,
+      mode: previewMode,
+      version: contentVersion,
+      status: hugo,
+      markdownSuffix: site.markdownSuffix
+    }),
+    [previewUrl, previewMode, contentVersion, hugo, site.markdownSuffix]
   )
 
   // A preview in its own window follows what the bar in this window says; one that was
@@ -914,6 +920,7 @@ export default function App(): React.JSX.Element | null {
                       mode={previewMode}
                       onMode={setPreviewMode}
                       version={contentVersion}
+                      markdownSuffix={site.markdownSuffix}
                       detached={false}
                       onDetach={toggleDetached}
                       onAttach={toggleDetached}

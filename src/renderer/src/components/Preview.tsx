@@ -13,6 +13,8 @@ interface Props {
   onMode: (mode: PreviewMode) => void
   // Changes whenever the open file's text does.
   version: number
+  // The site's markdown rendition suffix; without one there is no Markdown mode.
+  markdownSuffix: string | null
   // Shown in the preview's own window: the last button brings it back.
   detached: boolean
   onDetach: () => void
@@ -21,19 +23,19 @@ interface Props {
   targets: (cb: (target: PreviewTarget) => void) => () => void
 }
 
-// A page's markdown twin lives at its URL plus index.html.md; llms.txt is text as it is.
-function textUrlFor(url: string): string {
-  return url.endsWith('.txt') ? url : url.replace(/\/?$/, '/') + 'index.html.md'
+// A page's markdown rendition lives at its URL plus the suffix; a .txt is text as it is.
+function textUrlFor(url: string, suffix: string | null): string {
+  return url.endsWith('.txt') || !suffix ? url : url.replace(/\/?$/, '/') + suffix
 }
 
 const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? false
 
 export default function Preview(props: Props): React.JSX.Element {
-  const { status, url, reloadKey, mode, onMode, version, detached } = props
+  const { status, url, reloadKey, mode, onMode, version, detached, markdownSuffix } = props
   const { onDetach, onAttach, targets } = props
   const plainFile = isPlainFile(url)
-  const textMode = plainFile || mode === 'markdown'
-  const shownUrl = url && textMode ? textUrlFor(url) : url
+  const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
+  const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
   const [reloads, setReloads] = useState(0)
 
   return (
@@ -41,7 +43,7 @@ export default function Preview(props: Props): React.JSX.Element {
       <div className="pane-bar">
         <span className={`dot ${status.state}`} />
         <span className="pane-title">{shownUrl ?? statusText(status)}</span>
-        {url && !plainFile && (
+        {url && !plainFile && markdownSuffix !== null && (
           <span className="segmented" title="The page as rendered, or its markdown for LLMs">
             <button className={mode === 'html' ? 'on' : ''} onClick={() => onMode('html')}>
               HTML
@@ -78,6 +80,7 @@ export default function Preview(props: Props): React.JSX.Element {
         url={url}
         mode={mode}
         version={version}
+        markdownSuffix={markdownSuffix}
         reloadKey={reloadKey + reloads}
         targets={targets}
         empty={status.message ?? statusText(status)}
@@ -91,6 +94,7 @@ interface ContentProps {
   mode: PreviewMode
   version: number
   reloadKey: number
+  markdownSuffix: string | null
   // Where scroll targets come from: the store in this window, or IPC in the detached one.
   targets: (cb: (target: PreviewTarget) => void) => () => void
   empty: string
@@ -98,10 +102,10 @@ interface ContentProps {
 
 // The page in a webview, or its text rendered; shared by the pane and the detached window.
 export function PreviewContent(props: ContentProps): React.JSX.Element {
-  const { url, mode, version, reloadKey, targets, empty } = props
+  const { url, mode, version, reloadKey, targets, empty, markdownSuffix } = props
   const view = useRef<WebviewElement>(null)
-  const textMode = isPlainFile(url) || mode === 'markdown'
-  const shownUrl = url && textMode ? textUrlFor(url) : url
+  const textMode = isPlainFile(url) || (mode === 'markdown' && markdownSuffix !== null)
+  const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
 
   useEffect(() => {
     if (reloadKey) view.current?.reload()

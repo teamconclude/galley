@@ -160,6 +160,8 @@ export interface PreviewState {
   // Changes whenever the open file's text does; the text view fetches again.
   version: number
   status: HugoStatus
+  // The site's markdown rendition suffix, or null when it has none.
+  markdownSuffix: string | null
 }
 
 export type SidebarTab = 'files' | 'changes' | 'search'

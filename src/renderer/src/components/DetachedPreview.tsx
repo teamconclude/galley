@@ -19,6 +19,7 @@ export default function DetachedPreview(): React.JSX.Element {
         mode={state?.mode ?? 'html'}
         onMode={(mode) => window.api.preview.setMode(mode)}
         version={state?.version ?? 0}
+        markdownSuffix={state?.markdownSuffix ?? null}
         reloadKey={0}
         detached
         onDetach={() => {}}

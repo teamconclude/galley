@@ -36,7 +36,7 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
     loadLists()
     loadImages()
     const off = window.api.repo.onChanged((paths) => {
-      if (paths.some((p) => /^(components|component-library)\//.test(p))) loadComponents()
+      if (paths.some((p) => p.startsWith(site.componentsDir + '/'))) loadComponents()
       if (paths.some((p) => p.startsWith('data/'))) loadLists()
       if (paths.some((p) => p.startsWith(site.imagesDir))) loadImages()
     })
@@ -44,7 +44,7 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
       live = false
       off()
     }
-  }, [repoPath, site.imagesDir, site.imagesUrl])
+  }, [repoPath, site.imagesDir, site.imagesUrl, site.componentsDir])
 
   const value = useMemo<Schemas>(
     () => ({

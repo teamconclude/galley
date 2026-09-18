@@ -18,9 +18,6 @@ import { findConfig, siteInfo } from './hugoConfig'
 import { defaultSiteInfo } from '../shared/siteInfo'
 
 const hiddenAtRoot = new Set(['node_modules', 'public', 'resources', 'bin'])
-export const componentDirs = ['components', 'component-library/components']
-export const isComponentFile = (rel: string): boolean =>
-  componentDirs.some((d) => rel.startsWith(d + '/'))
 const isConfigFile = (rel: string): boolean =>
   rel.startsWith('config/') ||
   /^(hugo|config)\.(ya?ml|toml|json)$/.test(rel) ||
@@ -112,9 +109,7 @@ export class Repo {
   // latter are normalised to the same shape.
   async components(): Promise<ComponentLibrary> {
     if (this.componentCache) return this.componentCache
-    const dir =
-      componentDirs.map((d) => join(this.path, d)).find((d) => existsSync(d)) ??
-      join(this.path, componentDirs[0])
+    const dir = join(this.path, (await this.site()).componentsDir)
     const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
     const names = entries
       .filter((e) => e.isDirectory())
@@ -265,7 +260,8 @@ export class Repo {
       this.structureChanged = false
       void this.refreshPages()
     }
-    if (paths.some(isComponentFile)) this.componentCache = null
+    if (paths.some((p) => p.startsWith(this.folders.componentsDir + '/')))
+      this.componentCache = null
     if (paths.some(isConfigFile)) this.siteCache = null
     if (paths.some((p) => p.startsWith('data/'))) this.dataCache = null
     if (paths.some((p) => p.startsWith(this.folders.imagesDir))) this.imageCache = null
