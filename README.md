@@ -88,9 +88,11 @@ npm run build:unpack # packaged app in dist/mac-arm64, for trying the packaged b
 npm run build:mac    # .dmg and .zip in dist/
 ```
 
-The page forms are generated from the component definitions in the site checkout,
-`component-library/components/<name>/<name>.yml`, or `<name>.bookshop.yml` while the site
-still uses Bookshop. Nothing in Galley needs to change when a component is added.
+The page forms are generated from the component schemas in the site checkout,
+`component-library/components/<name>/<name>.yml` (label, description and a `fields` map of
+type, label, placeholder, help and default per key), or from `<name>.bookshop.yml` while a
+site still uses Bookshop, with labels derived from the keys. Nothing in Galley needs to
+change when a component is added.
 
 ### Releasing
 

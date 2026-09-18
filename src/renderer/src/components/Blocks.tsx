@@ -1,15 +1,14 @@
 import { useState } from 'react'
-import type { InputHint } from '../../../shared/types'
+import type { FieldDef } from '../../../shared/types'
 import {
-  blankItem,
+  blankObject,
   blockName,
-  currentBlockKey,
   currentListKey,
-  humanize,
+  fieldsFor,
   isRecord,
   labelsFor,
   newBlock,
-  resolveField,
+  specFor,
   summaryOf,
   type FieldSpec
 } from '../lib/schema'
@@ -31,16 +30,19 @@ import { useSchemas } from '../lib/contexts'
 
 interface FieldForProps {
   path: Path
-  name: string
-  spec: FieldSpec
+  def: FieldDef
   value: unknown
-  inputs: Record<string, InputHint>
-  placeholder?: string
+  // Page-level fields resolve outside the schema, e.g. to a picker from a data file.
+  spec?: FieldSpec
 }
 
-export function FieldFor(props: FieldForProps): React.JSX.Element {
-  const { path, name, spec, value, inputs, placeholder } = props
-  const heading = <div className="field-heading">{humanize(name)}</div>
+export function FieldFor({ path, def, value, spec: given }: FieldForProps): React.JSX.Element {
+  const spec = given ?? specFor(def)
+  const heading = (
+    <div className="field-heading" title={def.help}>
+      {def.label}
+    </div>
+  )
   switch (spec.kind) {
     case 'blocks':
       return (
@@ -60,13 +62,7 @@ export function FieldFor(props: FieldForProps): React.JSX.Element {
       return (
         <div className="field-wide">
           {heading}
-          <ObjectList
-            path={path}
-            items={Array.isArray(value) ? value : []}
-            item={spec.item}
-            fromBlueprint={spec.fromBlueprint}
-            inputs={inputs}
-          />
+          <ObjectList path={path} items={Array.isArray(value) ? value : []} fields={spec.fields} />
         </div>
       )
     case 'fields':
@@ -74,22 +70,17 @@ export function FieldFor(props: FieldForProps): React.JSX.Element {
         <div className="field-wide">
           {heading}
           <div className="nested fields-grid">
-            <ObjectFields
-              path={path}
-              obj={isRecord(value) ? value : {}}
-              blueprint={spec.blueprint}
-              inputs={inputs}
-            />
+            <ObjectFields path={path} obj={isRecord(value) ? value : {}} fields={spec.fields} />
           </div>
         </div>
       )
     default:
       return (
         <div className="field">
-          <span className="field-name" title={inputs[name]?.comment}>
-            {humanize(name)}
+          <span className="field-name" title={def.help}>
+            {def.label}
           </span>
-          <Control path={path} spec={spec} value={value} placeholder={placeholder} />
+          <Control path={path} spec={spec} value={value} placeholder={def.placeholder} />
         </div>
       )
   }
@@ -100,7 +91,12 @@ function Control({
   spec,
   value,
   placeholder
-}: Omit<FieldForProps, 'name' | 'inputs'>): React.JSX.Element | null {
+}: {
+  path: Path
+  spec: FieldSpec
+  value: unknown
+  placeholder?: string
+}): React.JSX.Element | null {
   switch (spec.kind) {
     case 'string':
       return (
@@ -132,35 +128,16 @@ function Control({
 interface ObjectFieldsProps {
   path: Path
   obj: Record<string, unknown>
-  blueprint: Record<string, unknown>
-  inputs: Record<string, InputHint>
-  skip?: string[]
+  fields: FieldDef[]
 }
 
-// Blueprint fields first, in schema order, then anything else the page sets.
-export function ObjectFields({
-  path,
-  obj,
-  blueprint,
-  inputs,
-  skip = []
-}: ObjectFieldsProps): React.JSX.Element {
-  const keys = [...Object.keys(blueprint), ...Object.keys(obj).filter((k) => !(k in blueprint))]
+// Declared fields first, in schema order, then anything else the page sets.
+export function ObjectFields({ path, obj, fields }: ObjectFieldsProps): React.JSX.Element {
   return (
     <>
-      {keys
-        .filter((key) => !skip.includes(key))
-        .map((key) => (
-          <FieldFor
-            key={key}
-            path={[...path, key]}
-            name={key}
-            spec={resolveField(key, blueprint[key], inputs, obj[key])}
-            value={obj[key]}
-            inputs={inputs}
-            placeholder={typeof blueprint[key] === 'string' ? blueprint[key] : undefined}
-          />
-        ))}
+      {fieldsFor(fields, obj).map((def) => (
+        <FieldFor key={def.key} path={[...path, def.key]} def={def} value={obj[def.key]} />
+      ))}
     </>
   )
 }
@@ -311,15 +288,7 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
         const obj = isRecord(item) ? item : {}
         const name = blockName(obj)
         const schema = name === null ? undefined : schemas.get(name)
-        return (
-          <ObjectFields
-            path={[...path, index]}
-            obj={obj}
-            blueprint={schema?.blueprint ?? {}}
-            inputs={schema?.inputs ?? {}}
-            skip={[currentBlockKey()]}
-          />
-        )
+        return <ObjectFields path={[...path, index]} obj={obj} fields={schema?.fields ?? []} />
       }}
       addControl={(insert) => (
         <>
@@ -352,37 +321,20 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
 interface ObjectListProps {
   path: Path
   items: unknown[]
-  item: Record<string, unknown>
-  fromBlueprint: boolean
-  inputs: Record<string, InputHint>
+  fields: FieldDef[]
 }
 
-// Lists of plain items without a fieldGroup, such as accordion entries or pricing plans.
-export function ObjectList({
-  path,
-  items,
-  item,
-  fromBlueprint,
-  inputs
-}: ObjectListProps): React.JSX.Element {
+// Lists of plain objects that are not blocks, such as accordion entries or pricing plans.
+export function ObjectList({ path, items, fields }: ObjectListProps): React.JSX.Element {
   return (
     <CardList
       path={path}
       items={items}
       titleOf={(_item, index) => `#${index + 1}`}
       bodyOf={(value, index) => (
-        <ObjectFields
-          path={[...path, index]}
-          obj={isRecord(value) ? value : {}}
-          blueprint={item}
-          inputs={inputs}
-        />
+        <ObjectFields path={[...path, index]} obj={isRecord(value) ? value : {}} fields={fields} />
       )}
-      addControl={(insert) => (
-        <button onClick={() => insert(fromBlueprint ? structuredClone(item) : blankItem(item))}>
-          Add item
-        </button>
-      )}
+      addControl={(insert) => <button onClick={() => insert(blankObject(fields))}>Add item</button>}
     />
   )
 }
@@ -428,13 +380,7 @@ export function SingleBlock({ path, value, component }: SingleBlockProps): React
         </span>
       </div>
       <div className="block-body fields-grid">
-        <ObjectFields
-          path={path}
-          obj={value}
-          blueprint={schema?.blueprint ?? {}}
-          inputs={schema?.inputs ?? {}}
-          skip={[currentBlockKey()]}
-        />
+        <ObjectFields path={path} obj={value} fields={schema?.fields ?? []} />
       </div>
     </div>
   )

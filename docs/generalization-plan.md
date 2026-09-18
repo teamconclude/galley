@@ -104,30 +104,44 @@ settings form still renders from the frontmatter.
 
 ### Component schema
 
-One folder per component under `components.dir`, holding `<name>.yml` and the Hugo
-partial `<name>.html`. The schema is the format already on the editor-environment
-branch:
+One folder per component under `components.dir`, holding `<name>.yml`, the Hugo partial
+`<name>.html` and optionally `<name>.scss` and an llms emitter `<name>.md`. The schema
+only drives the editor; templates read the page data directly.
 
 ```yaml
 label: Banner
-description: Home page banner
+description: Full-width hero at the top of a page
 standalone: true # may appear directly in the page's block list (default)
-blueprint: # defaults for a new block; types are inferred from values
-  title: Welcome
-  text: ''
-  image: /images/banner.webp
+fields: # one entry per key the template reads, in form order
+  title:
+    label: Heading # type text when omitted
+    placeholder: The page's main message
+  text:
+    type: markdown
+  image:
+    type: image
+    help: Shown beside the text
+  background:
+    type: select
+    options: [white, blue, light]
+    default: white # a new block starts with this; else empty
+    required: true # no empty choice
   buttonRow:
-    block/button-row # one nested block; blocks/<name> is a list of them,
-    # blocks is a list of any standalone component
-inputs: # overrides where the value alone is ambiguous
-  text: { type: markdown }
-  image: { type: image }
-  color: { type: select, options: { allow_empty: true, values: [blue, green] } }
+    type: block # one nested block
+    component: button-row
+  content:
+    type: blocks # a list of blocks; `components: [button]` restricts it
+  entries:
+    type: list # a list of objects when it has fields, else of strings
+    fields:
+      question: {}
+      answer: { type: markdown }
 ```
 
-Input types are frozen at the set Galley understands today: text, url, color, markdown,
-image, checkbox, switch, number, array, select. The spec says so, because the web repo's
-`gen-frontmatter` tool reads the same files.
+Field types: text, textarea, markdown, url, image, boolean, number, select, list, object,
+block, blocks. Keys a page sets that the schema does not declare still show, typed from
+their value. Galley reads Bookshop's `<name>.bookshop.yml` into the same model, with
+labels derived from the keys, until the web repo has dropped it.
 
 ### Preview markers
 

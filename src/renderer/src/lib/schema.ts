@@ -1,10 +1,7 @@
-import type {
-  BlockKey,
-  ListKey,
-  ComponentSchema,
-  DataLists,
-  InputHint
-} from '../../../shared/types'
+import type { BlockKey, ListKey, ComponentSchema, DataLists, FieldDef } from '../../../shared/types'
+import { inferField, isRecord } from '../../../shared/fields'
+
+export { humanize, isRecord } from '../../../shared/fields'
 
 export type FieldSpec =
   | { kind: 'blocks'; allowed: string[] | null }
@@ -16,11 +13,8 @@ export type FieldSpec =
   | { kind: 'choice'; choices: string[] }
   | { kind: 'choicelist'; options: string[] }
   | { kind: 'list' }
-  | { kind: 'objects'; item: Record<string, unknown>; fromBlueprint: boolean }
-  | { kind: 'fields'; blueprint: Record<string, unknown> }
-
-export const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v)
+  | { kind: 'objects'; fields: FieldDef[] }
+  | { kind: 'fields'; fields: FieldDef[] }
 
 let blockKey: BlockKey = 'component'
 let listKey: ListKey = 'blocks'
@@ -40,106 +34,90 @@ export function blockName(v: unknown): string | null {
   return typeof name === 'string' ? name : null
 }
 
-// `[blocks]` allows any standalone component, `[blocks/a, blocks/b]` only those; other
-// values are not block lists at all.
-function blockAllowed(v: unknown): string[] | null | undefined {
-  if (!Array.isArray(v) || v.length === 0) return undefined
-  const names: string[] = []
-  for (const item of v) {
-    if (item === 'blocks') return null
-    if (typeof item !== 'string' || !item.startsWith('blocks/')) return undefined
-    names.push(item.slice('blocks/'.length))
-  }
-  return names
-}
-
-const imageKey = /^image$|^image_path$|Img$|^logo$|^icon$|^thumbnail$/
-
-export function resolveField(
-  name: string,
-  blueprintValue: unknown,
-  inputs: Record<string, InputHint>,
-  currentValue: unknown
-): FieldSpec {
-  const allowed = blockAllowed(blueprintValue)
-  if (allowed !== undefined) return { kind: 'blocks', allowed }
-  if (typeof blueprintValue === 'string' && blueprintValue.startsWith('block/')) {
-    return { kind: 'block', component: blueprintValue.slice('block/'.length) }
-  }
-  const hint = inputs[name]
-  switch (hint?.type) {
+export function specFor(def: FieldDef): FieldSpec {
+  switch (def.type) {
+    case 'blocks':
+      return { kind: 'blocks', allowed: def.components ?? null }
+    case 'block':
+      return { kind: 'block', component: def.component ?? '' }
     case 'text':
     case 'url':
-    case 'color':
       return { kind: 'string', multiline: false }
+    case 'textarea':
+      return { kind: 'string', multiline: true }
     case 'markdown':
       return { kind: 'string', multiline: true, markdown: true }
     case 'image':
       return { kind: 'image' }
-    case 'checkbox':
-    case 'switch':
+    case 'boolean':
       return { kind: 'boolean' }
     case 'number':
       return { kind: 'number' }
-    case 'array':
-      return { kind: 'list' }
     case 'select': {
-      const options = hint.options ?? {}
-      const choices = (options.values ?? []).map(String)
-      return { kind: 'choice', choices: options.allow_empty ? ['', ...choices] : choices }
+      const options = def.options ?? []
+      return { kind: 'choice', choices: def.required ? options : ['', ...options] }
     }
+    case 'list':
+      return def.fields ? { kind: 'objects', fields: def.fields } : { kind: 'list' }
+    case 'object':
+      return { kind: 'fields', fields: def.fields ?? [] }
   }
-  const fromBlueprint = blueprintValue !== undefined
-  const v = fromBlueprint ? blueprintValue : currentValue
-  if (typeof v === 'boolean') return { kind: 'boolean' }
-  if (typeof v === 'number') return { kind: 'number' }
-  if (Array.isArray(v)) {
-    const first: unknown = v[0]
-    if (isRecord(first)) {
-      if (blockName(first) !== null) return { kind: 'blocks', allowed: null }
-      return { kind: 'objects', item: first, fromBlueprint }
-    }
-    return { kind: 'list' }
-  }
-  if (isRecord(v)) {
-    const component = blockName(v)
-    if (component !== null) return { kind: 'block', component }
-    return { kind: 'fields', blueprint: v }
-  }
-  const s = typeof v === 'string' ? v : ''
-  if (s.startsWith('/images/') || imageKey.test(name)) return { kind: 'image' }
-  return { kind: 'string', multiline: s.includes('\n') || s.length > 80 }
 }
 
-// Top-level page fields have no blueprint; a few keys get pickers from the data files.
+// The declared fields in schema order, then anything else the object sets, guessed from
+// its value.
+export function fieldsFor(declared: FieldDef[], obj: Record<string, unknown>): FieldDef[] {
+  const known = new Set(declared.map((f) => f.key))
+  const extra = Object.keys(obj)
+    .filter((k) => !known.has(k) && k !== blockKey)
+    .map((k) => inferField(k, obj[k], blockKey))
+  return [...declared, ...extra]
+}
+
+// Top-level page fields have no schema; a few keys get pickers from the data files.
 export function pageField(key: string, value: unknown, lists: DataLists): FieldSpec {
   if (key === listKey) return { kind: 'blocks', allowed: null }
   if (key === 'authors' || key === 'categories' || key === 'customercategories') {
     return { kind: 'choicelist', options: lists[key] }
   }
   if (key === 'description' || key === 'summary') return { kind: 'string', multiline: true }
-  return resolveField(key, undefined, {}, value)
+  return specFor(inferField(key, value, blockKey))
 }
 
-export function newBlock(schema: ComponentSchema): Record<string, unknown> {
-  const out: Record<string, unknown> = { [blockKey]: schema.name }
-  for (const [key, value] of Object.entries(schema.blueprint)) {
-    if (blockAllowed(value) !== undefined) out[key] = []
-    else if (typeof value === 'string' && value.startsWith('block/')) continue
-    else out[key] = structuredClone(value)
+// The value a new field starts with: its default, else empty for its type. A nested
+// block is left out until the user adds it.
+export function blankValue(def: FieldDef): unknown {
+  if (def.default !== undefined) return structuredClone(def.default)
+  switch (def.type) {
+    case 'boolean':
+      return false
+    case 'number':
+      return 0
+    case 'select':
+      return def.required ? (def.options?.[0] ?? '') : ''
+    case 'list':
+    case 'blocks':
+      return []
+    case 'object':
+      return blankObject(def.fields ?? [])
+    case 'block':
+      return undefined
+    default:
+      return ''
+  }
+}
+
+export function blankObject(fields: FieldDef[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const f of fields) {
+    const v = blankValue(f)
+    if (v !== undefined) out[f.key] = v
   }
   return out
 }
 
-// An empty copy of an item taken from page content rather than from a blueprint.
-export function blankItem(item: unknown): unknown {
-  if (Array.isArray(item)) return []
-  if (isRecord(item)) {
-    return Object.fromEntries(Object.entries(item).map(([k, v]) => [k, blankItem(v)]))
-  }
-  if (typeof item === 'boolean') return false
-  if (typeof item === 'number') return 0
-  return ''
+export function newBlock(schema: ComponentSchema): Record<string, unknown> {
+  return { [blockKey]: schema.name, ...blankObject(schema.fields) }
 }
 
 const summaryKeys = ['title', 'name', 'heading', 'question', 'header', 'text', 'subtitle']
@@ -154,14 +132,6 @@ export function summaryOf(obj: Record<string, unknown>): string {
     if (typeof v === 'string' && v.trim() && !v.startsWith('/')) return v.trim()
   }
   return ''
-}
-
-export function humanize(name: string): string {
-  return name
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    .replace(/^./, (c) => c.toUpperCase())
 }
 
 // Two components share a label in the site today, so tell them apart in pickers.

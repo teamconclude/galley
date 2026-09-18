@@ -19,10 +19,34 @@ export interface HugoStatus {
   missing?: boolean
 }
 
-export interface InputHint {
-  type?: string
-  comment?: string
-  options?: { allow_empty?: boolean; values?: unknown[] }
+export type FieldType =
+  | 'text'
+  | 'textarea'
+  | 'markdown'
+  | 'url'
+  | 'image'
+  | 'boolean'
+  | 'number'
+  | 'select'
+  | 'list'
+  | 'object'
+  | 'block'
+  | 'blocks'
+
+// One field of a component's form. A list has `fields` when its items are objects; a
+// block names its component, a block list may restrict the components allowed in it.
+export interface FieldDef {
+  key: string
+  type: FieldType
+  label: string
+  placeholder?: string
+  help?: string
+  default?: unknown
+  required?: boolean
+  options?: string[]
+  fields?: FieldDef[]
+  component?: string
+  components?: string[]
 }
 
 // The key naming a block's component and the page key holding the block list: component
@@ -42,8 +66,7 @@ export interface ComponentSchema {
   label: string
   description: string
   standalone: boolean
-  blueprint: Record<string, unknown>
-  inputs: Record<string, InputHint>
+  fields: FieldDef[]
 }
 
 export interface DataLists {

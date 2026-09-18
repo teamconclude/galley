@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { EditorView } from '@codemirror/view'
 import { Document, isMap, parseDocument } from 'yaml'
-import { pageField } from '../lib/schema'
+import { humanize, pageField } from '../lib/schema'
 import { FieldFor } from './Blocks'
 import { EditContext, type EditFn, useSchemas } from '../lib/contexts'
 import Editor, { type Selection } from './Editor'
@@ -98,10 +98,9 @@ export default function Frontmatter(props: Props): React.JSX.Element {
                 <FieldFor
                   key={key}
                   path={[key]}
-                  name={key}
+                  def={{ key, type: 'text', label: humanize(key) }}
                   spec={pageField(key, value, lists)}
                   value={value}
-                  inputs={{}}
                 />
               ))}
               {Object.keys(data).length === 0 && (
