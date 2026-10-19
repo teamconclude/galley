@@ -18,6 +18,7 @@ import ChangesPanel from './components/ChangesPanel'
 import ClaudePane from './components/ClaudePane'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
 import { NewPageDialog, PromptDialog } from './components/Dialogs'
+import CommitList from './components/CommitList'
 import DiffView from './components/DiffView'
 import Editor, { type Selection } from './components/Editor'
 import FileTree from './components/FileTree'
@@ -73,6 +74,7 @@ type DialogState =
 const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 const binaryFile = /\.(pdf|zip|gz|woff2?|ttf|otf|eot|mp4|mov|webm|mp3)$/i
 const markdownFile = /\.(md|markdown)$/i
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 // A cheap fingerprint of a text, to notice changes without carrying the text around.
 function hashText(text: string): number {
   let h = text.length
@@ -145,7 +147,7 @@ export default function App(): React.JSX.Element | null {
   const [bodyView, setBodyView] = useState<EditorView | null>(null)
   const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
   const [gitDialog, setGitDialog] = useState<
-    'new-branch' | 'switch-branch' | 'identity' | 'merge' | null
+    'new-branch' | 'move' | 'switch-branch' | 'identity' | 'merge' | null
   >(null)
   const [releaseDialog, setReleaseDialog] = useState<ReleaseStep | null>(null)
   const [prefs, setPrefs] = useState<Preferences | null>(null)
@@ -821,6 +823,7 @@ export default function App(): React.JSX.Element | null {
             ) : (
               <ChangesPanel
                 status={gitStatus}
+                me={identity}
                 selected={diff?.change.path ?? null}
                 onShowDiff={(c) => void showDiff(c)}
                 onDiscard={(c) => void discardChange(c)}
@@ -832,6 +835,8 @@ export default function App(): React.JSX.Element | null {
                 onFetch={() => void gitAction(() => window.api.git.fetch())}
                 onNewBranch={() => setGitDialog('new-branch')}
                 onMerge={() => setGitDialog('merge')}
+                onMove={() => setGitDialog('move')}
+                onIgnore={(path) => void gitAction(() => window.api.git.ignore(path))}
                 onRelease={setReleaseDialog}
                 onPublish={setReleaseDialog}
                 onSwitchBranch={() => void openSwitchBranch()}
@@ -1005,6 +1010,19 @@ export default function App(): React.JSX.Element | null {
             }}
           />
         )}
+        {gitDialog === 'move' && gitStatus && (
+          <NewBranchDialog
+            base={gitStatus.base}
+            prefix={branchPrefix}
+            dirty={false}
+            note={`The ${plural(gitStatus.ahead, 'commit')} move to the new branch, and ${gitStatus.branch} goes back to what GitHub has. Uncommitted changes come along.`}
+            onCancel={() => setGitDialog(null)}
+            onSubmit={(name) => {
+              setGitDialog(null)
+              void save().then(() => gitAction(() => window.api.git.moveToBranch(name)))
+            }}
+          />
+        )}
         {gitDialog === 'switch-branch' && gitStatus && (
           <SwitchBranchDialog
             branches={branches}
@@ -1024,12 +1042,21 @@ export default function App(): React.JSX.Element | null {
             onConfirm={() => void mergeToBase()}
           >
             <p className="dialog-note">
-              The {gitStatus.aheadOfBase} commit{gitStatus.aheadOfBase === 1 ? '' : 's'} on{' '}
-              {gitStatus.branch} become part of {gitStatus.base} on GitHub.{' '}
+              The {plural(gitStatus.aheadOfBase, 'commit')} on {gitStatus.branch} become part of{' '}
+              {gitStatus.baseSite
+                ? `${gitStatus.base}, which ${gitStatus.baseSite} shows`
+                : gitStatus.base}
+              . You keep working on {gitStatus.branch}
               {prefs?.deleteMergedBranch === false
-                ? 'The branch stays and you keep working on it.'
-                : `The branch is then removed and you continue on ${gitStatus.base}.`}
+                ? '.'
+                : '; its copy on GitHub is removed until your next push.'}
             </p>
+            <CommitList
+              range={{ kind: 'branch' }}
+              total={gitStatus.aheadOfBase}
+              me={identity}
+              summary
+            />
           </ConfirmDialog>
         )}
         {releaseDialog && (
@@ -1044,12 +1071,18 @@ export default function App(): React.JSX.Element | null {
             onConfirm={() => void runRelease(releaseDialog)}
           >
             <p className="dialog-note">
-              {releaseDialog.count} change{releaseDialog.count === 1 ? '' : 's'} on{' '}
-              {releaseDialog.from} go to {releaseDialog.to}.{' '}
+              {plural(releaseDialog.count, 'change')} on {releaseDialog.from} go to{' '}
+              {releaseDialog.to}.{' '}
               {releaseDialog.to === 'production'
-                ? 'A pull request is opened and merged, and the live site updates a few minutes later.'
-                : 'GitHub publishes the branch a few minutes later.'}
+                ? `A pull request is opened and merged, and ${releaseDialog.site ?? 'the live site'} updates a few minutes later.`
+                : `${releaseDialog.site ?? 'The site'} follows a few minutes later.`}
             </p>
+            <CommitList
+              range={{ kind: 'release', from: releaseDialog.from, to: releaseDialog.to }}
+              total={releaseDialog.count}
+              me={identity}
+              summary
+            />
           </ConfirmDialog>
         )}
         {showSettings && prefs && (

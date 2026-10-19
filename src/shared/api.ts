@@ -1,4 +1,6 @@
 import type {
+  Commit,
+  CommitRange,
   ComponentLibrary,
   DataLists,
   DirEntry,
@@ -67,6 +69,13 @@ export interface Api {
     pull: () => Promise<void>
     update: () => Promise<void>
     mergeToBase: () => Promise<void>
+    // Moves local commits off a shared branch onto a new branch.
+    moveToBranch: (name: string) => Promise<void>
+    log: (range: CommitRange) => Promise<Commit[]>
+    // Stops listing an entry outside the site, through .git/info/exclude.
+    ignore: (path: string) => Promise<void>
+    // The committed version of a file as a data URL, for showing changed images.
+    committedImage: (path: string) => Promise<string | null>
     release: (from: string, to: string) => Promise<void>
     publish: (from: string, to: string) => Promise<PublishResult>
     discard: (path: string, untracked: boolean) => Promise<void>

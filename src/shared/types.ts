@@ -109,6 +109,30 @@ export interface ReleaseStep {
   from: string
   to: string
   count: number
+  // The address the target branch is built for, e.g. conclude.dev.
+  site: string | null
+}
+
+// Untracked files outside every folder git tracks, e.g. source documents kept in the
+// checkout; one entry per top-level file or folder.
+export interface OutsideEntry {
+  path: string
+  isDir: boolean
+  files: number
+}
+
+// The commits behind one of the counts in the Changes panel.
+export type CommitRange =
+  | { kind: 'incoming' | 'outgoing' | 'base' | 'branch' }
+  | { kind: 'release'; from: string; to: string }
+
+export interface Commit {
+  hash: string
+  author: string
+  email: string
+  date: number
+  subject: string
+  files: string[]
 }
 
 export interface PublishResult {
@@ -122,6 +146,8 @@ export interface GitStatus {
   base: string
   protected: boolean
   changes: Change[]
+  outside: OutsideEntry[]
+  // The branch this one follows on GitHub; for a shared branch its namesake on origin.
   upstream: string | null
   ahead: number
   behind: number
@@ -129,6 +155,7 @@ export interface GitStatus {
   rebased: boolean
   baseAhead: number
   aheadOfBase: number
+  baseSite: string | null
   releases: ReleaseStep[]
   remoteUrl: string | null
   lastFetch: number | null

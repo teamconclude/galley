@@ -37,8 +37,8 @@ export default function SettingsDialog({ prefs, onChange, onClose }: Props): Rea
             onChange={(e) => onChange({ ...prefs, deleteMergedBranch: e.target.checked })}
           />
           <span>
-            Remove a branch once it is merged
-            <small>After merging you continue on the shared branch.</small>
+            Remove a merged branch from GitHub
+            <small>You keep working on it here; your next push brings it back.</small>
           </span>
         </label>
         <label className="dialog-check">

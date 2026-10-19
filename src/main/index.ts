@@ -16,6 +16,7 @@ import { pathToFileURL } from 'url'
 import { electronApp } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import type {
+  CommitRange,
   Identity,
   Layout,
   MenuCommand,
@@ -259,6 +260,10 @@ function registerIpc(): void {
   ipcMain.handle('git:pull', () => currentGit().pull())
   ipcMain.handle('git:update', () => currentGit().update())
   ipcMain.handle('git:mergeToBase', () => currentGit().mergeToBase())
+  ipcMain.handle('git:moveToBranch', (_e, name: string) => currentGit().moveToBranch(name))
+  ipcMain.handle('git:log', (_e, range: CommitRange) => currentGit().log(range))
+  ipcMain.handle('git:ignore', (_e, rel: string) => currentGit().ignore(rel))
+  ipcMain.handle('git:committedImage', (_e, rel: string) => currentGit().committedImage(rel))
   ipcMain.handle('git:release', (_e, from: string, to: string) => currentGit().release(from, to))
   ipcMain.handle('git:publish', (_e, from: string, to: string) => currentGit().publish(from, to))
   ipcMain.handle('git:discard', async (_e, rel: string, untracked: boolean) => {

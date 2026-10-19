@@ -58,6 +58,26 @@ export async function loadConfig(root: string): Promise<Record<string, unknown>>
   return out
 }
 
+// The host a Hugo environment builds for, from the baseURL in config/<env>/, e.g.
+// conclude.dev for config/staging/hugo.yaml. Null without one or with a relative baseURL.
+export async function environmentSite(root: string, env: string): Promise<string | null> {
+  for (const name of names) {
+    for (const ext of exts) {
+      const file = join(root, 'config', env, `${name}.${ext}`)
+      const text = await fs.readFile(file, 'utf8').catch(() => null)
+      if (text === null) continue
+      try {
+        const config = parse(file, text)
+        const url = isRecord(config) && typeof config.baseURL === 'string' ? config.baseURL : ''
+        return url.match(/^[a-z]+:\/\/([^/]+)/i)?.[1] ?? null
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
+}
+
 const str = (v: unknown, fallback: string): string => (typeof v === 'string' && v ? v : fallback)
 const lower = (v: unknown): string => (typeof v === 'string' ? v.toLowerCase() : '')
 

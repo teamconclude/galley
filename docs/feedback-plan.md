@@ -6,7 +6,9 @@ the web repository, and the work that follows from it.
 
 ## Status
 
-Not started (2026-10-19). Phase 1 is next.
+Phase 1 is done on develop, unreleased (2026-10-19). The site names in the Publishing
+section need a `baseURL` in `config/staging/` and `config/production/` of the web
+repository, which today passes it on the command line only. Phase 2 is next.
 
 ## What the feedback showed
 

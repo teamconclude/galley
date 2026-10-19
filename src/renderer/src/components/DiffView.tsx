@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import type { Change } from '../../../shared/types'
 import { splitDiff } from '../../../shared/diff'
@@ -56,6 +57,42 @@ function rows(hunk: string): Row[] {
   return out
 }
 
+const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
+
+// An image as committed next to the one in the checkout, whichever of them exist.
+function ImageDiff({ change }: { change: Change }): React.JSX.Element {
+  const [before, setBefore] = useState<string | null>(null)
+  // The query keeps the browser from showing an earlier load of the same file.
+  const [loaded] = useState(() => Date.now())
+  const hadBefore = change.kind !== 'untracked' && change.kind !== 'added'
+  useEffect(() => {
+    if (!hadBefore) return
+    let live = true
+    void window.api.git
+      .committedImage(change.from ?? change.path)
+      .then((url) => live && setBefore(url))
+    return () => {
+      live = false
+    }
+  }, [change.path, change.from, hadBefore])
+  return (
+    <div className="image-diff">
+      {hadBefore && (
+        <figure>
+          {before && <img src={before} alt="" />}
+          <figcaption>Before</figcaption>
+        </figure>
+      )}
+      {change.kind !== 'deleted' && (
+        <figure>
+          <img src={`galley://repo/${change.path}?v=${loaded}`} alt="" />
+          <figcaption>{hadBefore ? 'Now' : 'New'}</figcaption>
+        </figure>
+      )}
+    </div>
+  )
+}
+
 // "@@ -23,7 +23,9 @@ context" becomes "Lines 23 to 31" of the current file.
 function hunkLabel(header: string): string {
   const m = header.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/)
@@ -77,7 +114,9 @@ export default function DiffView(props: Props): React.JSX.Element {
         {change.kind !== 'deleted' && <button onClick={onOpen}>Edit this file</button>}
         <button onClick={onDiscard}>Discard changes</button>
       </div>
-      {diff === null ? (
+      {imageFile.test(change.path) ? (
+        <ImageDiff key={change.path} change={change} />
+      ) : diff === null ? (
         <div className="pane-empty">Loading…</div>
       ) : hunks.length === 0 ? (
         <div className="pane-empty">No differences to show.</div>

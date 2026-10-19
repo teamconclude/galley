@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, RotateCcw } from 'lucide-react'
-import type { Change, GitStatus, ReleaseStep } from '../../../shared/types'
+import { ChevronRight, Folder, RotateCcw } from 'lucide-react'
+import type { Change, CommitRange, GitStatus, Identity, ReleaseStep } from '../../../shared/types'
+import { ago } from '../lib/time'
+import CommitList from './CommitList'
 import FileIcon from './FileIcon'
 import Tip from './Tip'
 
 interface Props {
   status: GitStatus | null
+  me: Identity | null
   selected: string | null
   onShowDiff: (change: Change) => void
   onDiscard: (change: Change) => void
@@ -18,6 +21,8 @@ interface Props {
   onNewBranch: () => void
   onSwitchBranch: () => void
   onMerge: () => void
+  onMove: () => void
+  onIgnore: (path: string) => void
   onRelease: (step: ReleaseStep) => void
   onPublish: (step: ReleaseStep) => void
 }
@@ -33,14 +38,9 @@ const kindMark: Record<Change['kind'], string> = {
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
-function ago(time: number | null): string {
-  if (!time) return 'not yet'
-  const minutes = Math.round((Date.now() - time) / 60_000)
-  if (minutes < 1) return 'just now'
-  if (minutes === 1) return 'a minute ago'
-  if (minutes < 60) return `${minutes} minutes ago`
-  return `${Math.round(minutes / 60)} hours ago`
-}
+// A shared branch with the address it is built for, e.g. "staging (conclude.dev)".
+const named = (branch: string, site: string | null): string =>
+  site ? `${branch} (${site})` : branch
 
 // GitHub's compare page for the current branch against the base branch.
 function pullRequestUrl(status: GitStatus): string | null {
@@ -50,9 +50,9 @@ function pullRequestUrl(status: GitStatus): string | null {
 }
 
 export default function ChangesPanel(props: Props): React.JSX.Element {
-  const { status, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
+  const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch } = props
-  const { onMerge, onRelease, onPublish } = props
+  const { onMerge, onMove, onIgnore, onRelease, onPublish } = props
   const [message, setMessage] = useState('')
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [menuOpen, setMenuOpen] = useState(false)
@@ -79,6 +79,26 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
         else next.add(p)
       return next
     })
+
+  // Lists reload when GitHub was checked or a count moved.
+  const version = [
+    status.lastFetch,
+    status.ahead,
+    status.behind,
+    status.baseAhead,
+    status.aheadOfBase,
+    ...status.releases.map((r) => r.count)
+  ].join(':')
+  const countRow = (
+    range: CommitRange,
+    total: number,
+    text: string,
+    action?: React.ReactNode
+  ): React.JSX.Element => (
+    <CountRow range={range} total={total} text={text} me={me} version={version}>
+      {action}
+    </CountRow>
+  )
 
   const commit = async (): Promise<void> => {
     const ok = await onCommit(
@@ -147,12 +167,27 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 <button onClick={onNewBranch}>New branch</button>
               </div>
             )}
-            {status.behind > 0 && !status.rebased && (
-              <div className="sync-row">
-                {plural(status.behind, 'new commit')} on this branch from others.
+            {status.protected &&
+              status.ahead > 0 &&
+              countRow(
+                { kind: 'outgoing' },
+                status.ahead,
+                `${plural(status.ahead, 'commit')} here cannot go to GitHub from ${status.branch}.`,
+                <button className="primary" onClick={onMove}>
+                  Move to a new branch…
+                </button>
+              )}
+            {status.behind > 0 &&
+              !status.rebased &&
+              !(status.protected && status.ahead > 0) &&
+              countRow(
+                { kind: 'incoming' },
+                status.behind,
+                status.protected
+                  ? `${plural(status.behind, 'new commit')} on GitHub.`
+                  : `${plural(status.behind, 'new commit')} on this branch from others.`,
                 <button onClick={onPull}>Pull</button>
-              </div>
-            )}
+              )}
             {status.rebased && (
               <div className="sync-row">
                 Updated from {status.base}; GitHub still has the old version of this branch.
@@ -161,26 +196,37 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 </button>
               </div>
             )}
-            {status.baseAhead > 0 && status.branch !== status.base && (
-              <div className="sync-row">
-                {plural(status.baseAhead, 'change')} on {status.base} not in this branch.
+            {!status.protected &&
+              status.baseAhead > 0 &&
+              status.branch !== status.base &&
+              countRow(
+                { kind: 'base' },
+                status.baseAhead,
+                `${plural(status.baseAhead, 'change')} on ${status.base} not in this branch.`,
                 <button onClick={onUpdate}>Update</button>
-              </div>
-            )}
-            {status.ahead > 0 && !status.rebased && (
-              <div className="sync-row">
-                {plural(status.ahead, 'commit')} to push.
-                <button className="primary" onClick={onPush} disabled={status.protected}>
-                  Push
-                </button>
-              </div>
-            )}
-            {!status.upstream && status.branch && !status.protected && status.ahead === 0 && (
-              <div className="sync-row">
-                This branch is not on GitHub yet.
-                <button onClick={onPush}>Push</button>
-              </div>
-            )}
+              )}
+            {!status.protected &&
+              status.ahead > 0 &&
+              !status.rebased &&
+              countRow(
+                { kind: 'outgoing' },
+                status.ahead,
+                `${plural(status.ahead, 'commit')} to push.`,
+                <PushButton onPush={onPush} />
+              )}
+            {!status.upstream &&
+              status.branch &&
+              !status.protected &&
+              (status.aheadOfBase > 0 ? (
+                countRow(
+                  { kind: 'outgoing' },
+                  status.aheadOfBase,
+                  `${plural(status.aheadOfBase, 'commit')} not on GitHub yet.`,
+                  <PushButton onPush={onPush} />
+                )
+              ) : (
+                <div className="sync-row muted">Everything on this branch is in {status.base}.</div>
+              ))}
             {status.upstream && status.ahead === 0 && status.behind === 0 && (
               <div className="sync-row muted">
                 In sync with GitHub. Checked {ago(status.lastFetch)}.
@@ -191,14 +237,15 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 )}
               </div>
             )}
-            {canMerge && (
-              <div className="sync-row">
-                {plural(status.aheadOfBase, 'commit')} ready for {status.base}.
+            {canMerge &&
+              countRow(
+                { kind: 'branch' },
+                status.aheadOfBase,
+                `${plural(status.aheadOfBase, 'commit')} ready for ${named(status.base, status.baseSite)}.`,
                 <button className="primary" onClick={onMerge}>
                   Merge into {status.base}…
                 </button>
-              </div>
-            )}
+              )}
           </>
         )}
       </div>
@@ -230,6 +277,40 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
           onShowDiff={onShowDiff}
           onDiscard={onDiscard}
         />
+        {status.outside.length > 0 && (
+          <div className="outside">
+            <div className="changes-head">
+              <span>Not part of the site</span>
+            </div>
+            <p className="outside-note">New files beside the site. They are never committed.</p>
+            {status.outside.map((entry) => (
+              <div key={entry.path} className="tree-item change-row">
+                {entry.isDir ? (
+                  <Folder
+                    className="file-icon"
+                    size={16}
+                    strokeWidth={1.75}
+                    color="#6d8086"
+                    aria-hidden
+                  />
+                ) : (
+                  <FileIcon name={entry.path} />
+                )}
+                <span className="tree-name" title={entry.path}>
+                  {entry.path}
+                  {entry.isDir && (
+                    <span className="outside-count"> {plural(entry.files, 'file')}</span>
+                  )}
+                </span>
+                <Tip text="Stop listing it here. Nothing is deleted.">
+                  <button className="outside-ignore" onClick={() => onIgnore(entry.path)}>
+                    Ignore
+                  </button>
+                </Tip>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {changes.length > 0 && (
@@ -266,23 +347,80 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
             {status.releases.map((step) =>
               step.count === 0 ? (
                 <div key={step.to} className="sync-row muted">
-                  {step.to} has everything from {step.from}.
+                  {named(step.to, step.site)} has everything from {step.from}.
                 </div>
               ) : (
-                <div key={step.to} className="sync-row">
-                  {plural(step.count, 'change')} on {step.from} not yet on {step.to}.
-                  <button
-                    disabled={busy}
-                    onClick={() => (step.to === 'production' ? onPublish(step) : onRelease(step))}
+                <CountRow
+                  key={step.to}
+                  range={{ kind: 'release', from: step.from, to: step.to }}
+                  total={step.count}
+                  text={`${plural(step.count, 'change')} on ${step.from} not yet on ${named(step.to, step.site)}.`}
+                  me={me}
+                  version={version}
+                >
+                  <Tip
+                    text={
+                      step.to === 'production'
+                        ? `Puts ${step.from} live on ${step.site ?? step.to} through a pull request`
+                        : `Merges ${step.from} into ${step.to}; ${step.site ?? 'the site'} follows in minutes`
+                    }
                   >
-                    {step.to === 'production' ? 'Publish…' : `Merge into ${step.to}…`}
-                  </button>
-                </div>
+                    <button
+                      disabled={busy}
+                      onClick={() => (step.to === 'production' ? onPublish(step) : onRelease(step))}
+                    >
+                      {step.to === 'production' ? 'Publish…' : `Merge into ${step.to}…`}
+                    </button>
+                  </Tip>
+                </CountRow>
               )
             )}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Pushing only uploads; saying so keeps it apart from publishing.
+function PushButton({ onPush }: { onPush: () => void }): React.JSX.Element {
+  return (
+    <Tip text="Uploads your commits to your branch on GitHub. Nothing goes live.">
+      <button className="primary" onClick={onPush}>
+        Push
+      </button>
+    </Tip>
+  )
+}
+
+// A count that opens into the commits behind it.
+function CountRow(props: {
+  range: CommitRange
+  total: number
+  text: string
+  me: Identity | null
+  version: string
+  children?: React.ReactNode
+}): React.JSX.Element {
+  const { range, total, text, me, version, children } = props
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="count-row">
+      <div className="sync-row">
+        <button
+          className="count-toggle"
+          aria-expanded={open}
+          title={open ? 'Hide the commits' : 'Show the commits'}
+          onClick={() => setOpen(!open)}
+        >
+          <span className={`tree-arrow${open ? ' open' : ''}`}>
+            <ChevronRight size={14} />
+          </span>
+          {text}
+        </button>
+        {children}
+      </div>
+      {open && <CommitList range={range} total={total} me={me} version={version} />}
     </div>
   )
 }

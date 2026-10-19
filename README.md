@@ -66,12 +66,19 @@ body text** opens the page's prose. Everything is saved as you type.
 **Claude.** The Claude button opens Claude Code in the checkout. Ask it to draft a blog
 post, rewrite a section, or find where something is on the site.
 
-**Publishing.** The **Changes** tab lists what you changed and shows a diff for each file.
-Work happens on a branch: the branch menu creates one, named after you. Write a short
-message and **Commit** the selected files, then **Push**. When the branch is pushed,
-**Open pull request** takes you to GitHub where the change is reviewed and merged to
-`staging` and later `production`. Galley checks GitHub every few minutes and offers
-**Pull** when a colleague added to your branch and **Update** when `staging` moved on.
+**Publishing.** The **Changes** tab lists what you changed and shows a diff for each file,
+or the picture for an image. Work happens on a branch: the branch menu creates one, named
+after you. Write a short message and **Commit** the selected files; **Push** uploads them
+to your branch on GitHub, where nothing goes live yet. **Merge into develop** adds your
+commits to the shared branch and you carry on with your own. The Publishing section moves
+the shared branches on, `develop` to `staging` and `staging` to `production`, named after
+the site each one builds when its Hugo environment (`config/<branch>/`) sets a `baseURL`.
+Every count opens into its commits with author, date and files, and the merge and publish
+confirmations name whose work goes along. Galley checks GitHub every few minutes and
+offers **Pull** when a colleague added to your branch and **Update** when the base moved
+on. The shared branches only follow GitHub: commits made on one by mistake get **Move to
+a new branch**. New files next to the site, such as documents kept in the checkout, are
+listed apart under "Not part of the site" and are never committed; **Ignore** hides them.
 
 ## Development
 

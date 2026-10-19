@@ -1,17 +1,21 @@
 import { execFile, spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { dirname, extname, isAbsolute, join } from 'path'
 import type {
   Change,
   ChangeKind,
+  Commit,
+  CommitRange,
   GitStatus,
   Identity,
+  OutsideEntry,
   PublishResult,
   ReleaseStep
 } from '../shared/types'
 import { splitDiff } from '../shared/diff'
 import { publish } from './github'
+import { environmentSite } from './hugoConfig'
 import { prefs } from './settings'
 import { findGit, gitEnv } from './tools'
 
@@ -19,6 +23,8 @@ const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'd
 // Work flows from personal branches into the first of these, then on to the next.
 const sharedChain = ['develop', 'staging', 'production']
 const fetchInterval = 5 * 60_000
+// Commits listed under one count; the count itself says how many there are in all.
+const maxLog = 100
 
 async function gitBinary(): Promise<string> {
   const tool = await findGit()
@@ -27,13 +33,22 @@ async function gitBinary(): Promise<string> {
 }
 
 async function run(cwd: string, args: string[]): Promise<string> {
+  return (await runBuffer(cwd, args)).toString('utf8')
+}
+
+async function runBuffer(cwd: string, args: string[]): Promise<Buffer> {
   const bin = await gitBinary()
   const env = { ...process.env, ...(await gitEnv()) }
   return new Promise((resolve, reject) => {
-    execFile(bin, args, { cwd, env, maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
-      if (err) reject(new Error(stderr.trim() || err.message))
-      else resolve(stdout)
-    })
+    execFile(
+      bin,
+      args,
+      { cwd, env, maxBuffer: 64 << 20, encoding: 'buffer' },
+      (err, stdout, stderr) => {
+        if (err) reject(new Error(stderr.toString().trim() || err.message))
+        else resolve(stdout)
+      }
+    )
   })
 }
 
@@ -61,6 +76,46 @@ function parseStatus(out: string): Change[] {
     changes.push(change)
   }
   return changes.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+// New files under a top-level entry git knows nothing about are not part of the site,
+// e.g. documents and screenshots kept next to it; they are listed apart, per entry.
+function splitOutside(
+  changes: Change[],
+  tracked: Set<string> | null
+): { site: Change[]; outside: OutsideEntry[] } {
+  if (!tracked) return { site: changes, outside: [] }
+  const site: Change[] = []
+  const outside = new Map<string, OutsideEntry>()
+  for (const change of changes) {
+    const top = change.path.split('/')[0]
+    if (change.kind !== 'untracked' || tracked.has(top)) {
+      site.push(change)
+      continue
+    }
+    const entry = outside.get(top) ?? { path: top, isDir: top !== change.path, files: 0 }
+    entry.files++
+    outside.set(top, entry)
+  }
+  return { site, outside: [...outside.values()] }
+}
+
+// A path as an anchored .gitignore pattern matching just that entry.
+function excludePattern(entry: OutsideEntry): string {
+  const escaped = entry.path.replace(/[\\*?[]/g, '\\$&').replace(/^[#!]/, '\\$&')
+  const spaces = escaped.replace(/ +$/, (m) => '\\ '.repeat(m.length))
+  return '/' + spaces + (entry.isDir ? '/' : '')
+}
+
+const imageTypes: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  avif: 'image/avif',
+  ico: 'image/x-icon'
 }
 
 // Git state of one checkout, refreshed after every operation and on a fetch timer.
@@ -111,15 +166,14 @@ export class Git {
       .then((s) => s.trim().replace(/^origin\//, ''))
       .catch(() => 'main')
     const base = remotes.includes('origin/develop') ? 'develop' : originHead
-    const upstream =
-      (await this.git(['rev-parse', '--abbrev-ref', '@{upstream}']).catch(() => '')).trim() || null
+    const isProtected = protectedBranches.has(branch)
+    const upstream = await this.tracking(branch, remotes)
     let ahead = 0
     let behind = 0
     let rebased = false
     if (upstream) {
-      const counts = await this.git(['rev-list', '--left-right', '--count', `HEAD...${upstream}`])
-      ;[ahead, behind] = counts.trim().split(/\s+/).map(Number)
-      if (behind > 0) {
+      ;[ahead, behind] = await this.aheadBehind(upstream)
+      if (behind > 0 && !isProtected) {
         const unique = await this.count(
           `--cherry-pick --right-only HEAD...${upstream}`.split(' '),
           1
@@ -134,11 +188,12 @@ export class Git {
     const releases: ReleaseStep[] = []
     for (let i = 0; i + 1 < chain.length; i++) {
       const [from, to] = [chain[i], chain[i + 1]]
-      releases.push({ from, to, count: await this.count([`origin/${to}..origin/${from}`]) })
+      const count = await this.count([`origin/${to}..origin/${from}`])
+      releases.push({ from, to, count, site: await environmentSite(this.path, to) })
     }
     const remoteUrl =
       (await this.git(['remote', 'get-url', 'origin']).catch(() => '')).trim() || null
-    const changes = parseStatus(
+    const all = parseStatus(
       await this.git([
         '--no-optional-locks',
         'status',
@@ -147,17 +202,23 @@ export class Git {
         '--untracked-files=all'
       ]).catch(() => '')
     )
+    const tracked = await this.git(['ls-tree', '--name-only', 'HEAD'])
+      .then((out) => new Set(out.split('\n').filter(Boolean)))
+      .catch(() => null)
+    const { site: changes, outside } = splitOutside(all, tracked)
     return {
       branch,
       base,
-      protected: protectedBranches.has(branch),
+      protected: isProtected,
       changes,
+      outside,
       upstream,
       ahead,
       behind,
       rebased,
       baseAhead,
       aheadOfBase,
+      baseSite: hasBase ? await environmentSite(this.path, base) : null,
       releases,
       remoteUrl,
       lastFetch: this.lastFetch,
@@ -169,6 +230,83 @@ export class Git {
   private async count(revs: string[], fallback = 0): Promise<number> {
     const out = await this.git(['rev-list', '--count', ...revs]).catch(() => String(fallback))
     return Number(out.trim())
+  }
+
+  // The configured upstream; a shared branch without one follows its namesake on origin.
+  private async tracking(branch: string, remotes: string[]): Promise<string | null> {
+    const upstream = (
+      await this.git(['rev-parse', '--abbrev-ref', '@{upstream}']).catch(() => '')
+    ).trim()
+    if (upstream) return upstream
+    const own = `origin/${branch}`
+    return protectedBranches.has(branch) && remotes.includes(own) ? own : null
+  }
+
+  private async aheadBehind(ref: string): Promise<[number, number]> {
+    const counts = await this.git(['rev-list', '--left-right', '--count', `HEAD...${ref}`])
+    const [ahead, behind] = counts.trim().split(/\s+/).map(Number)
+    return [ahead, behind]
+  }
+
+  // A shared branch only ever follows GitHub. When it has nothing of its own it is
+  // brought level; edits that collide with the new commits leave it as it is.
+  private async followShared(): Promise<void> {
+    const branch = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
+    if (!protectedBranches.has(branch)) return
+    const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
+    const upstream = await this.tracking(branch, remotes)
+    if (!upstream) return
+    const [ahead, behind] = await this.aheadBehind(upstream)
+    if (ahead === 0 && behind > 0) {
+      await this.git(['merge', '--ff-only', upstream]).catch(() => undefined)
+    }
+  }
+
+  // The commits behind one of the counts the status reports, newest first.
+  async log(range: CommitRange): Promise<Commit[]> {
+    const status = await this.status()
+    const { upstream, base } = status
+    const revs = ((): string | null => {
+      switch (range.kind) {
+        case 'incoming':
+          return upstream && `HEAD..${upstream}`
+        case 'outgoing':
+          return upstream ? `${upstream}..HEAD` : `origin/${base}..HEAD`
+        case 'base':
+          return `HEAD..origin/${base}`
+        case 'branch':
+          return `origin/${base}..HEAD`
+        case 'release': {
+          const known = status.releases.some((s) => s.from === range.from && s.to === range.to)
+          return known ? `origin/${range.to}..origin/${range.from}` : null
+        }
+      }
+    })()
+    if (!revs) return []
+    const out = await this.git([
+      'log',
+      '-n',
+      String(maxLog),
+      '--name-only',
+      '--format=%x1e%H%x1f%an%x1f%ae%x1f%at%x1f%s',
+      revs,
+      '--'
+    ])
+    return out
+      .split('\x1e')
+      .filter((chunk) => chunk.trim())
+      .map((chunk) => {
+        const [head, ...files] = chunk.split('\n')
+        const [hash, author, email, date, subject] = head.split('\x1f')
+        return {
+          hash,
+          author,
+          email,
+          date: Number(date) * 1000,
+          subject,
+          files: files.filter(Boolean)
+        }
+      })
   }
 
   async refresh(): Promise<void> {
@@ -201,6 +339,7 @@ export class Git {
       } catch (e) {
         this.fetchError = message(e)
       }
+      await this.followShared()
     })
   }
 
@@ -231,6 +370,21 @@ export class Git {
   switchBranch(name: string): Promise<void> {
     return this.op('Switching branch…', async () => {
       await this.git(['switch', name])
+      await this.followShared()
+    })
+  }
+
+  // Commits made on a shared branch move to a new branch of their own, and the shared
+  // branch goes back to what GitHub has. Uncommitted edits come along.
+  async moveToBranch(name: string): Promise<void> {
+    const { branch, protected: isProtected, upstream, ahead } = await this.status()
+    if (!isProtected || !upstream || ahead === 0) {
+      throw new Error(`${branch} has no commits of its own to move`)
+    }
+    return this.op('Moving commits…', async () => {
+      await this.git(['check-ref-format', '--branch', name])
+      await this.git(['switch', '-c', name])
+      await this.git(['branch', '-f', branch, upstream])
     })
   }
 
@@ -246,22 +400,32 @@ export class Git {
   // After a rebase the upstream holds only older versions of our commits, so replacing
   // them is safe; the lease still refuses if someone else pushed in the meantime.
   async push(): Promise<void> {
-    const { rebased } = await this.status()
+    const { branch, rebased, protected: isProtected } = await this.status()
+    if (isProtected) throw new Error(`${branch} is shared; move your commits to a branch first`)
     return this.op('Pushing…', async () => {
       await this.git(['push', '-u', ...(rebased ? ['--force-with-lease'] : []), 'origin', 'HEAD'])
       this.lastFetch = Date.now()
     })
   }
 
-  pull(): Promise<void> {
+  // A shared branch only fast-forwards; merging into it would make commits nobody can push.
+  async pull(): Promise<void> {
+    const { branch, upstream, protected: isProtected } = await this.status()
     return this.op('Pulling…', async () => {
-      await this.git(['pull', '--no-rebase', '--no-edit'])
+      if (!isProtected) {
+        await this.git(['pull', '--no-rebase', '--no-edit'])
+        return
+      }
+      if (!upstream) throw new Error(`${branch} is not on GitHub`)
+      await this.git(['fetch', 'origin', branch])
+      await this.git(['merge', '--ff-only', upstream])
     })
   }
 
   // Rebases the current branch onto the latest base branch; a conflict is rolled back.
   async update(): Promise<void> {
-    const { base } = await this.status()
+    const { branch, base, protected: isProtected } = await this.status()
+    if (isProtected) throw new Error(`${branch} is shared and only follows GitHub`)
     return this.op(`Updating from ${base}…`, async () => {
       await this.git(['fetch', 'origin', base])
       try {
@@ -273,8 +437,9 @@ export class Git {
     })
   }
 
-  // Fast-forwards the base branch on GitHub to this branch. By default the merged branch
-  // is then removed here and on GitHub and work continues on the base branch.
+  // Fast-forwards the base branch on GitHub to this branch, then brings the branch level
+  // with the base so work goes on here. By default its copy on GitHub is removed and comes
+  // back with the next push.
   async mergeToBase(): Promise<void> {
     const { branch, base, changes } = await this.status()
     if (!branch || branch === base) throw new Error(`Not on a branch to merge into ${base}`)
@@ -290,14 +455,14 @@ export class Git {
         await this.pullRequestInto(branch, base)
       }
       this.lastFetch = Date.now()
-      if (!prefs().deleteMergedBranch) return
       await this.git(['fetch', 'origin', base])
-      await this.git(['switch', base]).catch(() =>
-        this.git(['switch', '-c', base, `origin/${base}`])
-      )
-      await this.git(['merge', '--ff-only', `origin/${base}`])
-      await this.git(['branch', '-D', branch])
-      await this.git(['push', 'origin', '--delete', branch]).catch(() => undefined)
+      await this.git(['merge', '--ff-only', `origin/${base}`]).catch(() => undefined)
+      if (prefs().deleteMergedBranch) {
+        await this.git(['push', 'origin', '--delete', branch]).catch(() => undefined)
+        await this.git(['branch', '--unset-upstream']).catch(() => undefined)
+      } else {
+        await this.git(['push', 'origin', 'HEAD']).catch(() => undefined)
+      }
     })
   }
 
@@ -393,6 +558,27 @@ export class Git {
         .join('\n')
     }
     return this.git(['diff', '--no-color', '-U3', 'HEAD', '--', path])
+  }
+
+  // Appends the entry to .git/info/exclude, which only this checkout reads.
+  async ignore(path: string): Promise<void> {
+    const entry = (await this.status()).outside.find((e) => e.path === path)
+    if (!entry) throw new Error(`${path} is not listed outside the site`)
+    const file = (await this.git(['rev-parse', '--git-path', 'info/exclude'])).trim()
+    const abs = isAbsolute(file) ? file : join(this.path, file)
+    await fs.mkdir(dirname(abs), { recursive: true })
+    const text = await fs.readFile(abs, 'utf8').catch(() => '')
+    const sep = text === '' || text.endsWith('\n') ? '' : '\n'
+    await fs.writeFile(abs, `${text}${sep}${excludePattern(entry)}\n`)
+    await this.refresh()
+  }
+
+  // An image as last committed, for comparing it with the one in the checkout.
+  async committedImage(path: string): Promise<string | null> {
+    const type = imageTypes[extname(path).slice(1).toLowerCase()]
+    if (!type) return null
+    const data = await runBuffer(this.path, ['show', `HEAD:${path}`]).catch(() => null)
+    return data && `data:${type};base64,${data.toString('base64')}`
   }
 
   // Null unless both a name and something shaped like an email address are configured.
