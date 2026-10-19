@@ -30,6 +30,7 @@ export const prefs = (): Preferences => ({
   pushOnCommit: true,
   deleteMergedBranch: true,
   claude: true,
+  claudeModel: 'opus',
   ...loadSettings().prefs
 })
 

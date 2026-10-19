@@ -64,7 +64,14 @@ body text** opens the page's prose. Everything is saved as you type.
 **Separate window** moves it out of the main window, for example to a second screen.
 
 **Claude.** The Claude button opens Claude Code in the checkout. Ask it to draft a blog
-post, rewrite a section, or find where something is on the site.
+post, rewrite a section, or find where something is on the site. Galley starts it for an
+editor: it knows which page is open, edits pages without asking for each one, leaves
+commits and publishing to the Changes tab, and runs on the model chosen in Settings
+(Opus unless changed). Files dropped on the pane are copied where Claude can read them,
+and Word or web documents arrive converted to Markdown by rule, so their text and links
+come through exactly. Galley's own skills, `galley:import-document` and
+`galley:add-images`, live in `resources/claude-plugin/`; anything about one particular
+site belongs in that site's CLAUDE.md and `.claude/skills/`.
 
 **Publishing.** The **Changes** tab lists what you changed and shows a diff for each file,
 or the picture for an image. Work happens on a branch: the branch menu creates one, named

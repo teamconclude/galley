@@ -1,16 +1,20 @@
 import * as pty from 'node-pty'
 import { dirname } from 'path'
-import { findClaude, findGit, gitEnv } from './tools'
+import { shellQuote } from './claude'
+import { findClaude, findGit, gitToolEnv } from './tools'
 
 export class ClaudeTerminal {
   private proc: pty.IPty | null = null
+  // The pane's latest size, kept while Claude is still being started so it begins with
+  // the size the pane has by then rather than the one it asked with.
+  private size = { cols: 80, rows: 24 }
 
   constructor(
     private onData: (data: string) => void,
     private onExit: (code: number) => void
   ) {}
 
-  async start(cwd: string, cols: number, rows: number): Promise<void> {
+  async start(cwd: string, args: string[] = []): Promise<void> {
     this.kill()
     const env: Record<string, string> = {}
     // Markers from a Claude session that launched the app would make the CLI think it is nested.
@@ -22,17 +26,19 @@ export class ClaudeTerminal {
     // The pane is white on white; Claude Code reads this to pick its light theme.
     env.COLORFGBG = '0;15'
     env.LANG ||= 'en_US.UTF-8'
-    Object.assign(env, await gitEnv())
+    // Git without Galley's GitHub token: Claude reads history but never pushes.
+    Object.assign(env, await gitToolEnv())
     const git = await findGit()
     const claude = await findClaude()
     // Claude's own git calls get the portable git when that is what this Mac has.
     const extraPath = [claude && dirname(claude), git && dirname(git.bin)].filter(Boolean)
-    const command = `export PATH="${extraPath.join(':')}:$PATH"; exec ${claude ? JSON.stringify(claude) : 'claude'}`
+    const bin = claude ? shellQuote(claude) : 'claude'
+    const command = `export PATH="${extraPath.join(':')}:$PATH"; exec ${[bin, ...args.map(shellQuote)].join(' ')}`
     // The login shell supplies the user's PATH, which a GUI app does not inherit.
     const proc = pty.spawn('/bin/zsh', ['-lc', command], {
       name: 'xterm-256color',
-      cols: Math.max(cols, 2),
-      rows: Math.max(rows, 1),
+      cols: Math.max(this.size.cols, 2),
+      rows: Math.max(this.size.rows, 1),
       cwd,
       env
     })
@@ -52,7 +58,9 @@ export class ClaudeTerminal {
   }
 
   resize(cols: number, rows: number): void {
-    if (cols > 1 && rows > 0) this.proc?.resize(cols, rows)
+    if (cols < 2 || rows < 1) return
+    this.size = { cols, rows }
+    this.proc?.resize(cols, rows)
   }
 
   kill(): void {

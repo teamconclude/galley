@@ -119,6 +119,10 @@ export interface Api {
     write: (data: string) => void
     resize: (cols: number, rows: number) => void
     kill: () => void
+    // Copies dropped files where Claude may read them; returns the copies' paths to paste.
+    drop: (paths: string[]) => Promise<string[]>
+    // The file open in the editor, which "this page" refers to; null for none.
+    context: (path: string | null) => void
     onData: (cb: (data: string) => void) => Unsubscribe
     onExit: (cb: (code: number) => void) => Unsubscribe
   }

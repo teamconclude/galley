@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { Preferences } from '../../../shared/types'
+import type { ClaudeModel, Preferences } from '../../../shared/types'
 
 interface Props {
   prefs: Preferences
@@ -51,6 +51,19 @@ export default function SettingsDialog({ prefs, onChange, onClose }: Props): Rea
             Claude Code pane
             <small>Opens Claude Code in the checkout. Off, setup does not install it.</small>
           </span>
+        </label>
+        <label className="dialog-field">
+          <span>Claude model</span>
+          <select
+            value={prefs.claudeModel}
+            disabled={!prefs.claude}
+            onChange={(e) => onChange({ ...prefs, claudeModel: e.target.value as ClaudeModel })}
+          >
+            <option value="opus">Opus, the most careful</option>
+            <option value="sonnet">Sonnet, quicker</option>
+            <option value="default">As set in Claude Code</option>
+          </select>
+          <small>Takes effect when Claude restarts.</small>
         </label>
         <div className="dialog-buttons">
           <button type="button" className="primary" onClick={onClose}>

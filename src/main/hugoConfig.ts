@@ -78,6 +78,15 @@ export async function environmentSite(root: string, env: string): Promise<string
   return null
 }
 
+// Every host the site's environments build for, e.g. conclude.dev and conclude.io.
+export async function environmentSites(root: string): Promise<string[]> {
+  const dirs = await fs.readdir(join(root, 'config'), { withFileTypes: true }).catch(() => [])
+  const hosts = await Promise.all(
+    dirs.filter((d) => d.isDirectory()).map((d) => environmentSite(root, d.name))
+  )
+  return [...new Set(hosts.filter((h): h is string => h !== null))]
+}
+
 const str = (v: unknown, fallback: string): string => (typeof v === 'string' && v ? v : fallback)
 const lower = (v: unknown): string => (typeof v === 'string' ? v.toLowerCase() : '')
 

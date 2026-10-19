@@ -35,6 +35,8 @@ export default function ClaudePane({ repoPath }: Props): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [exitCode, setExitCode] = useState<number | null>(null)
   const [generation, setGeneration] = useState(0)
+  const [dropping, setDropping] = useState(false)
+  const termRef = useRef<Terminal | null>(null)
 
   useEffect(() => {
     const el = host.current!
@@ -48,6 +50,7 @@ export default function ClaudePane({ repoPath }: Props): React.JSX.Element {
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(el)
+    termRef.current = term
     fit.fit()
     window.api.terminal.start(term.cols, term.rows)
     const offData = window.api.terminal.onData((data) => term.write(data))
@@ -65,6 +68,7 @@ export default function ClaudePane({ repoPath }: Props): React.JSX.Element {
       input.dispose()
       offData()
       offExit()
+      termRef.current = null
       term.dispose()
       window.api.terminal.kill()
     }
@@ -75,8 +79,31 @@ export default function ClaudePane({ repoPath }: Props): React.JSX.Element {
     setGeneration((g) => g + 1)
   }
 
+  // Dropped files are copied where Claude may read them, and their paths pasted at the
+  // prompt as a paste, which is how Claude Code recognises images.
+  const drop = async (e: React.DragEvent): Promise<void> => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropping(false)
+    const paths = [...e.dataTransfer.files].map((f) => window.api.files.pathFor(f))
+    if (paths.length === 0) return
+    const copies = await window.api.terminal.drop(paths)
+    termRef.current?.paste(copies.join(' ') + ' ')
+    termRef.current?.focus()
+  }
+
   return (
-    <div className="claude">
+    <div
+      className={'claude' + (dropping ? ' dropping' : '')}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return
+        e.preventDefault()
+        e.stopPropagation()
+        setDropping(true)
+      }}
+      onDragLeave={() => setDropping(false)}
+      onDrop={(e) => void drop(e)}
+    >
       <div className="pane-bar">
         <span className="pane-title">Claude</span>
         <button onClick={restart}>Restart</button>

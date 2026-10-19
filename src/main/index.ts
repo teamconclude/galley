@@ -28,7 +28,9 @@ import type {
   SetupStepId
 } from '../shared/types'
 import { isDev } from './env'
+import { claudeArgs, receiveDrops, setContext } from './claude'
 import { clone, Git } from './git'
+import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
 import { dropPlacement } from './placement'
 import { buildMenu } from './menu'
@@ -325,8 +327,17 @@ function registerIpc(): void {
   ipcMain.on('preview:show', (_e, target: PreviewTarget) => {
     previewWin?.webContents.send('preview:target', target)
   })
-  ipcMain.on('terminal:start', (_e, cols: number, rows: number) => {
-    if (repo) void terminal.start(repo.path, cols, rows)
+  ipcMain.on('terminal:start', async (_e, cols: number, rows: number) => {
+    if (!repo) return
+    terminal.resize(cols, rows)
+    const opened = repo
+    const args = await claudeArgs(await opened.site(), prefs(), await environmentSites(opened.path))
+    if (repo === opened) void terminal.start(opened.path, args)
+  })
+  ipcMain.handle('terminal:drop', (_e, paths: string[]) => receiveDrops(paths))
+  ipcMain.on('terminal:context', async (_e, rel: string | null) => {
+    const url = rel && repo ? await repo.pageUrl(rel).catch(() => null) : null
+    await setContext(rel, url)
   })
   ipcMain.on('terminal:write', (_e, data: string) => terminal.write(data))
   ipcMain.on('terminal:resize', (_e, cols: number, rows: number) => terminal.resize(cols, rows))

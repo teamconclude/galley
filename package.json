@@ -35,10 +35,13 @@
     "@xterm/xterm": "^6.0.0",
     "codemirror": "^6.0.2",
     "lucide-react": "^1.46.0",
+    "mammoth": "^1.13.0",
     "node-pty": "^1.1.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "smol-toml": "^1.8.0",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
@@ -48,6 +51,7 @@
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/turndown": "^5.0.6",
     "@vitejs/plugin-react": "^5.1.1",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",

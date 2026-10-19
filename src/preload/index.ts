@@ -87,6 +87,8 @@ const api: Api = {
     write: (data) => ipcRenderer.send('terminal:write', data),
     resize: (cols, rows) => ipcRenderer.send('terminal:resize', cols, rows),
     kill: () => ipcRenderer.send('terminal:kill'),
+    drop: (paths) => ipcRenderer.invoke('terminal:drop', paths),
+    context: (path) => ipcRenderer.send('terminal:context', path),
     onData: (cb) => on('terminal:data', cb),
     onExit: (cb) => on('terminal:exit', cb)
   },

@@ -633,6 +633,9 @@ export default function App(): React.JSX.Element | null {
     }
   }, [filePath, textPreview])
 
+  // Claude hears which page is open, so "this page" means what the editor sees.
+  useEffect(() => window.api.terminal.context(filePath), [filePath])
+
   // A data file the home page renders as text, e.g. llms.txt, is previewed as that text.
   const shownPath = textPreview ?? pagePath
   const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + shownPath : null

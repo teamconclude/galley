@@ -2294,3 +2294,8 @@ body.dragging .terminal-host {
   display: flex;
   gap: 6px;
 }
+
+.claude.dropping .terminal-host {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}

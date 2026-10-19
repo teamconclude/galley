@@ -297,4 +297,8 @@ export interface Preferences {
   deleteMergedBranch: boolean
   // The Claude pane, and installing Claude Code during setup.
   claude: boolean
+  // The model the pane starts Claude with; 'default' leaves it to Claude Code's settings.
+  claudeModel: ClaudeModel
 }
+
+export type ClaudeModel = 'opus' | 'sonnet' | 'default'

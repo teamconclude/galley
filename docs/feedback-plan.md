@@ -6,9 +6,10 @@ the web repository, and the work that follows from it.
 
 ## Status
 
-Phase 1 is done on develop, unreleased (2026-10-19). The site names in the Publishing
+Phases 1 and 2 are done on develop, unreleased (2026-10-19). The site names in the Publishing
 section need a `baseURL` in `config/staging/` and `config/production/` of the web
-repository, which today passes it on the command line only. Phase 2 is next.
+repository, which today passes it on the command line only. The web side of phase 2 is
+on its branch `lars/claude-content-editing`. Phase 3 is next.
 
 ## What the feedback showed
 
@@ -111,24 +112,31 @@ What concerns the site (how a blog post is built, where images go, how internal 
 written) belongs in the web repository, where developers see it too. What concerns the
 editor's role belongs to Galley and applies only inside it, for any site.
 
-1. Galley starts Claude with `--append-system-prompt` (working for a content editor;
+1. Done. Galley starts Claude with `--append-system-prompt` (working for a content editor;
    Galley does branches, commits and publishing; do exactly what is asked and add no
-   links; the site's image folder and preview address), `--permission-mode acceptEdits`
-   (every edit shows in Changes and can be reverted there), and `--settings` with
-   permissions: allow reading, `hugo list`, read-only git, `textutil`, `sips`, `cp`, `mv`,
-   `mkdir` and fetching conclude.io and conclude.dev; deny git commands that change
-   history or branches, `gh` and `curl`. A model preference, passed as `--model`.
-2. Files dropped on the pane are copied to an inbox outside the checkout, added with
-   `--add-dir`, and their paths typed into the prompt. A prompt hook tells Claude which
-   page is open.
-3. A small plugin bundled with the app (`--plugin-dir`) for skills that do not depend on
-   the site.
-4. In the web repository: a content-editing section in CLAUDE.md and model-invocable
-   skills `blog-post`, `import-document` (text and links exactly as given, `.docx` through
-   `textutil`) and `page-images`; the release flow text updated once staging is gone.
+   links; the site's folders), `--permission-mode acceptEdits`, `--settings` with
+   permissions (allow reading the inbox, `hugo list`, read-only git, `sips`, fetching the
+   site's own hosts from its Hugo environments; deny git commands that change anything,
+   `gh` and `curl`), and `--model` from a new preference, Opus by default. Claude's
+   environment no longer carries Galley's GitHub token: permission rules on Bash are not
+   a boundary, so it has no credential to push with.
+2. Done. Files dropped on the pane are copied to an inbox under Galley's user data, added
+   with `--add-dir`, and pasted at the prompt. `.docx` and `.html` arrive as Markdown,
+   converted by rule with mammoth and turndown; pictures are extracted beside it. This
+   is the converter phase 3 needs for rich paste. A `UserPromptSubmit` hook tells Claude
+   which page is open.
+3. Done. A plugin in `resources/claude-plugin/` with `import-document` (work from the
+   converted file, separate notes from text, check the links mechanically against the
+   document) and `add-images`.
+4. On the web branch `lars/claude-content-editing`, not merged: a "Claude in Galley's
+   pane" section in CLAUDE.md and a `blog-post` skill (settings, categories, authors,
+   images, links, shortcodes, and how the content team's document header maps onto
+   them). The release flow text changes when staging goes.
 
-Verify: in the pane, an edit to a page needs no approval, `git push` is refused, a dropped
-image is readable without a prompt, and "this page" refers to the open page.
+Checked: on a real document from the content team, all 16 link addresses and every
+visible link survive conversion; the ten link runs that disappear are Google Docs links
+on a single space. In the pane, Claude named the open page from the hook, `git push` was
+refused, and both skills are listed.
 
 ### Phase 3: content in without Claude
 

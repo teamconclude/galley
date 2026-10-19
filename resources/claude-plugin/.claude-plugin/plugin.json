@@ -1,0 +1,5 @@
+{
+  "name": "galley",
+  "description": "Skills for editing a Hugo site's content from Galley",
+  "version": "1.0.0"
+}

@@ -109,8 +109,7 @@ let askpass: string | null = null
 // token as git's only credential helper, so neither a prompt nor a helper installed on
 // the Mac, such as Git Credential Manager, gets in the way.
 export async function gitEnv(): Promise<Record<string, string>> {
-  const tool = await findGit()
-  const env: Record<string, string> = { GIT_TERMINAL_PROMPT: '0', ...(tool?.env ?? {}) }
+  const env = await gitToolEnv()
   const tok = githubToken()
   if (tok) {
     askpass ??= await writeAskpass()
@@ -124,6 +123,13 @@ export async function gitEnv(): Promise<Record<string, string>> {
       '!f() { echo username=x-access-token; echo "password=$GALLEY_GIT_TOKEN"; }; f'
   }
   return env
+}
+
+// The same without the GitHub token, for programs that read but never push, such as the
+// Claude pane.
+export async function gitToolEnv(): Promise<Record<string, string>> {
+  const tool = await findGit()
+  return { GIT_TERMINAL_PROMPT: '0', ...(tool?.env ?? {}) }
 }
 
 async function writeAskpass(): Promise<string> {
