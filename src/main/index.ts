@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -29,6 +30,7 @@ import type {
 } from '../shared/types'
 import { isDev } from './env'
 import { claudeArgs, receiveDrops, setContext } from './claude'
+import { importDocument } from './convert'
 import { clone, Git } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
@@ -222,9 +224,30 @@ function registerIpc(): void {
   ipcMain.handle('repo:data', () => current().data())
   ipcMain.handle('repo:snippets', () => current().snippets())
   ipcMain.handle('repo:images', () => current().images())
-  ipcMain.handle('repo:importFile', (_e, src: string, dir: string) =>
-    current().importFile(src, dir)
+  ipcMain.handle('repo:importFile', (_e, src: string, dir: string, name?: string) =>
+    current().importFile(src, dir, name)
   )
+  ipcMain.handle(
+    'repo:importBytes',
+    (_e, data: Uint8Array, dir: string, name: string, ext: string) =>
+      current().importBytes(data, dir, name, ext)
+  )
+  ipcMain.handle('repo:importUrl', (_e, url: string, dir: string, name: string) =>
+    current().importUrl(url, dir, name)
+  )
+  ipcMain.handle('repo:chooseDocument', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'New page from a document',
+      properties: ['openFile'],
+      filters: [{ name: 'Documents', extensions: ['docx', 'md', 'markdown', 'txt', 'html', 'htm'] }]
+    })
+    const src = result.filePaths[0]
+    return src ? importDocument(src) : null
+  })
+  ipcMain.handle('repo:linkTargets', async () => ({
+    targets: await current().linkTargets(),
+    hosts: await environmentSites(current().path)
+  }))
   ipcMain.handle('repo:create', (_e, rel: string, text: string) => current().create(rel, text))
   ipcMain.handle('repo:mkdir', (_e, rel: string) => current().mkdir(rel))
   ipcMain.handle('repo:rename', (_e, from: string, to: string) => current().rename(from, to))
@@ -348,6 +371,7 @@ function registerIpc(): void {
   ipcMain.on('layout:save', (_e, layout: Layout) => saveSettings({ ...loadSettings(), layout }))
   ipcMain.handle('prefs:get', () => prefs())
   ipcMain.on('zoom', (_e, step: number | null) => zoom(step))
+  ipcMain.handle('clipboard:text', () => clipboard.readText())
   ipcMain.handle('prefs:set', (_e, p: Preferences) => saveSettings({ ...loadSettings(), prefs: p }))
   ipcMain.handle('setup:status', () => setup.status)
   ipcMain.handle('setup:retry', (_e, step: SetupStepId) => setup.retry(step))

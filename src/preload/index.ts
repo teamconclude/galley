@@ -21,7 +21,12 @@ const api: Api = {
     snippets: () => ipcRenderer.invoke('repo:snippets'),
     images: () => ipcRenderer.invoke('repo:images'),
     importImage: (dir) => ipcRenderer.invoke('repo:importImage', dir),
-    importFile: (src, dir) => ipcRenderer.invoke('repo:importFile', src, dir),
+    importFile: (src, dir, name) => ipcRenderer.invoke('repo:importFile', src, dir, name),
+    importBytes: (data, dir, name, ext) =>
+      ipcRenderer.invoke('repo:importBytes', data, dir, name, ext),
+    importUrl: (url, dir, name) => ipcRenderer.invoke('repo:importUrl', url, dir, name),
+    chooseDocument: () => ipcRenderer.invoke('repo:chooseDocument'),
+    linkTargets: () => ipcRenderer.invoke('repo:linkTargets'),
     create: (rel, text) => ipcRenderer.invoke('repo:create', rel, text),
     mkdir: (rel) => ipcRenderer.invoke('repo:mkdir', rel),
     rename: (from, to) => ipcRenderer.invoke('repo:rename', from, to),
@@ -96,6 +101,7 @@ const api: Api = {
     pathFor: (file) => webUtils.getPathForFile(file)
   },
   zoom: (step) => ipcRenderer.send('zoom', step),
+  clipboardText: () => ipcRenderer.invoke('clipboard:text'),
   prefs: {
     get: () => ipcRenderer.invoke('prefs:get'),
     set: (prefs) => ipcRenderer.invoke('prefs:set', prefs)

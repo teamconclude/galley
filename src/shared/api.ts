@@ -2,6 +2,7 @@ import type {
   Commit,
   CommitRange,
   Placement,
+  ImportedDocument,
   ComponentLibrary,
   DataLists,
   DirEntry,
@@ -42,7 +43,13 @@ export interface Api {
     snippets: () => Promise<Snippet[]>
     images: () => Promise<string[]>
     importImage: (dir: string) => Promise<string | null>
-    importFile: (src: string, dir: string) => Promise<string>
+    importFile: (src: string, dir: string, name?: string) => Promise<string>
+    importBytes: (data: Uint8Array, dir: string, name: string, ext: string) => Promise<string>
+    importUrl: (url: string, dir: string, name: string) => Promise<string>
+    // Asks for a document and returns it as Markdown; null when cancelled.
+    chooseDocument: () => Promise<ImportedDocument | null>
+    // Addresses links may point to, and the site's own hosts, for marking broken links.
+    linkTargets: () => Promise<{ targets: string[]; hosts: string[] }>
     create: (rel: string, text: string) => Promise<void>
     mkdir: (rel: string) => Promise<void>
     rename: (from: string, to: string) => Promise<void>
@@ -131,6 +138,8 @@ export interface Api {
   }
   // Text size steps; null returns to the default.
   zoom: (step: number | null) => void
+  // The clipboard's plain text, for Paste as plain text.
+  clipboardText: () => Promise<string>
   prefs: {
     get: () => Promise<Preferences>
     set: (prefs: Preferences) => Promise<void>

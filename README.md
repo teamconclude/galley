@@ -60,6 +60,17 @@ Images are chosen from the site's images or dropped in. **YAML** at the top righ
 raw settings for the rare case the form does not cover something. Below the settings, **Show
 body text** opens the page's prose. Everything is saved as you type.
 
+Text pasted from Google Docs, Word or a web page becomes Markdown with its headings, lists,
+emphasis and links; text that already is Markdown pastes as it is, and **Paste as plain
+text** (⌘⇧V) pastes the clipboard's text exactly. A pasted picture is saved into the
+section's images folder, and a whole page pasted into an empty page fills in its settings
+too. Links to addresses on the site that lead to no page or file get a red wavy underline.
+
+**New pages.** The `+` button asks for the title, the address and the publish date. **From
+a document…** makes the page from a Word, Markdown or web document: its headline becomes
+the title, the text and links come over exactly, its pictures go to the section's images
+folder, and notes above the headline, such as a proposed address, stay out of the page.
+
 **Preview.** The right side shows the page as it will look, updated after every change.
 **Separate window** moves it out of the main window, for example to a second screen.
 

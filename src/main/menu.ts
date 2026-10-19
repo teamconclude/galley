@@ -54,7 +54,11 @@ export function buildMenu(actions: Actions): Menu {
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
-        { role: 'pasteAndMatchStyle' },
+        {
+          label: 'Paste as plain text',
+          accelerator: 'CmdOrCtrl+Shift+V',
+          click: () => actions.command('paste-plain')
+        },
         { role: 'delete' },
         { role: 'selectAll' },
         { type: 'separator' },

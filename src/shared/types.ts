@@ -106,6 +106,14 @@ export interface Change {
   warning?: string
 }
 
+// A document chosen for a new page, converted to Markdown, with its pictures saved
+// beside the conversion and referred to by file name in the text.
+export interface ImportedDocument {
+  name: string
+  markdown: string
+  images: string[]
+}
+
 // Where a file dropped into a folder should go, and what is wrong with the folder.
 export interface Placement {
   warning: string | null
@@ -290,6 +298,7 @@ export type MenuCommand =
   | 'replace'
   | 'find-in-site'
   | 'replace-in-site'
+  | 'paste-plain'
 
 // Git conveniences for editors who are not git users; both on unless turned off.
 export interface Preferences {

@@ -6,10 +6,10 @@ the web repository, and the work that follows from it.
 
 ## Status
 
-Phases 1 and 2 are done on develop, unreleased (2026-10-19). The site names in the Publishing
+Phases 1 to 3 are done on develop, unreleased (2026-10-19). The site names in the Publishing
 section need a `baseURL` in `config/staging/` and `config/production/` of the web
 repository, which today passes it on the command line only. The web side of phase 2 is
-on its branch `lars/claude-content-editing`. Phase 3 is next.
+on its branch `lars/claude-content-editing`. Phase 4 is next.
 
 ## What the feedback showed
 
@@ -140,16 +140,26 @@ refused, and both skills are listed.
 
 ### Phase 3: content in without Claude
 
-1. Pasting HTML into a markdown editor converts it, keeping headings, lists, emphasis and
-   links. Text that already reads as markdown, or HTML that only styles the plain text
-   (code editors, chat apps), pastes as it is; ⌘⇧V always pastes plain. A whole markdown
-   file with frontmatter pasted into an empty page fills the settings as well. Pasted
-   images are copied into the section's image folder; Google Docs image links expire.
-2. New page from document…: `textutil` turns a `.docx` into HTML, the same converter does
-   the rest.
-3. The New page dialog shows the address the page gets instead of the file name, says
+Done on develop, unreleased (2026-10-19).
+
+1. Pasting into a Markdown editor converts HTML with the converter phase 2 introduced, now
+   in `src/shared/markdown.ts` for both processes. It handles Google Docs (bold and italic
+   as inline styles, the document-wide `<b>` wrapper, google.com/url redirects, list items
+   wrapped in paragraphs) and Word. Text that reads as Markdown, or HTML that only styles
+   it, pastes as it is. Paste as plain text (⌘⇧V) replaces Paste and Match Style. A whole
+   page pasted into an empty body merges its settings. Pasted pictures, as data or by
+   address, are saved into the section's images folder under the page's name.
+2. New page from a document: mammoth for Word, the same converter for HTML, Markdown as
+   it is. The headline becomes the title, notes above it are shown and kept out of the
+   page, an address on a line of its own in the notes becomes the page's address, and
+   the pictures are copied to the images folder as `<page>-1.png` and so on.
+3. The New page dialog shows the address under the section instead of a file name, says
    what the title is for, and has a publish date.
-4. Internal links that match no page are marked in the editor.
+4. Links to the site's own addresses, relative or on one of its hosts, that match no page,
+   alias or static file are underlined. The targets come from `hugo list all`, the
+   `aliases` in front matter and the static folder, cached until pages move.
+
+Tables without a header row stay HTML: Markdown tables need one, and Hugo renders the HTML.
 
 ### Phase 4: images
 
@@ -159,7 +169,7 @@ refused, and both skills are listed.
    base), filters by folder starting at the page's section, and shows names on two lines.
 3. Done in phase 1: images dropped on the tree among the pages go to the images folder
    and the new file opens.
-4. Pasting an image from the clipboard into the body.
+4. Done in phase 3: pasting a picture into the body.
 
 ### Phase 5: finding pages
 

@@ -18,7 +18,7 @@ import { EditorView } from '@codemirror/view'
 import ChangesPanel from './components/ChangesPanel'
 import ClaudePane from './components/ClaudePane'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
-import { NewPageDialog, PromptDialog } from './components/Dialogs'
+import { NewPageDialog, PromptDialog, type NewPage } from './components/Dialogs'
 import CommitList from './components/CommitList'
 import DiffView from './components/DiffView'
 import Editor, { type Selection } from './components/Editor'
@@ -45,7 +45,8 @@ import SettingsDialog from './components/SettingsDialog'
 import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
-import { newPageText } from './lib/newPage'
+import { mergeSettings, newPageText } from './lib/newPage'
+import { setLinkTargets } from './lib/linkCheck'
 import { currentListKey } from './lib/schema'
 
 interface OpenFile {
@@ -84,6 +85,15 @@ const outsideWords = (entry: OutsideEntry): { what: string } => ({
       ? 'the file in it'
       : `the ${entry.files} files in it`
 })
+const extensionFor = (type: string): string =>
+  ({
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'image/avif': '.avif'
+  })[type] ?? '.png'
 const isNew = (change: Change): boolean => change.kind === 'untracked' || change.kind === 'added'
 // The name a dropped file gets, as Repo.importFile makes it.
 const importName = (name: string): string => {
@@ -301,11 +311,33 @@ export default function App(): React.JSX.Element | null {
       return next
     })
 
-  const createPage = async (dir: string, title: string, filename: string): Promise<void> => {
-    const path = inDir(dir, filename)
+  // A page made from a document gets its text, its settings if it brings any, and its
+  // pictures, copied to the section's images folder under the page's name.
+  const createPage = async (dir: string, page: NewPage): Promise<void> => {
+    const path = inDir(dir, page.filename)
     try {
       const template = await window.api.repo.newest(dir)
-      await window.api.repo.create(path, newPageText(template, title))
+      let text = newPageText(template, page.title, page.date)
+      if (page.document) {
+        const { parts, images } = page.document
+        const slug = page.filename.replace(/\.md$/, '')
+        const under = dir.startsWith(site.contentDir + '/')
+          ? dir.slice(site.contentDir.length + 1)
+          : ''
+        const folder = `${site.imagesDir}/${under.split('/')[0] || 'pages'}`
+        let body = parts.body
+        for (const [i, src] of images.entries()) {
+          const rel = await window.api.repo.importFile(src, folder, `${slug}-${i + 1}`)
+          const name = src.split('/').pop()!
+          body = body.split(`(${name})`).join(`(${imageUrl(site, rel)})`)
+        }
+        const own = split(text)
+        const settings = parts.frontmatter
+          ? (mergeSettings(own.frontmatter ?? '', parts.frontmatter) ?? own.frontmatter)
+          : own.frontmatter
+        text = join(settings, '\n' + body, own.format)
+      }
+      await window.api.repo.create(path, text)
       reveal(path)
       await open(path)
     } catch (e) {
@@ -377,19 +409,75 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
-  // Images dropped into a page body land in the images folder under the page's section.
-  const importImages = async (files: File[]): Promise<string[]> => {
+  // Images dropped or pasted into a page body land in the images folder of its section.
+  const sectionImages = (): string => {
     const parts = file?.path.split('/') ?? []
     const section = parts[0] === site.contentDir && parts.length > 2 ? parts[1] : 'pages'
+    return `${site.imagesDir}/${section}`
+  }
+
+  const importImages = async (files: File[]): Promise<string[]> => {
     const urls: string[] = []
     for (const f of files) {
-      const rel = await window.api.repo.importFile(
-        window.api.files.pathFor(f),
-        `${site.imagesDir}/${section}`
-      )
+      const rel = await window.api.repo.importFile(window.api.files.pathFor(f), sectionImages())
       urls.push(imageUrl(site, rel))
     }
     return urls
+  }
+
+  // A pasted picture, as data or by address, is saved under the page's name. Pictures
+  // already in the site stay where they are.
+  const pasteImage = async (source: Blob | string): Promise<string | null> => {
+    if (typeof source === 'string' && source.startsWith(site.imagesUrl + '/')) return source
+    const dir = sectionImages()
+    const name = (file?.path.split('/').pop() ?? 'image').replace(/\.[^.]+$/, '') + '-image'
+    try {
+      let rel: string
+      if (typeof source !== 'string') {
+        const data = new Uint8Array(await source.arrayBuffer())
+        rel = await window.api.repo.importBytes(data, dir, name, extensionFor(source.type))
+      } else if (source.startsWith('data:')) {
+        const m = source.match(/^data:([^;,]+)(;base64)?,([\s\S]*)$/)
+        if (!m) return null
+        const data = m[2]
+          ? Uint8Array.from(atob(m[3]), (c) => c.charCodeAt(0))
+          : new TextEncoder().encode(decodeURIComponent(m[3]))
+        rel = await window.api.repo.importBytes(data, dir, name, extensionFor(m[1]))
+      } else if (/^https?:\/\//.test(source)) {
+        rel = await window.api.repo.importUrl(source, dir, name)
+      } else return null
+      return imageUrl(site, rel)
+    } catch (e) {
+      fail(e)
+      return null
+    }
+  }
+
+  // A whole page pasted into an empty body: its settings fill in the page's settings,
+  // overriding the defaults the new page started with, and its text becomes the body.
+  const pasteDocument = (frontmatter: string, body: string): boolean => {
+    const current = fileRef.current
+    if (!current) return false
+    const page = split(current.text)
+    if (page.format !== 'yaml') return false
+    const merged = mergeSettings(page.frontmatter ?? '', frontmatter)
+    if (merged === null) return false
+    changeText(join(merged, '\n' + body.replace(/^\s*\n/, ''), 'yaml'))
+    return true
+  }
+
+  // Paste as plain text: the clipboard's text exactly, into whatever has focus.
+  const pastePlain = async (): Promise<void> => {
+    const text = await window.api.clipboardText()
+    const view = focusedEditor()
+    if (view) {
+      view.dispatch(view.state.replaceSelection(text))
+      return
+    }
+    const el = document.activeElement
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      document.execCommand('insertText', false, text)
+    }
   }
 
   const menuItems = (entry: DirEntry): MenuItem[] =>
@@ -441,6 +529,27 @@ export default function App(): React.JSX.Element | null {
   }
 
   const repoPath = repo?.path
+
+  // Links in the editors are checked against the site's pages, reloaded after changes.
+  useEffect(() => {
+    if (!repoPath) return
+    let timer: number | undefined
+    const load = (): void => {
+      void window.api.repo
+        .linkTargets()
+        .then(({ targets, hosts }) => setLinkTargets(targets, hosts))
+        .catch(() => undefined)
+    }
+    load()
+    const off = window.api.repo.onChanged(() => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(load, 2000)
+    })
+    return () => {
+      off()
+      window.clearTimeout(timer)
+    }
+  }, [repoPath])
   useEffect(() => {
     if (!repoPath) return
     void window.api.git.status().then(setGitStatus)
@@ -747,6 +856,9 @@ export default function App(): React.JSX.Element | null {
           case 'replace-in-site':
             findInSite(true)
             break
+          case 'paste-plain':
+            void pastePlain()
+            break
         }
       }),
     [save, toggleDetached, find, findInSite]
@@ -943,6 +1055,7 @@ export default function App(): React.JSX.Element | null {
                           }
                           onSave={() => void save()}
                           importImages={isMarkdown ? importImages : undefined}
+                          paste={isMarkdown ? { pasteImage, pasteDocument } : undefined}
                           prose={isMarkdown}
                           select={selectIn('body')}
                           onView={isMarkdown ? setBodyView : undefined}
@@ -1002,10 +1115,15 @@ export default function App(): React.JSX.Element | null {
         {dialog?.kind === 'new-page' && (
           <NewPageDialog
             directory={dialog.dir}
+            sectionUrl={
+              dialog.dir.startsWith(site.contentDir + '/')
+                ? `/${dialog.dir.slice(site.contentDir.length + 1)}/`
+                : '/'
+            }
             onCancel={() => setDialog(null)}
-            onSubmit={(title, filename) => {
+            onSubmit={(page) => {
               setDialog(null)
-              void createPage(dialog.dir, title, filename)
+              void createPage(dialog.dir, page)
             }}
           />
         )}

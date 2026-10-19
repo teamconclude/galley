@@ -9,7 +9,9 @@ import { search } from '@codemirror/search'
 import { basicSetup } from 'codemirror'
 import { clearActiveEditor, editorChanged, setActiveEditor } from '../lib/activeEditor'
 import { FindPanel } from '../lib/findPanel'
+import { linkCheck } from '../lib/linkCheck'
 import { markdownStyle } from '../lib/markdownStyle'
+import { pasteMarkdown, type PasteHooks } from '../lib/paste'
 
 interface Props {
   filename: string
@@ -18,6 +20,8 @@ interface Props {
   onSave?: () => void
   // Copies dropped images into the site and returns their URL paths.
   importImages?: (files: File[]) => Promise<string[]>
+  // Saving pasted pictures and taking a whole pasted page; see PasteHooks.
+  paste?: PasteHooks
   // A writing surface: proportional type, no line numbers.
   prose?: boolean
   // A range to select and scroll to, e.g. a search hit; a new tick selects again.
@@ -37,17 +41,19 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 // Remount (change the React key) to open a different file.
 export default function Editor(props: Props): React.JSX.Element {
-  const { filename, value, onChange, onSave, importImages, prose, select, onView } = props
+  const { filename, value, onChange, onSave, importImages, paste, prose, select, onView } = props
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
   const importImagesRef = useRef(importImages)
+  const pasteRef = useRef(paste)
   const onViewRef = useRef(onView)
   useEffect(() => {
     onChangeRef.current = onChange
     onSaveRef.current = onSave
     importImagesRef.current = importImages
+    pasteRef.current = paste
     onViewRef.current = onView
   })
 
@@ -75,7 +81,7 @@ export default function Editor(props: Props): React.JSX.Element {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString())
           }),
           trackFocus(),
-          isMarkdown ? markdownStyle : [],
+          isMarkdown ? [markdownStyle, pasteMarkdown(pasteRef), linkCheck()] : [],
           importImages ? dropImages(importImagesRef) : []
         ]
       }),

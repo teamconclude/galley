@@ -1,4 +1,5 @@
 import { execFile } from 'child_process'
+import { net } from 'electron'
 import { FSWatcher, existsSync, promises as fs, watch } from 'fs'
 import { basename, dirname, extname, join, resolve, sep } from 'path'
 import { parse as parseYaml } from 'yaml'
@@ -40,6 +41,7 @@ export class Repo {
   private dataCache: DataLists | null = null
   private snippetCache: Promise<Snippet[]> | null = null
   private imageCache: string[] | null = null
+  private targetCache: string[] | null = null
   private ownRenames = new Set<string>()
 
   constructor(
@@ -182,21 +184,81 @@ export class Repo {
     return this.imageCache
   }
 
-  // Copies a file into <dir> under a lowercase, unique name and returns its path.
-  async importFile(src: string, dir: string): Promise<string> {
+  // Copies a file into <dir> under a lowercase, unique name, from its own name or the one
+  // given, and returns its path.
+  async importFile(src: string, dir: string, name?: string): Promise<string> {
+    return this.place(dir, name ?? basename(src, extname(src)), extname(src), (to) =>
+      fs.copyFile(src, to)
+    )
+  }
+
+  // Writes image data, e.g. a pasted screenshot, the same way.
+  async importBytes(data: Uint8Array, dir: string, name: string, ext: string): Promise<string> {
+    return this.place(dir, name, ext, (to) => fs.writeFile(to, data))
+  }
+
+  // Downloads an image, e.g. one in text pasted from Google Docs, whose links expire.
+  async importUrl(url: string, dir: string, name: string): Promise<string> {
+    const res = await net.fetch(url)
+    if (!res.ok) throw new Error(`Could not download ${url}: ${res.status}`)
+    const type = res.headers.get('content-type') ?? ''
+    const ext =
+      imageExtensions[type.split(';')[0].trim()] ?? (extname(new URL(url).pathname) || '.png')
+    return this.importBytes(new Uint8Array(await res.arrayBuffer()), dir, name, ext)
+  }
+
+  private async place(
+    dir: string,
+    name: string,
+    extension: string,
+    write: (to: string) => Promise<void>
+  ): Promise<string> {
     const folder = this.absolute(dir)
     await fs.mkdir(folder, { recursive: true })
-    const ext = extname(src).toLowerCase()
+    const ext = extension.toLowerCase()
     const base =
-      basename(src, extname(src))
+      name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '') || 'file'
-    let name = base + ext
-    for (let i = 2; existsSync(join(folder, name)); i++) name = `${base}-${i}${ext}`
-    await fs.copyFile(src, join(folder, name))
+    let file = base + ext
+    for (let i = 2; existsSync(join(folder, file)); i++) file = `${base}-${i}${ext}`
+    await write(join(folder, file))
     if (dir.startsWith(this.folders.imagesDir)) this.imageCache = null
-    return `${dir}/${name}`
+    return `${dir}/${file}`
+  }
+
+  // Every address a link within the site may point to: the pages, their aliases and the
+  // files in the static folder. Empty when Hugo cannot list the pages.
+  async linkTargets(): Promise<string[]> {
+    if (this.targetCache) return this.targetCache
+    await this.refreshPages()
+    if (this.pages.size === 0) return []
+    const { contentDir, staticDir } = await this.site()
+    const targets = new Set([...this.pages.values()].map(slashed))
+    const walk = async (dir: string, visit: (rel: string) => Promise<void>): Promise<void> => {
+      for (const e of await fs
+        .readdir(join(this.path, dir), { withFileTypes: true })
+        .catch(() => [])) {
+        if (e.name.startsWith('.')) continue
+        const rel = `${dir}/${e.name}`
+        if (e.isDirectory()) await walk(rel, visit)
+        else await visit(rel)
+      }
+    }
+    await walk(contentDir, async (rel) => {
+      if (!/\.md$/.test(rel)) return
+      const text = await fs.readFile(join(this.path, rel), 'utf8').catch(() => '')
+      const block = text.match(/^aliases:\s*\n((?:\s+-.*\n)+)/m)?.[1] ?? ''
+      for (const m of block.matchAll(/-\s*['"]?([^'"\s]+)/g)) targets.add(slashed(m[1]))
+      const inline = text.match(/^aliases:\s*\[(.*)\]/m)?.[1] ?? ''
+      for (const m of inline.matchAll(/['"]?([^'",\s]+)/g)) targets.add(slashed(m[1]))
+    })
+    await walk(staticDir, async (rel) => {
+      targets.add(rel.slice(staticDir.length))
+    })
+    this.targetCache = [...targets]
+    return this.targetCache
   }
 
   // Same, for an image addressed by the URL path of its folder.
@@ -268,8 +330,10 @@ export class Repo {
     this.ownRenames.clear()
     if (this.structureChanged) {
       this.structureChanged = false
+      this.targetCache = null
       void this.refreshPages()
     }
+    if (paths.some((p) => p.startsWith(this.folders.staticDir + '/'))) this.targetCache = null
     if (paths.some((p) => p.startsWith(this.folders.componentsDir + '/')))
       this.componentCache = null
     if (paths.some(isConfigFile)) this.siteCache = null
@@ -283,6 +347,21 @@ export class Repo {
     this.watcher?.close()
     this.watcher = null
   }
+}
+
+const imageExtensions: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/svg+xml': '.svg',
+  'image/avif': '.avif'
+}
+
+// A page address with its trailing slash, as Hugo writes them.
+function slashed(url: string): string {
+  const path = url.replace(/[?#].*$/, '')
+  return /\/$|\.[a-z0-9]+$/i.test(path) ? path : path + '/'
 }
 
 function guessUrl(rel: string): string {
