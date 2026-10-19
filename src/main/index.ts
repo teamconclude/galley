@@ -30,6 +30,7 @@ import type {
 import { isDev } from './env'
 import { clone, Git } from './git'
 import { HugoServer } from './hugo'
+import { dropPlacement } from './placement'
 import { buildMenu } from './menu'
 import { Repo } from './repo'
 import { replace, search } from './search'
@@ -72,7 +73,12 @@ function openRepo(path: string): void {
     git?.scheduleRefresh()
   })
   repo.watch()
-  git = new Git(path, (status) => send('git:status', status))
+  const opened = repo
+  git = new Git(
+    path,
+    (status) => send('git:status', status),
+    () => opened.site()
+  )
   git.start()
   saveSettings({ ...loadSettings(), repoPath: path })
   void hugo.start(path).then(() => hugo.refresh())
@@ -221,6 +227,12 @@ function registerIpc(): void {
   ipcMain.handle('repo:mkdir', (_e, rel: string) => current().mkdir(rel))
   ipcMain.handle('repo:rename', (_e, from: string, to: string) => current().rename(from, to))
   ipcMain.handle('repo:trash', (_e, rel: string) => shell.trashItem(current().absolute(rel)))
+  ipcMain.handle('repo:reveal', (_e, rel: string) =>
+    shell.showItemInFolder(current().absolute(rel))
+  )
+  ipcMain.handle('repo:placement', async (_e, rel: string) =>
+    dropPlacement(current().path, rel, await current().site())
+  )
   ipcMain.handle('repo:newest', (_e, dir: string) => current().newest(dir))
   ipcMain.handle('repo:search', async (_e, query: string, options: SearchOptions) =>
     search(current().path, query, options, (await current().site()).contentDir)
@@ -262,13 +274,16 @@ function registerIpc(): void {
   ipcMain.handle('git:mergeToBase', () => currentGit().mergeToBase())
   ipcMain.handle('git:moveToBranch', (_e, name: string) => currentGit().moveToBranch(name))
   ipcMain.handle('git:log', (_e, range: CommitRange) => currentGit().log(range))
-  ipcMain.handle('git:ignore', (_e, rel: string) => currentGit().ignore(rel))
+  ipcMain.handle('git:include', (_e, rel: string) => currentGit().include(rel))
   ipcMain.handle('git:committedImage', (_e, rel: string) => currentGit().committedImage(rel))
   ipcMain.handle('git:release', (_e, from: string, to: string) => currentGit().release(from, to))
   ipcMain.handle('git:publish', (_e, from: string, to: string) => currentGit().publish(from, to))
-  ipcMain.handle('git:discard', async (_e, rel: string, untracked: boolean) => {
-    if (untracked) await shell.trashItem(current().absolute(rel))
-    else await currentGit().discard(rel)
+  // A new file goes to the Trash, after leaving the index if it was added there.
+  ipcMain.handle('git:discard', async (_e, rel: string, isNew: boolean) => {
+    if (isNew) {
+      await currentGit().unstage(rel)
+      await shell.trashItem(current().absolute(rel))
+    } else await currentGit().discard(rel)
     currentGit().scheduleRefresh()
   })
   ipcMain.handle('git:revertHunk', (_e, rel: string, index: number) =>

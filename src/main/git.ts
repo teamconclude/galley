@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
-import { dirname, extname, isAbsolute, join } from 'path'
+import { extname, join } from 'path'
 import type {
   Change,
   ChangeKind,
@@ -11,11 +11,14 @@ import type {
   Identity,
   OutsideEntry,
   PublishResult,
-  ReleaseStep
+  ReleaseStep,
+  SiteInfo
 } from '../shared/types'
 import { splitDiff } from '../shared/diff'
 import { publish } from './github'
 import { environmentSite } from './hugoConfig'
+import { placementWarning } from './placement'
+import { defaultSiteInfo } from '../shared/siteInfo'
 import { prefs } from './settings'
 import { findGit, gitEnv } from './tools'
 
@@ -100,13 +103,6 @@ function splitOutside(
   return { site, outside: [...outside.values()] }
 }
 
-// A path as an anchored .gitignore pattern matching just that entry.
-function excludePattern(entry: OutsideEntry): string {
-  const escaped = entry.path.replace(/[\\*?[]/g, '\\$&').replace(/^[#!]/, '\\$&')
-  const spaces = escaped.replace(/ +$/, (m) => '\\ '.repeat(m.length))
-  return '/' + spaces + (entry.isDir ? '/' : '')
-}
-
 const imageTypes: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -129,7 +125,9 @@ export class Git {
 
   constructor(
     readonly path: string,
-    private onStatus: (status: GitStatus) => void
+    private onStatus: (status: GitStatus) => void,
+    // The site's folders, for judging where new files are; setup only needs the defaults.
+    private site: () => Promise<SiteInfo> = async () => defaultSiteInfo
   ) {}
 
   start(): void {
@@ -206,6 +204,16 @@ export class Git {
       .then((out) => new Set(out.split('\n').filter(Boolean)))
       .catch(() => null)
     const { site: changes, outside } = splitOutside(all, tracked)
+    const site = await this.site()
+    for (const change of changes) {
+      if (change.kind !== 'untracked' && change.kind !== 'added') continue
+      const top = change.path.split('/')[0]
+      const warning =
+        tracked && !tracked.has(top)
+          ? `${top} is not one of the site's folders, so the site does not use ${change.path.split('/').pop()}.`
+          : placementWarning(this.path, change.path, site)
+      if (warning) change.warning = warning
+    }
     return {
       branch,
       base,
@@ -525,6 +533,10 @@ export class Git {
     })
   }
 
+  async unstage(path: string): Promise<void> {
+    await this.git(['reset', '-q', '--', path]).catch(() => undefined)
+  }
+
   discard(path: string): Promise<void> {
     return this.op('Discarding…', async () => {
       await this.git(['reset', '-q', '--', path]).catch(() => undefined)
@@ -560,16 +572,13 @@ export class Git {
     return this.git(['diff', '--no-color', '-U3', 'HEAD', '--', path])
   }
 
-  // Appends the entry to .git/info/exclude, which only this checkout reads.
-  async ignore(path: string): Promise<void> {
-    const entry = (await this.status()).outside.find((e) => e.path === path)
-    if (!entry) throw new Error(`${path} is not listed outside the site`)
-    const file = (await this.git(['rev-parse', '--git-path', 'info/exclude'])).trim()
-    const abs = isAbsolute(file) ? file : join(this.path, file)
-    await fs.mkdir(dirname(abs), { recursive: true })
-    const text = await fs.readFile(abs, 'utf8').catch(() => '')
-    const sep = text === '' || text.endsWith('\n') ? '' : '\n'
-    await fs.writeFile(abs, `${text}${sep}${excludePattern(entry)}\n`)
+  // Makes an entry outside the site part of it: its files show as new and the next
+  // commit takes them, like any other change.
+  async include(path: string): Promise<void> {
+    if (!(await this.status()).outside.some((e) => e.path === path)) {
+      throw new Error(`${path} is not listed outside the site`)
+    }
+    await this.git(['add', '--intent-to-add', '--', path])
     await this.refresh()
   }
 

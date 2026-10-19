@@ -1985,10 +1985,10 @@ body.dragging .terminal-host {
   color: var(--text-muted);
 }
 
-.outside-ignore {
+.change-warning {
   flex: none;
-  padding: 0 6px;
-  font-size: 11px;
+  display: inline-flex;
+  color: var(--yellow5);
 }
 
 .image-diff {

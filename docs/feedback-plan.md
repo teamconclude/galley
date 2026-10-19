@@ -86,14 +86,23 @@ out of the checkout, set Claude's model back, and use Publish… rather than ask
 5. Every count expands into its commits: author, date, message and files. The merge and
    publish confirmations list the commits and name the people whose work goes along.
 6. Untracked files outside the folders git already tracks are listed apart as "Not part
-   of the site", one row per top-level entry, with Ignore, which adds it to
-   `.git/info/exclude`. They are not counted, committed, discarded, or in the way of a
-   merge.
+   of the site", one row per top-level entry. They are not counted, committed, discarded,
+   or in the way of a merge. Each offers Show in Finder, Move to Trash, and Add to the
+   site, which warns first and then registers the files with `git add --intent-to-add`
+   so they show as new files like any other change.
 7. Images in the Changes tab show as pictures.
+8. New files in obviously wrong places get a warning in plain words and start left out of
+   the commit; committing them anyway asks first. Wrong places are: outside the site's
+   folders, a document anywhere but the static folder, a page in the static folder, an
+   image among the pages outside a page bundle, a temporary file from Finder or Office,
+   and a name with capitals or spaces where it becomes an address. An image dropped on
+   the tree among the pages goes to its section's images folder; other doubtful drops
+   ask first.
 
 Verify: on a scratch clone, a staging branch with local commits offers Move and nothing
 else; after a merge the branch is level with develop and still checked out; a folder of
-documents at the root shows under "Not part of the site" and Ignore removes it; expanding
+documents at the root shows under "Not part of the site", and adding it warns first and
+leaves its files unticked; expanding
 "N commits to push" lists them.
 
 ### Phase 2: Claude in Galley
@@ -140,8 +149,8 @@ image is readable without a prompt, and "this page" refers to the open page.
    section's image folder.
 2. The picker starts with the images new on this branch (untracked or added since the
    base), filters by folder starting at the page's section, and shows names on two lines.
-3. Images dropped on the tree inside the content folder go to the images folder; the new
-   file is selected.
+3. Done in phase 1: images dropped on the tree among the pages go to the images folder
+   and the new file opens.
 4. Pasting an image from the clipboard into the body.
 
 ### Phase 5: finding pages
@@ -201,3 +210,7 @@ month fit the free 300 credits, which are a hard limit (prices as of October 202
   permissions in Galley's launch settings.
 - Shared branches are never worked on in Galley; it moves stray commits off them rather
   than pushing them.
+- Untracked files are resolved, not hidden: added to the site or moved away. A checkout
+  holds no untracked files beyond build output, which the site's .gitignore covers.
+- Editors are not expected to know git or Hugo: anything that looks misplaced is
+  explained in plain words before it is committed.

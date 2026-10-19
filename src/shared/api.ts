@@ -1,6 +1,7 @@
 import type {
   Commit,
   CommitRange,
+  Placement,
   ComponentLibrary,
   DataLists,
   DirEntry,
@@ -46,6 +47,10 @@ export interface Api {
     mkdir: (rel: string) => Promise<void>
     rename: (from: string, to: string) => Promise<void>
     trash: (rel: string) => Promise<void>
+    // Shows the file or folder in the Finder.
+    reveal: (rel: string) => Promise<void>
+    // What to make of a file about to be dropped at this path.
+    placement: (rel: string) => Promise<Placement>
     newest: (dir: string) => Promise<string | null>
     search: (query: string, options: SearchOptions) => Promise<SearchResults>
     replace: (query: string, options: SearchOptions, replacement: string) => Promise<ReplaceResult>
@@ -72,13 +77,14 @@ export interface Api {
     // Moves local commits off a shared branch onto a new branch.
     moveToBranch: (name: string) => Promise<void>
     log: (range: CommitRange) => Promise<Commit[]>
-    // Stops listing an entry outside the site, through .git/info/exclude.
-    ignore: (path: string) => Promise<void>
+    // Makes an entry outside the site part of it, so the next commit takes its files.
+    include: (path: string) => Promise<void>
     // The committed version of a file as a data URL, for showing changed images.
     committedImage: (path: string) => Promise<string | null>
     release: (from: string, to: string) => Promise<void>
     publish: (from: string, to: string) => Promise<PublishResult>
-    discard: (path: string, untracked: boolean) => Promise<void>
+    // A new file is moved to the Trash.
+    discard: (path: string, isNew: boolean) => Promise<void>
     diff: (path: string) => Promise<string>
     revertHunk: (path: string, index: number) => Promise<void>
     identity: () => Promise<Identity | null>

@@ -77,8 +77,11 @@ Every count opens into its commits with author, date and files, and the merge an
 confirmations name whose work goes along. Galley checks GitHub every few minutes and
 offers **Pull** when a colleague added to your branch and **Update** when the base moved
 on. The shared branches only follow GitHub: commits made on one by mistake get **Move to
-a new branch**. New files next to the site, such as documents kept in the checkout, are
-listed apart under "Not part of the site" and are never committed; **Ignore** hides them.
+a new branch**. New files the site does not use, such as documents kept in the checkout, are
+listed apart under "Not part of the site": show them in the Finder to move them away, move
+them to the Trash, or add them after a warning. New files in odd places, a document among
+the pages or a file name with spaces, are marked and left out of the commit until ticked,
+and images dropped among the pages go to the section's images folder.
 
 ## Development
 

@@ -1,6 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, Folder, RotateCcw } from 'lucide-react'
-import type { Change, CommitRange, GitStatus, Identity, ReleaseStep } from '../../../shared/types'
+import {
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  Plus,
+  RotateCcw,
+  Trash2,
+  TriangleAlert
+} from 'lucide-react'
+import type {
+  Change,
+  CommitRange,
+  GitStatus,
+  Identity,
+  OutsideEntry,
+  ReleaseStep
+} from '../../../shared/types'
 import { ago } from '../lib/time'
 import CommitList from './CommitList'
 import FileIcon from './FileIcon'
@@ -22,7 +37,7 @@ interface Props {
   onSwitchBranch: () => void
   onMerge: () => void
   onMove: () => void
-  onIgnore: (path: string) => void
+  onOutside: (entry: OutsideEntry, action: 'reveal' | 'include' | 'trash') => void
   onRelease: (step: ReleaseStep) => void
   onPublish: (step: ReleaseStep) => void
 }
@@ -52,10 +67,20 @@ function pullRequestUrl(status: GitStatus): string | null {
 export default function ChangesPanel(props: Props): React.JSX.Element {
   const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch } = props
-  const { onMerge, onMove, onIgnore, onRelease, onPublish } = props
+  const { onMerge, onMove, onOutside, onRelease, onPublish } = props
   const [message, setMessage] = useState('')
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // A new file that looks out of place starts left out of the commit, once; ticking it
+  // afterwards is the editor's choice.
+  const [warned, setWarned] = useState<Set<string>>(() => new Set())
+  const misplaced = (status?.changes ?? []).filter((c) => c.warning && !warned.has(c.path))
+  if (misplaced.length > 0) {
+    const paths = misplaced.map((c) => c.path)
+    setWarned(new Set([...warned, ...paths]))
+    setExcluded((prev) => new Set([...prev, ...paths]))
+  }
 
   if (!status) return <div className="pane-empty">Reading the repository…</div>
 
@@ -101,6 +126,12 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
   )
 
   const commit = async (): Promise<void> => {
+    const doubtful = included.filter((c) => c.warning)
+    if (doubtful.length > 0) {
+      const list = doubtful.map((c) => `• ${c.warning}`).join('\n')
+      const files = doubtful.length === 1 ? 'This file looks' : 'These files look'
+      if (!window.confirm(`${files} out of place:\n\n${list}\n\nCommit anyway?`)) return
+    }
     const ok = await onCommit(
       message.trim(),
       included.map((c) => c.path)
@@ -282,7 +313,10 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
             <div className="changes-head">
               <span>Not part of the site</span>
             </div>
-            <p className="outside-note">New files beside the site. They are never committed.</p>
+            <p className="outside-note">
+              Files the site does not use, so they are not committed. Move them somewhere else, or
+              add them if they belong to the site.
+            </p>
             {status.outside.map((entry) => (
               <div key={entry.path} className="tree-item change-row">
                 {entry.isDir ? (
@@ -302,9 +336,31 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                     <span className="outside-count"> {plural(entry.files, 'file')}</span>
                   )}
                 </span>
-                <Tip text="Stop listing it here. Nothing is deleted.">
-                  <button className="outside-ignore" onClick={() => onIgnore(entry.path)}>
-                    Ignore
+                <Tip text="Show in Finder">
+                  <button
+                    className="change-discard"
+                    aria-label="Show in Finder"
+                    onClick={() => onOutside(entry, 'reveal')}
+                  >
+                    <FolderOpen size={14} />
+                  </button>
+                </Tip>
+                <Tip text="Add to the site…">
+                  <button
+                    className="change-discard"
+                    aria-label="Add to the site"
+                    onClick={() => onOutside(entry, 'include')}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </Tip>
+                <Tip text="Move to Trash…">
+                  <button
+                    className="change-discard"
+                    aria-label="Move to Trash"
+                    onClick={() => onOutside(entry, 'trash')}
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </Tip>
               </div>
@@ -545,10 +601,23 @@ function ChangeTree(props: TreeProps): React.JSX.Element {
         <span className="tree-name" title={change.path}>
           {name}
         </span>
+        {change.warning && (
+          <Tip text={change.warning}>
+            <span className="change-warning" aria-label={change.warning}>
+              <TriangleAlert size={14} />
+            </span>
+          </Tip>
+        )}
         <span className={`change-mark ${change.kind}`} title={change.kind}>
           {kindMark[change.kind]}
         </span>
-        <Tip text={change.kind === 'untracked' ? 'Move to Trash' : 'Discard changes'}>
+        <Tip
+          text={
+            change.kind === 'untracked' || change.kind === 'added'
+              ? 'Move to Trash'
+              : 'Discard changes'
+          }
+        >
           <button
             className="change-discard"
             aria-label="Discard"

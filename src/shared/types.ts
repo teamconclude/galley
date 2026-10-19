@@ -102,6 +102,15 @@ export interface Change {
   path: string
   kind: ChangeKind
   from?: string
+  // Why a new file looks out of place, for the editor.
+  warning?: string
+}
+
+// Where a file dropped into a folder should go, and what is wrong with the folder.
+export interface Placement {
+  warning: string | null
+  // A better folder, e.g. the images folder for an image dropped among the pages.
+  home: string | null
 }
 
 // One hop in the chain of shared branches, e.g. develop to staging.

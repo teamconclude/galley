@@ -7,6 +7,7 @@ import type {
   HugoStatus,
   Identity,
   RepoInfo,
+  OutsideEntry,
   ReleaseStep,
   Preferences,
   SearchMatch,
@@ -75,6 +76,25 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 const binaryFile = /\.(pdf|zip|gz|woff2?|ttf|otf|eot|mp4|mov|webm|mp3)$/i
 const markdownFile = /\.(md|markdown)$/i
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+// How to speak of an entry outside the site: a file, or a folder and what it holds.
+const outsideWords = (entry: OutsideEntry): { what: string } => ({
+  what: !entry.isDir
+    ? 'it'
+    : entry.files === 1
+      ? 'the file in it'
+      : `the ${entry.files} files in it`
+})
+const isNew = (change: Change): boolean => change.kind === 'untracked' || change.kind === 'added'
+// The name a dropped file gets, as Repo.importFile makes it.
+const importName = (name: string): string => {
+  const dot = name.lastIndexOf('.')
+  const [base, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
+  const clean = base
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  return (clean || 'file') + ext.toLowerCase()
+}
 // A cheap fingerprint of a text, to notice changes without carrying the text around.
 function hashText(text: string): number {
   let h = text.length
@@ -150,6 +170,10 @@ export default function App(): React.JSX.Element | null {
     'new-branch' | 'move' | 'switch-branch' | 'identity' | 'merge' | null
   >(null)
   const [releaseDialog, setReleaseDialog] = useState<ReleaseStep | null>(null)
+  const [outsideDialog, setOutsideDialog] = useState<{
+    entry: OutsideEntry
+    action: 'include' | 'trash'
+  } | null>(null)
   const [prefs, setPrefs] = useState<Preferences | null>(null)
   const claudeOn = prefs?.claude !== false
   const [showSettings, setShowSettings] = useState(false)
@@ -337,10 +361,17 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
+  // Files dropped on the tree land in that folder, except images dropped among the pages,
+  // which go to the images folder of the section; anything else out of place is asked about.
   const dropFiles = async (dir: string, files: File[]): Promise<void> => {
     try {
-      for (const f of files) await window.api.repo.importFile(window.api.files.pathFor(f), dir)
-      reveal(inDir(dir, 'x'))
+      let last: string | null = null
+      for (const f of files) {
+        const { warning, home } = await window.api.repo.placement(inDir(dir, importName(f.name)))
+        if (warning && !home && !window.confirm(`${warning}\n\nAdd it here anyway?`)) continue
+        last = await window.api.repo.importFile(window.api.files.pathFor(f), home ?? dir)
+      }
+      if (last) await open(last)
     } catch (e) {
       fail(e)
     }
@@ -486,13 +517,12 @@ export default function App(): React.JSX.Element | null {
   }
 
   const discardChange = async (change: Change): Promise<void> => {
-    const question =
-      change.kind === 'untracked'
-        ? `Move the new file ${change.path} to the Trash?`
-        : `Discard the changes to ${change.path}?`
+    const question = isNew(change)
+      ? `Move the new file ${change.path} to the Trash?`
+      : `Discard the changes to ${change.path}?`
     if (!window.confirm(question)) return
     await save()
-    await gitAction(() => window.api.git.discard(change.path, change.kind === 'untracked'))
+    await gitAction(() => window.api.git.discard(change.path, isNew(change)))
     if (diff?.change.path === change.path) setDiff(null)
     if (file?.path === change.path) await reopen(change.path)
   }
@@ -502,7 +532,7 @@ export default function App(): React.JSX.Element | null {
     if (!window.confirm(question)) return
     await save()
     for (const change of changes) {
-      await gitAction(() => window.api.git.discard(change.path, change.kind === 'untracked'))
+      await gitAction(() => window.api.git.discard(change.path, isNew(change)))
     }
     setDiff(null)
     if (file) await reopen(file.path)
@@ -836,7 +866,11 @@ export default function App(): React.JSX.Element | null {
                 onNewBranch={() => setGitDialog('new-branch')}
                 onMerge={() => setGitDialog('merge')}
                 onMove={() => setGitDialog('move')}
-                onIgnore={(path) => void gitAction(() => window.api.git.ignore(path))}
+                onOutside={(entry, action) =>
+                  action === 'reveal'
+                    ? void window.api.repo.reveal(entry.path)
+                    : setOutsideDialog({ entry, action })
+                }
                 onRelease={setReleaseDialog}
                 onPublish={setReleaseDialog}
                 onSwitchBranch={() => void openSwitchBranch()}
@@ -1083,6 +1117,47 @@ export default function App(): React.JSX.Element | null {
               me={identity}
               summary
             />
+          </ConfirmDialog>
+        )}
+        {outsideDialog?.action === 'include' && (
+          <ConfirmDialog
+            title={`Add ${outsideDialog.entry.path} to the site?`}
+            action="Add anyway"
+            onCancel={() => setOutsideDialog(null)}
+            onConfirm={() => {
+              const { path } = outsideDialog.entry
+              setOutsideDialog(null)
+              void gitAction(() => window.api.git.include(path))
+            }}
+          >
+            <p className="dialog-note">
+              {outsideDialog.entry.path} is not one of the site&apos;s folders, so the site does not
+              use {outsideWords(outsideDialog.entry).what}. Once committed,{' '}
+              {outsideWords(outsideDialog.entry).what} would be on GitHub for everyone working on
+              the site.
+            </p>
+            <p className="dialog-note">
+              Drafts, documents and screenshots are better kept outside the site, for example in
+              Documents. Only add this if it was asked for.
+            </p>
+          </ConfirmDialog>
+        )}
+        {outsideDialog?.action === 'trash' && (
+          <ConfirmDialog
+            title={`Move ${outsideDialog.entry.path} to the Trash?`}
+            action="Move to Trash"
+            onCancel={() => setOutsideDialog(null)}
+            onConfirm={() => {
+              const { path } = outsideDialog.entry
+              setOutsideDialog(null)
+              void gitAction(() => window.api.repo.trash(path))
+            }}
+          >
+            <p className="dialog-note">
+              {outsideDialog.entry.isDir
+                ? `${outsideDialog.entry.path} and ${outsideWords(outsideDialog.entry).what} go to the Trash, where you can get them back until the Trash is emptied. To keep them, use Show in Finder and move the folder out of the site's folder.`
+                : `${outsideDialog.entry.path} goes to the Trash, where you can get it back until the Trash is emptied. To keep it, use Show in Finder and move it out of the site's folder.`}
+            </p>
           </ConfirmDialog>
         )}
         {showSettings && prefs && (
