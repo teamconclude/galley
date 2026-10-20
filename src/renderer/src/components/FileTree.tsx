@@ -57,27 +57,27 @@ export default function FileTree(props: Props): React.JSX.Element {
         <span className="tree-actions">
           <Tip text="Find page (⌘P)">
             <button aria-label="Find page" onClick={onFindPage}>
-              <Search size={16} />
+              <Search size={18} />
             </button>
           </Tip>
           <Tip text="New page">
             <button aria-label="New page" onClick={onNewPage}>
-              <FilePlus size={16} />
+              <FilePlus size={18} />
             </button>
           </Tip>
           <Tip text="New folder">
             <button aria-label="New folder" onClick={onNewFolder}>
-              <FolderPlus size={16} />
+              <FolderPlus size={18} />
             </button>
           </Tip>
           <Tip text="Refresh">
             <button aria-label="Refresh" onClick={onRefresh}>
-              <RefreshCw size={16} />
+              <RefreshCw size={18} />
             </button>
           </Tip>
           <Tip text="Collapse all">
             <button aria-label="Collapse all" onClick={onCollapseAll}>
-              <ChevronsDownUp size={16} />
+              <ChevronsDownUp size={18} />
             </button>
           </Tip>
           <Tip text={showTitles ? 'Hide page titles' : 'Show page titles'}>
@@ -86,7 +86,7 @@ export default function FileTree(props: Props): React.JSX.Element {
               className={showTitles ? 'on' : ''}
               onClick={onToggleTitles}
             >
-              <Heading size={16} />
+              <Heading size={18} />
             </button>
           </Tip>
           <Tip text={showAll ? 'Show content files only' : 'Show all files'}>
@@ -95,7 +95,7 @@ export default function FileTree(props: Props): React.JSX.Element {
               className={showAll ? 'on' : ''}
               onClick={onToggleShowAll}
             >
-              {showAll ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showAll ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </Tip>
         </span>
@@ -222,7 +222,7 @@ function Children(props: ChildrenProps): React.JSX.Element {
               {titled && page?.title ? (
                 <span className="tree-label">
                   <span className="tree-name">{entry.name}</span>
-                  <span className="tree-title">{page.title}</span>
+                  <span className="tree-page-title">{page.title}</span>
                 </span>
               ) : (
                 <span className="tree-name">{entry.name}</span>

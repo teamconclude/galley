@@ -249,7 +249,15 @@ button.primary:disabled:hover {
   letter-spacing: 0.04em;
 }
 
+.tree-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tree-actions {
+  flex: none;
   display: flex;
   gap: 2px;
 }
@@ -257,7 +265,7 @@ button.primary:disabled:hover {
 .tree-actions button {
   border: none;
   background: transparent;
-  padding: 2px;
+  padding: 3px;
   line-height: 0;
   border-radius: 4px;
   color: var(--text-muted);
@@ -349,7 +357,7 @@ button.primary:disabled:hover {
   line-height: 17px;
 }
 
-.tree-title {
+.tree-page-title {
   font-size: 11px;
   line-height: 14px;
   color: var(--text-muted);
