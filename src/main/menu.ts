@@ -144,7 +144,8 @@ const siteCommands: MenuCommand[] = [
   'new-page',
   'new-page-from-document',
   'new-folder',
-  'add-images'
+  'add-images',
+  'find-page'
 ]
 const pageCommands: MenuCommand[] = [
   'save',
