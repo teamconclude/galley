@@ -113,8 +113,8 @@ them to the Trash, or add them after a warning. New files in odd places, a docum
 the pages or a file name with spaces, are marked and left out of the commit until ticked,
 and images dropped among the pages go to the section's images folder.
 
-**Review links.** Once a branch is on GitHub, the share button at the top right copies a
-link to it and the open page, e.g.
+**Review links.** The share button at the top right copies a link to the current branch
+and the open page, sending the branch to GitHub first if it is not there yet, e.g.
 `https://conclude.io/galley/open/?branch=buket/pylon&page=content/compare/pylon.md`. The
 page there hands it to `galley://open`, which opens the colleague's Galley; pull requests
 Galley opens carry the link too. Galley first shows the branch's commits and authors, then

@@ -2647,3 +2647,7 @@ body.dragging .terminal-host {
 .share-popover span {
   color: var(--text-muted);
 }
+
+.share-popover .share-warning {
+  color: var(--yellow5);
+}

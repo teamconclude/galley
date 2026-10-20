@@ -270,8 +270,9 @@ along, so check with your colleagues before publishing their work.
 ## Sharing work for review
 
 The share button at the top right copies a review link to your branch and the page you
-have open. Paste it in Slack, or wherever a colleague will see it. The button is greyed
-out until your branch is on GitHub; commit once, and it works.
+have open. Paste it in Slack, or wherever a colleague will see it. If your branch, or your
+latest commits, are not on GitHub yet, Galley sends them there first, so your colleague
+sees what you see. Changes you have not committed are not included; commit them first.
 
 ![The share button's confirmation, with the copied link](images/share.png)
 

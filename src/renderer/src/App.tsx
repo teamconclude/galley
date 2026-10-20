@@ -34,7 +34,7 @@ import {
 import Frontmatter from './components/Frontmatter'
 import PageFinder from './components/PageFinder'
 import ReviewDialog from './components/ReviewDialog'
-import ShareButton from './components/ShareButton'
+import ShareButton, { type Shared } from './components/ShareButton'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import { imagePath, imageUrl, sectionImageFolder, useSiteInfo } from './lib/site'
@@ -763,14 +763,26 @@ export default function App(): React.JSX.Element | null {
 
   // A link to the branch on GitHub, and to the open page, for a colleague to review;
   // copied, and returned to show what was copied.
-  const shareReview = async (): Promise<string | null> => {
-    if (!gitStatus?.branch || !gitStatus.upstream) return null
-    const repoName = gitStatus.remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
+  // A branch GitHub lacks, or commits it has not had yet, are sent first, so the link
+  // opens what the editor sees.
+  const shareReview = async (): Promise<Shared | null> => {
+    const status = gitStatus
+    if (!status?.branch) return null
+    const behindGitHub = !status.upstream || status.ahead > 0
+    const pushed = behindGitHub && !status.protected
+    if (pushed) {
+      try {
+        await window.api.git.push()
+      } catch (e) {
+        fail(e)
+        return null
+      }
+    }
+    const repoName = status.remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
     const page = file?.path.startsWith(site.contentDir + '/') ? file.path : null
-    const branch = gitStatus.upstream.replace(/^origin\//, '')
-    const link = makeReviewLink({ repo: repoName ?? null, branch, page })
+    const link = makeReviewLink({ repo: repoName ?? null, branch: status.branch, page })
     await window.api.clipboardWrite(link)
-    return link
+    return { link, pushed }
   }
 
   const openSwitchBranch = async (): Promise<void> => {
