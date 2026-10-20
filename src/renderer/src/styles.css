@@ -319,6 +319,11 @@ button.primary:disabled:hover {
   text-overflow: ellipsis;
 }
 
+/* Folders stand out from the pages and files in them. */
+.tree-item.folder .tree-name {
+  font-weight: 600;
+}
+
 /* A page in a content folder: its file name, and its title below. */
 .tree-item.two-line {
   height: auto;

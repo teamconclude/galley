@@ -181,6 +181,7 @@ function Children(props: ChildrenProps): React.JSX.Element {
           ? [titled ? null : page.title, stateDetail(page)].filter(Boolean).join('\n') || undefined
           : undefined
         if (titled && page?.title) classes.push('two-line')
+        if (entry.isDir) classes.push('folder')
         return (
           <div key={entry.path}>
             <div
