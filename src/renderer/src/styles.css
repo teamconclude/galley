@@ -2345,7 +2345,8 @@ body.dragging .terminal-host {
   gap: 6px;
 }
 
-.dialog.dropping {
+.dialog.dropping,
+.modal.dropping {
   outline: 2px dashed var(--accent);
   outline-offset: -6px;
 }

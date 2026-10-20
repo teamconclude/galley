@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ComponentSchema, DataLists, SiteInfo, Snippet } from '../../../shared/types'
 import { emptyLists, SchemaContext, type Schemas } from '../lib/contexts'
 import { setImagesUrl, setKeys } from '../lib/schema'
+import { imageFile, imagePath, imageUrl } from '../lib/site'
 
 interface Props {
   repoPath: string
@@ -66,6 +67,15 @@ export function SchemaProvider({ repoPath, site, page, children }: Props): React
         const path = await window.api.repo.importImage(dir)
         if (path) setImages(await window.api.repo.images())
         return path
+      },
+      importFiles: async (files, dir) => {
+        const urls: string[] = []
+        for (const file of files.filter((f) => imageFile.test(f.name))) {
+          const from = window.api.files.pathFor(file)
+          urls.push(imageUrl(site, await window.api.repo.importFile(from, imagePath(site, dir))))
+        }
+        if (urls.length > 0) setImages(await window.api.repo.images())
+        return urls
       }
     }),
     [site, components, lists, snippets, images, page]

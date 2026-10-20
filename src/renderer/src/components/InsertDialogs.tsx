@@ -3,9 +3,7 @@ import type { ImageValues, LinkValues } from '../lib/inline'
 import { Dialog } from './Dialogs'
 import ImagePicker from './ImagePicker'
 import { useSchemas } from '../lib/contexts'
-import { imagePath, imageUrl, isImageUrl, uploadFolder } from '../lib/site'
-
-const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
+import { imageFile, imagePath, isImageUrl, uploadFolder } from '../lib/site'
 
 interface LinkProps {
   initial: LinkValues
@@ -57,7 +55,7 @@ interface ImageProps {
 }
 
 export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.JSX.Element {
-  const { site, page, importImage } = useSchemas()
+  const { site, page, importImage, importFiles } = useSchemas()
   const [path, setPath] = useState(initial.path)
   const [alt, setAlt] = useState(initial.alt)
   const [picking, setPicking] = useState(false)
@@ -68,12 +66,8 @@ export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.
   }
   const drop = async (files: File[]): Promise<void> => {
     const file = files.find((f) => imageFile.test(f.name))
-    if (!file) return
-    const rel = await window.api.repo.importFile(
-      window.api.files.pathFor(file),
-      imagePath(site, folder)
-    )
-    setPath(imageUrl(site, rel))
+    const [url] = file ? await importFiles([file], folder) : []
+    if (url) setPath(url)
   }
   return (
     <>

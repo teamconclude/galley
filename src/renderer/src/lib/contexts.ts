@@ -20,6 +20,8 @@ export interface Schemas {
   // The open page, whose section decides where uploaded pictures go.
   page: string | null
   importImage: (dir: string) => Promise<string | null>
+  // Copies dropped pictures into an images folder; returns their addresses.
+  importFiles: (files: File[], dir: string) => Promise<string[]>
 }
 
 export const emptyLists: DataLists = {}
@@ -32,7 +34,8 @@ export const SchemaContext = createContext<Schemas>({
   snippets: [],
   images: [],
   page: null,
-  importImage: async () => null
+  importImage: async () => null,
+  importFiles: async () => []
 })
 
 export const useSchemas = (): Schemas => useContext(SchemaContext)

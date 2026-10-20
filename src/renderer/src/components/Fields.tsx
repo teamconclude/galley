@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { setValue, type Path } from '../lib/yamlEdit'
 import { useEdit, useSchemas } from '../lib/contexts'
-import { imagePath, imageUrl, isImageUrl, uploadFolder } from '../lib/site'
+import { imageFile, imagePath, isImageUrl, uploadFolder } from '../lib/site'
 import type { EditorView } from '@codemirror/view'
 import { useActiveEditor } from '../lib/activeEditor'
 import Editor from './Editor'
@@ -172,7 +172,7 @@ export function ChoiceListControl({
 export function ImageControl({ path, value }: ControlProps): React.JSX.Element {
   const edit = useEdit()
   const [open, setOpen] = useState(false)
-  const { site, page, importImage } = useSchemas()
+  const { site, page, importImage, importFiles } = useSchemas()
   const text = asText(value)
   const set = (v: string): void => edit((doc) => setValue(doc, path, v))
   const folder = uploadFolder(site, page, text)
@@ -181,16 +181,11 @@ export function ImageControl({ path, value }: ControlProps): React.JSX.Element {
     if (url) set(url)
   }
   const drop = async (e: React.DragEvent): Promise<void> => {
-    const file = [...e.dataTransfer.files].find((f) =>
-      /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(f.name)
-    )
+    const file = [...e.dataTransfer.files].find((f) => imageFile.test(f.name))
     if (!file) return
     e.preventDefault()
-    const rel = await window.api.repo.importFile(
-      window.api.files.pathFor(file),
-      imagePath(site, folder)
-    )
-    set(imageUrl(site, rel))
+    const [url] = await importFiles([file], folder)
+    if (url) set(url)
   }
   return (
     <div

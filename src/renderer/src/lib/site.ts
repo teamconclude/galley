@@ -23,6 +23,8 @@ export function useSiteInfo(repoPath: string | null): SiteInfo {
   return site
 }
 
+export const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
+
 // An image's URL path as pages write it, and the repository path behind it.
 export const imagePath = (site: SiteInfo, url: string): string =>
   site.imagesDir + url.slice(site.imagesUrl.length)

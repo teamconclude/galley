@@ -15,7 +15,7 @@ const allFolders = ''
 // Pictures to choose from: the ones this branch brings first, as those are usually what
 // the page is waiting for, then one folder at a time, starting at the page's section.
 export default function ImagePicker({ value, onPick, onClose }: Props): React.JSX.Element {
-  const { site, images, page, importImage } = useSchemas()
+  const { site, images, page, importImage, importFiles } = useSchemas()
   const [query, setQuery] = useState('')
   const [added, setAdded] = useState<string[]>([])
   const folders = useMemo(
@@ -58,6 +58,22 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
   const elsewhere = folder === allFolders ? 0 : images.filter((p) => matches(p)).length
   const shown = matching.slice(0, limit)
 
+  // Pictures dropped on the picker go into the folder it shows; a single one is chosen.
+  // Drag events stop here, so that a field or dialog behind the picker does not take them.
+  const [over, setOver] = useState(0)
+  const dragging = (e: React.DragEvent): boolean => {
+    if (!e.dataTransfer.types.includes('Files')) return false
+    e.preventDefault()
+    e.stopPropagation()
+    return true
+  }
+  const drop = async (e: React.DragEvent): Promise<void> => {
+    if (!dragging(e)) return
+    setOver(0)
+    const urls = await importFiles([...e.dataTransfer.files], folder || section)
+    if (urls.length === 1) onPick(urls[0])
+  }
+
   const upload = async (): Promise<void> => {
     const path = await importImage(folder === allFolders ? section : folder)
     if (path) onPick(path)
@@ -84,7 +100,14 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
   // field that opened it.
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={'modal' + (over > 0 ? ' dropping' : '')}
+        onClick={(e) => e.stopPropagation()}
+        onDragEnter={(e) => dragging(e) && setOver((n) => n + 1)}
+        onDragLeave={(e) => dragging(e) && setOver((n) => Math.max(0, n - 1))}
+        onDragOver={(e) => void dragging(e)}
+        onDrop={(e) => void drop(e)}
+      >
         <div className="pane-bar">
           <input
             autoFocus
@@ -107,7 +130,7 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
           </select>
           <button
             onClick={() => void upload()}
-            title={`Copies a picture from your computer into ${imagePath(site, folder || section)}`}
+            title={`Copies a picture from your computer into ${imagePath(site, folder || section)}. Pictures dropped onto this window go there too.`}
           >
             Upload…
           </button>
