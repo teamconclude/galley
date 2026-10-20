@@ -862,7 +862,7 @@ export default function App(): React.JSX.Element | null {
             break
         }
       }),
-    [save, toggleDetached, find, findInSite]
+    [save, toggleDetached, find, findInSite, claudeOn]
   )
 
   if (repo === undefined) return null
