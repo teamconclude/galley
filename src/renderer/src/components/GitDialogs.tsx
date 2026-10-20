@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Identity } from '../../../shared/types'
+import type { BranchInfo, Identity } from '../../../shared/types'
 
 interface FrameProps {
   title: string
@@ -129,6 +129,95 @@ export function SwitchBranchDialog(props: SwitchBranchProps): React.JSX.Element 
         </select>
       </label>
       <p className="dialog-note">Commit or discard your changes first if switching fails.</p>
+    </Frame>
+  )
+}
+
+interface DeleteBranchProps {
+  branches: string[]
+  current: string
+  base: string
+  onSubmit: (name: string, onGitHub: boolean) => void
+  onCancel: () => void
+}
+
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+
+// Deleting a branch, e.g. a playground that is done with. It says what goes with it, and
+// deletes the copy on GitHub too unless colleagues' work is on the branch.
+export function DeleteBranchDialog(props: DeleteBranchProps): React.JSX.Element {
+  const { branches, current, base, onSubmit, onCancel } = props
+  const [name, setName] = useState(branches.includes(current) ? current : (branches[0] ?? ''))
+  // What deleting is about to remove, for the branch it was looked up for.
+  const [loaded, setLoaded] = useState<{ name: string; info: BranchInfo } | null>(null)
+  const info = loaded?.name === name ? loaded.info : null
+  const [onGitHub, setOnGitHub] = useState(false)
+  useEffect(() => {
+    if (!name) return
+    let live = true
+    void window.api.git.branchInfo(name).then((found) => {
+      if (!live) return
+      setLoaded({ name, info: found })
+      setOnGitHub(found.onGitHub && found.others.length === 0)
+    })
+    return () => {
+      live = false
+    }
+  }, [name])
+  return (
+    <Frame
+      title="Delete branch"
+      submitLabel="Delete"
+      canSubmit={info !== null}
+      onSubmit={() => onSubmit(name, onGitHub)}
+      onCancel={onCancel}
+    >
+      {branches.length === 0 ? (
+        <p className="dialog-note">
+          You have no branches of your own to delete. Only branches named with your prefix can be
+          deleted here.
+        </p>
+      ) : (
+        <>
+          <label className="dialog-field">
+            <span>Branch</span>
+            <select autoFocus value={name} onChange={(e) => setName(e.target.value)}>
+              {branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </label>
+          {info && (
+            <>
+              <p className="dialog-note">
+                {info.commits === 0
+                  ? `Everything on ${name} is in ${base}, so nothing is lost.`
+                  : `${plural(info.commits, 'commit')} on ${name} ${info.commits === 1 ? 'is' : 'are'} not in ${base} and will be lost.`}
+                {name === current && ` You are on ${name}; Galley switches to ${base} first.`}
+              </p>
+              {info.onGitHub && (
+                <label className="dialog-check">
+                  <input
+                    type="checkbox"
+                    checked={onGitHub}
+                    onChange={(e) => setOnGitHub(e.target.checked)}
+                  />
+                  <span>
+                    Delete it on GitHub too
+                    <small>
+                      {info.others.length > 0
+                        ? `It holds work by ${info.others.join(', ')}, which this removes for everyone.`
+                        : 'Review links to it stop working.'}
+                    </small>
+                  </span>
+                </label>
+              )}
+            </>
+          )}
+        </>
+      )}
     </Frame>
   )
 }

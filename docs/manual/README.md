@@ -220,6 +220,12 @@ Always work on your own branch. If you are on `develop`, Galley says so: click
 `develop` by mistake, **Move to a new branch…** moves those commits to a branch of yours.
 The ⋯ menu next to the branch name creates branches and switches between them.
 
+**Delete branch…** in the same menu removes a branch you no longer need, such as one you
+tried something out on. Only your own branches, the ones starting with your name, can be
+deleted. Galley says first how many commits would be lost, and deletes the branch on GitHub
+too unless colleagues' work is on it. If you are on the branch, Galley moves you to
+`develop` first.
+
 ### Committing
 
 1. Click a file to see what changed: removed text in red, added text in green, pictures

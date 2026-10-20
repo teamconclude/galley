@@ -217,6 +217,14 @@ export interface GitStatus {
   review: Review | null
 }
 
+// What deleting a branch would remove: its commits not yet in the base branch, whether
+// GitHub has a copy, and who else made commits on it.
+export interface BranchInfo {
+  commits: number
+  onGitHub: boolean
+  others: string[]
+}
+
 export interface Review {
   branch: string
   from: string

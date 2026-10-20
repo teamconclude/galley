@@ -1,4 +1,5 @@
 import type {
+  BranchInfo,
   Commit,
   CommitRange,
   Placement,
@@ -85,6 +86,11 @@ export interface Api {
     branches: () => Promise<string[]>
     createBranch: (name: string) => Promise<void>
     switchBranch: (name: string) => Promise<void>
+    // Branches in this checkout that can be deleted, what deleting one would remove, and
+    // deleting it, on GitHub too when asked.
+    ownBranches: () => Promise<string[]>
+    branchInfo: (name: string) => Promise<BranchInfo>
+    deleteBranch: (name: string, onGitHub: boolean) => Promise<void>
     commit: (message: string, paths: string[]) => Promise<void>
     push: () => Promise<void>
     pull: () => Promise<void>

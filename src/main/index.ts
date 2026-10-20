@@ -358,6 +358,11 @@ function registerIpc(): void {
   ipcMain.handle('git:branches', () => currentGit().branches())
   ipcMain.handle('git:createBranch', (_e, name: string) => currentGit().createBranch(name))
   ipcMain.handle('git:switchBranch', (_e, name: string) => currentGit().switchBranch(name))
+  ipcMain.handle('git:ownBranches', () => currentGit().ownBranches())
+  ipcMain.handle('git:branchInfo', (_e, name: string) => currentGit().branchInfo(name))
+  ipcMain.handle('git:deleteBranch', (_e, name: string, onGitHub: boolean) =>
+    currentGit().deleteBranch(name, onGitHub)
+  )
   ipcMain.handle('git:commit', (_e, msg: string, paths: string[]) =>
     currentGit().commit(msg, paths)
   )

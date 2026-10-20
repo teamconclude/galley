@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import { extname, join, resolve } from 'path'
 import type {
+  BranchInfo,
   Review,
   Change,
   ChangeKind,
@@ -16,6 +17,7 @@ import type {
   SiteInfo
 } from '../shared/types'
 import { splitDiff } from '../shared/diff'
+import { branchPrefix } from '../shared/branchPrefix'
 import { reviewLink } from '../shared/reviewLink'
 import { publish } from './github'
 import { environmentSite } from './hugoConfig'
@@ -469,6 +471,71 @@ export class Git {
     return this.op('Switching branch…', async () => {
       await this.git(['switch', name])
       await this.followShared()
+    })
+  }
+
+  // The editor's own branches, here or on GitHub, which they may delete: those named with
+  // their prefix. Without a commit identity there are none.
+  async ownBranches(): Promise<string[]> {
+    const email = (await this.identity())?.email
+    if (!email) return []
+    const prefix = branchPrefix(email)
+    return (await this.branches()).filter((b) => b.startsWith(prefix) && b !== prefix)
+  }
+
+  async branchInfo(name: string): Promise<BranchInfo> {
+    if (!(await this.validBranch(name))) throw new Error(`${name} is not a branch name`)
+    const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
+    const base = await this.base(remotes)
+    const onGitHub = remotes.includes(`origin/${name}`)
+    const local = await this.hasLocal(name)
+    const tips = [...(local ? [`refs/heads/${name}`] : []), ...(onGitHub ? [`origin/${name}`] : [])]
+    const authors = await this.lines([
+      'log',
+      '--format=%ae%x1f%an',
+      ...tips,
+      '--not',
+      `origin/${base}`,
+      '--'
+    ])
+    const me = (await this.identity())?.email.toLowerCase()
+    const others = new Set<string>()
+    for (const line of authors) {
+      const [email, author] = line.split('\x1f')
+      if (email.toLowerCase() !== me) others.add(author)
+    }
+    return { commits: authors.length, onGitHub, others: [...others].sort() }
+  }
+
+  private hasLocal(name: string): Promise<boolean> {
+    return this.git(['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]).then(
+      () => true,
+      () => false
+    )
+  }
+
+  // Removes a branch here and, when asked, on GitHub. The branch in use is left for the
+  // base branch first, which needs the checkout free of edits.
+  async deleteBranch(name: string, onGitHub: boolean): Promise<void> {
+    if (!(await this.ownBranches()).includes(name)) {
+      throw new Error(`${name} is not one of your branches, so Galley does not delete it`)
+    }
+    const { branch, base, changes } = await this.ready()
+    if (name === branch && changes.length > 0) {
+      throw new Error(`Commit or discard your changes first, then delete ${name}`)
+    }
+    return this.op(`Deleting ${name}…`, async () => {
+      if (name === branch) {
+        await this.git(['switch', base])
+        await this.followShared()
+      }
+      if (await this.hasLocal(name)) await this.git(['branch', '-D', name])
+      if (onGitHub) await this.git(['push', 'origin', '--delete', name])
+      const settings = loadSettings()
+      if (settings.review?.repo === this.path && settings.review.branch === name) {
+        delete settings.review
+        saveSettings(settings)
+      }
     })
   }
 

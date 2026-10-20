@@ -41,6 +41,7 @@ interface Props {
   onFetch: () => void
   onNewBranch: () => void
   onSwitchBranch: () => void
+  onDeleteBranch: () => void
   onMerge: () => void
   onMove: () => void
   onOutside: (entry: OutsideEntry, action: 'reveal' | 'include' | 'trash') => void
@@ -73,7 +74,7 @@ function pullRequestUrl(status: GitStatus): string | null {
 
 export default function ChangesPanel(props: Props): React.JSX.Element {
   const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
-  const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch } = props
+  const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch, onDeleteBranch } = props
   const { onMerge, onMove, onOutside, onRelease, onPublish } = props
   const { onContinue, onCancelRebase, onAskClaude } = props
   const [message, setMessage] = useState('')
@@ -178,6 +179,14 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
               }}
             >
               Switch branch…
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false)
+                onDeleteBranch()
+              }}
+            >
+              Delete branch…
             </button>
             <button
               onClick={() => {

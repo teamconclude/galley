@@ -31,7 +31,8 @@ import {
   ConfirmDialog,
   IdentityDialog,
   NewBranchDialog,
-  SwitchBranchDialog
+  SwitchBranchDialog,
+  DeleteBranchDialog
 } from './components/GitDialogs'
 import Frontmatter from './components/Frontmatter'
 import PageFinder from './components/PageFinder'
@@ -52,6 +53,7 @@ import SettingsDialog from './components/SettingsDialog'
 import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
+import { branchPrefix } from '../../shared/branchPrefix'
 import { askClaude } from './lib/claudeTerminal'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
@@ -192,7 +194,7 @@ export default function App(): React.JSX.Element | null {
   const [bodyView, setBodyView] = useState<EditorView | null>(null)
   const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
   const [gitDialog, setGitDialog] = useState<
-    'new-branch' | 'move' | 'switch-branch' | 'identity' | 'merge' | null
+    'new-branch' | 'move' | 'switch-branch' | 'delete-branch' | 'identity' | 'merge' | null
   >(null)
   const [releaseDialog, setReleaseDialog] = useState<ReleaseStep | null>(null)
   const [outsideDialog, setOutsideDialog] = useState<{
@@ -857,8 +859,23 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
-  const branchPrefix =
-    (identity?.email.split('@')[0] ?? 'me').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '/'
+  const openDeleteBranch = async (): Promise<void> => {
+    try {
+      setBranches(await window.api.git.ownBranches())
+      setGitDialog('delete-branch')
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  const deleteBranch = async (name: string, onGitHub: boolean): Promise<void> => {
+    await save()
+    await gitAction(() => window.api.git.deleteBranch(name, onGitHub))
+    setDiff(null)
+    if (file) await reopen(file.path)
+  }
+
+  const ownPrefix = branchPrefix(identity?.email)
 
   useEffect(
     () =>
@@ -1240,6 +1257,7 @@ export default function App(): React.JSX.Element | null {
                 onRelease={setReleaseDialog}
                 onPublish={setReleaseDialog}
                 onSwitchBranch={() => void openSwitchBranch()}
+                onDeleteBranch={() => void openDeleteBranch()}
               />
             )}
           </aside>
@@ -1463,7 +1481,7 @@ export default function App(): React.JSX.Element | null {
         {gitDialog === 'new-branch' && gitStatus && (
           <NewBranchDialog
             base={gitStatus.base}
-            prefix={branchPrefix}
+            prefix={ownPrefix}
             dirty={gitStatus.changes.length > 0}
             onCancel={() => setGitDialog(null)}
             onSubmit={(name) => {
@@ -1475,7 +1493,7 @@ export default function App(): React.JSX.Element | null {
         {gitDialog === 'move' && gitStatus && (
           <NewBranchDialog
             base={gitStatus.base}
-            prefix={branchPrefix}
+            prefix={ownPrefix}
             dirty={false}
             note={`The ${plural(gitStatus.ahead, 'commit')} move to the new branch, and ${gitStatus.branch} goes back to what GitHub has. Uncommitted changes come along.`}
             onCancel={() => setGitDialog(null)}
@@ -1493,6 +1511,18 @@ export default function App(): React.JSX.Element | null {
             onSubmit={(name) => {
               setGitDialog(null)
               void switchBranch(name)
+            }}
+          />
+        )}
+        {gitDialog === 'delete-branch' && gitStatus && (
+          <DeleteBranchDialog
+            branches={branches}
+            current={gitStatus.branch}
+            base={gitStatus.base}
+            onCancel={() => setGitDialog(null)}
+            onSubmit={(name, onGitHub) => {
+              setGitDialog(null)
+              void deleteBranch(name, onGitHub)
             }}
           />
         )}
