@@ -41,6 +41,9 @@ converted to Markdown, with the same text and links; work from that file.
 async function writeSettings(hosts: string[]): Promise<void> {
   const inboxRule = `//${inbox().replace(/^\//, '')}/**`
   const settings = {
+    // The pane is white whatever theme the user's own Claude Code uses; a dark one draws
+    // some text in white there.
+    theme: 'light',
     permissions: {
       allow: [
         `Read(${inboxRule})`,
