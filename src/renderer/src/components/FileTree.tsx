@@ -216,7 +216,7 @@ function Children(props: ChildrenProps): React.JSX.Element {
                   <ChevronRight size={16} />
                 </span>
               ) : (
-                <FileIcon name={entry.name} />
+                <FileIcon name={entry.name} size={titled && page?.title ? 28 : 16} />
               )}
               {titled && page?.title ? (
                 <span className="tree-label">

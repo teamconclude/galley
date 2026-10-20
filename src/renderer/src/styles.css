@@ -328,7 +328,11 @@ button.primary:disabled:hover {
   align-items: flex-start;
 }
 
-.tree-item.two-line > svg,
+.tree-item.two-line > .file-icon {
+  align-self: center;
+}
+
+.tree-item.two-line > .tree-arrow,
 .tree-item.two-line > .page-badge {
   margin-top: 2px;
 }

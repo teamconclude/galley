@@ -43,8 +43,11 @@ const types: Record<string, [LucideIcon, string]> = {
   pdf: [FileType, '#cc3e44']
 }
 
-export default function FileIcon({ name }: { name: string }): React.JSX.Element {
+// Larger icons, e.g. for tree rows with a page title below the name, get a finer stroke.
+export default function FileIcon(props: { name: string; size?: number }): React.JSX.Element {
+  const { name, size = 16 } = props
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
   const [Glyph, color] = types[ext] ?? [File, '#6d8086']
-  return <Glyph className="file-icon" size={16} strokeWidth={1.75} color={color} aria-hidden />
+  const stroke = size > 20 ? 1.25 : 1.75
+  return <Glyph className="file-icon" size={size} strokeWidth={stroke} color={color} aria-hidden />
 }
