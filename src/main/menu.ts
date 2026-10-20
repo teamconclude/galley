@@ -1,8 +1,9 @@
 import { app, Menu, MenuItemConstructorOptions } from 'electron'
-import type { MenuCommand } from '../shared/types'
+import type { MenuCommand, MenuState } from '../shared/types'
 import { isDev } from './env'
 
 interface Actions {
+  about: () => void
   openRepo: () => void
   checkUpdates: () => void
   command: (command: MenuCommand) => void
@@ -14,11 +15,23 @@ export function buildMenu(actions: Actions): Menu {
   const devItems: MenuItemConstructorOptions[] = isDev
     ? [{ type: 'separator' }, { role: 'toggleDevTools' }]
     : []
+  // A File menu item that acts on the open site or page; see setMenuState.
+  const item = (
+    command: MenuCommand,
+    label: string,
+    accelerator?: string
+  ): MenuItemConstructorOptions => ({
+    id: command,
+    label,
+    accelerator,
+    enabled: false,
+    click: () => actions.command(command)
+  })
   const template: MenuItemConstructorOptions[] = [
     {
       label: app.name,
       submenu: [
-        { role: 'about' },
+        { label: 'About Galley', click: actions.about },
         { label: 'Check for updates…', click: actions.checkUpdates },
         { label: 'Setup…', click: () => actions.command('setup') },
         {
@@ -38,11 +51,23 @@ export function buildMenu(actions: Actions): Menu {
     },
     {
       label: 'File',
+      // No Close: Galley has one main window, and ⌘W closing it surprised editors who
+      // meant the page. The separate preview window handles ⌘W itself.
       submenu: [
-        { label: 'Open site checkout…', accelerator: 'CmdOrCtrl+O', click: actions.openRepo },
-        { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => actions.command('save') },
+        item('new-page', 'New Page…', 'CmdOrCtrl+N'),
+        item('new-page-from-document', 'New Page from Document…', 'CmdOrCtrl+Shift+N'),
+        item('new-folder', 'New Folder…'),
+        item('add-images', 'Add Images…'),
         { type: 'separator' },
-        { role: 'close' }
+        item('save', 'Save', 'CmdOrCtrl+S'),
+        item('duplicate-page', 'Duplicate Page…'),
+        item('rename-page', 'Rename Page…'),
+        item('trash-page', 'Move Page to Trash…'),
+        { type: 'separator' },
+        item('open-in-browser', 'Open in Browser'),
+        item('show-in-finder', 'Show in Finder'),
+        { type: 'separator' },
+        { label: 'Open Site Checkout…', accelerator: 'CmdOrCtrl+O', click: actions.openRepo }
       ]
     },
     {
@@ -111,4 +136,34 @@ export function buildMenu(actions: Actions): Menu {
     { role: 'windowMenu' }
   ]
   return Menu.buildFromTemplate(template)
+}
+
+const siteCommands: MenuCommand[] = [
+  'new-page',
+  'new-page-from-document',
+  'new-folder',
+  'add-images'
+]
+const pageCommands: MenuCommand[] = [
+  'save',
+  'duplicate-page',
+  'rename-page',
+  'trash-page',
+  'show-in-finder'
+]
+
+// Greys out the items that need an open site, an open page, or its preview.
+export function setMenuState(state: MenuState): void {
+  const menu = Menu.getApplicationMenu()
+  if (!menu) return
+  for (const id of siteCommands) {
+    const entry = menu.getMenuItemById(id)
+    if (entry) entry.enabled = state.site
+  }
+  for (const id of pageCommands) {
+    const entry = menu.getMenuItemById(id)
+    if (entry) entry.enabled = state.page
+  }
+  const browser = menu.getMenuItemById('open-in-browser')
+  if (browser) browser.enabled = state.preview
 }

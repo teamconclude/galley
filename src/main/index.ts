@@ -21,6 +21,7 @@ import type {
   Identity,
   Layout,
   MenuCommand,
+  MenuState,
   Preferences,
   PreviewMode,
   PreviewState,
@@ -35,7 +36,8 @@ import { clone, Git } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
 import { dropPlacement } from './placement'
-import { buildMenu } from './menu'
+import { showAbout } from './about'
+import { buildMenu, setMenuState } from './menu'
 import { Repo } from './repo'
 import { replace, search } from './search'
 import { loadSettings, prefs, saveSettings } from './settings'
@@ -193,6 +195,13 @@ function detachPreview(state: PreviewState): void {
   rememberBounds(previewWin, 'preview')
   // The page is Galley's own; its title would otherwise replace "Preview".
   previewWin.on('page-title-updated', (e) => e.preventDefault())
+  // The File menu has no Close, so the preview window closes on ⌘W itself.
+  previewWin.webContents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.meta && input.key.toLowerCase() === 'w') {
+      e.preventDefault()
+      previewWin?.close()
+    }
+  })
   previewWin.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
@@ -235,6 +244,16 @@ function registerIpc(): void {
   ipcMain.handle('repo:importUrl', (_e, url: string, dir: string, name: string) =>
     current().importUrl(url, dir, name)
   )
+  ipcMain.handle('repo:chooseImages', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Add images',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'] }
+      ]
+    })
+    return result.filePaths
+  })
   ipcMain.handle('repo:chooseDocument', async () => {
     const result = await dialog.showOpenDialog({
       title: 'New page from a document',
@@ -334,6 +353,7 @@ function registerIpc(): void {
     if (!Repo.isSite(dest)) throw new Error(`${basename(dest)} is not a Hugo site checkout`)
     openRepo(dest)
   })
+  ipcMain.on('menu:state', (_e, state: MenuState) => setMenuState(state))
   ipcMain.on('preview:detach', (_e, state: PreviewState) => detachPreview(state))
   ipcMain.on('preview:update', (_e, state: PreviewState) => {
     previewState = state
@@ -436,6 +456,7 @@ app.whenReady().then(() => {
   if (isDev) app.dock?.setIcon(icon)
   Menu.setApplicationMenu(
     buildMenu({
+      about: showAbout,
       openRepo: () => void chooseRepo(),
       checkUpdates: () => void updater.check(true),
       zoom,

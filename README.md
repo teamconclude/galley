@@ -49,7 +49,8 @@ pick **Clone** to get a fresh copy from GitHub. Galley remembers the checkout.
 
 **Pages.** The left side lists the files of the site. The `content` folder holds the pages,
 one markdown file each, grouped by section. The `+` button and the right-click menu create,
-rename, duplicate and delete files. A new page copies the settings of the newest page in
+rename, duplicate and delete files; the File menu does the same for the open page, and
+makes a page from a Word or Markdown document or adds images to the section. A new page copies the settings of the newest page in
 the same folder, so it fits its section. Dropping images onto the tree or into a text puts
 them under `static/images`.
 

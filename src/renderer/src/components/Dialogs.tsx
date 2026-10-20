@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import type { ImportedDocument } from '../../../shared/types'
 import { documentParts, slugify, type DocumentParts } from '../lib/newPage'
 
 interface DialogProps {
@@ -105,6 +106,8 @@ interface NewPageProps {
   directory: string
   // The address of the folder's pages, e.g. /blog/.
   sectionUrl: string
+  // A document already chosen, as with New Page from Document.
+  initial?: ImportedDocument
   onSubmit: (page: NewPage) => void
   onCancel: () => void
 }
@@ -118,17 +121,20 @@ const words = (text: string): number => text.split(/\s+/).filter(Boolean).length
 // The address follows the title until the editor changes it by hand. A document fills in
 // the title and becomes the page's text.
 export function NewPageDialog(props: NewPageProps): React.JSX.Element {
-  const { directory, sectionUrl, onSubmit, onCancel } = props
-  const [title, setTitle] = useState('')
-  const [slug, setSlug] = useState('')
-  const [slugEdited, setSlugEdited] = useState(false)
+  const { directory, sectionUrl, initial, onSubmit, onCancel } = props
+  const [start] = useState(() => (initial ? documentParts(initial.markdown) : null))
+  const [title, setTitle] = useState(start?.title ?? '')
+  const [slug, setSlug] = useState(start?.slug ?? '')
+  const [slugEdited, setSlugEdited] = useState(!!start?.slug)
   const [date, setDate] = useState(() => {
     const now = new Date()
     now.setMinutes(0, 0, 0)
     return localInput(now)
   })
-  const [document, setDocument] = useState<NewPage['document']>(null)
-  const [docName, setDocName] = useState('')
+  const [document, setDocument] = useState<NewPage['document']>(
+    start && initial ? { parts: start, images: initial.images } : null
+  )
+  const [docName, setDocName] = useState(initial?.name ?? '')
   const [keepNotes, setKeepNotes] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const shownSlug = slugEdited ? slug : slugify(title)

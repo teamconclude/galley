@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "Desktop editor for the conclude.io website",
   "main": "./out/main/index.js",
-  "author": "Conclude",
+  "author": "Conclude AS",
   "homepage": "https://conclude.io",
   "license": "BSD-3-Clause",
   "scripts": {

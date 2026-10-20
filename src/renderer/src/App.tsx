@@ -6,6 +6,8 @@ import type {
   SetupStatus,
   HugoStatus,
   Identity,
+  ImportedDocument,
+  MenuCommand,
   RepoInfo,
   OutsideEntry,
   ReleaseStep,
@@ -68,7 +70,7 @@ interface Target extends Selection {
 }
 
 type DialogState =
-  | { kind: 'new-page'; dir: string }
+  | { kind: 'new-page'; dir: string; document?: ImportedDocument }
   | { kind: 'new-folder'; dir: string }
   | { kind: 'rename'; entry: DirEntry }
   | { kind: 'duplicate'; entry: DirEntry }
@@ -820,49 +822,114 @@ export default function App(): React.JSX.Element | null {
     if (detached && reloadKey) window.api.preview.reload()
   }, [detached, reloadKey])
 
+  // The folder new pages go to: the open page's, else the content folder.
+  const pageDir = (): string =>
+    file?.path.startsWith(site.contentDir + '/') ? parentOf(file.path) : site.contentDir
+
+  // The open file as the tree shows it, for the File menu's page commands.
+  const openEntry = (): DirEntry | null =>
+    file ? { name: file.path.split('/').pop() ?? file.path, path: file.path, isDir: false } : null
+
+  const newPageFromDocument = async (): Promise<void> => {
+    try {
+      const document = await window.api.repo.chooseDocument()
+      if (document) setDialog({ kind: 'new-page', dir: pageDir(), document })
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  // Pictures picked from disk go to the section's images folder; the last one opens.
+  const addImages = async (): Promise<void> => {
+    try {
+      let last: string | null = null
+      for (const path of await window.api.repo.chooseImages()) {
+        last = await window.api.repo.importFile(path, sectionImages())
+      }
+      if (last) await open(last)
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  const onMenu = (command: MenuCommand): void => {
+    const entry = openEntry()
+    switch (command) {
+      case 'save':
+        void save()
+        break
+      case 'toggle-preview':
+        setShowPreview((p) => !p)
+        break
+      case 'setup':
+        setShowSetup(true)
+        break
+      case 'settings':
+        setShowSettings(true)
+        break
+      case 'detach-preview':
+        toggleDetached()
+        break
+      case 'toggle-terminal':
+        if (claudeOn) setShowClaude((c) => !c)
+        break
+      case 'reload-preview':
+        setReloadKey((k) => k + 1)
+        break
+      case 'find':
+        find(false)
+        break
+      case 'replace':
+        find(true)
+        break
+      case 'find-in-site':
+        findInSite(false)
+        break
+      case 'replace-in-site':
+        findInSite(true)
+        break
+      case 'paste-plain':
+        void pastePlain()
+        break
+      case 'new-page':
+        setDialog({ kind: 'new-page', dir: pageDir() })
+        break
+      case 'new-page-from-document':
+        void newPageFromDocument()
+        break
+      case 'new-folder':
+        setDialog({ kind: 'new-folder', dir: pageDir() })
+        break
+      case 'add-images':
+        void addImages()
+        break
+      case 'duplicate-page':
+        if (entry) setDialog({ kind: 'duplicate', entry })
+        break
+      case 'rename-page':
+        if (entry) setDialog({ kind: 'rename', entry })
+        break
+      case 'trash-page':
+        if (entry) void trashEntry(entry)
+        break
+      case 'open-in-browser':
+        if (previewUrl) window.api.openExternal(previewUrl)
+        break
+      case 'show-in-finder':
+        if (file) void window.api.repo.reveal(file.path)
+        break
+    }
+  }
+
+  // The menu reaches the handler of the latest render, which sees the current page.
+  const menuHandler = useRef(onMenu)
+  useEffect(() => {
+    menuHandler.current = onMenu
+  })
+  useEffect(() => window.api.onMenu((command) => menuHandler.current(command)), [])
   useEffect(
-    () =>
-      window.api.onMenu((command) => {
-        switch (command) {
-          case 'save':
-            void save()
-            break
-          case 'toggle-preview':
-            setShowPreview((p) => !p)
-            break
-          case 'setup':
-            setShowSetup(true)
-            break
-          case 'settings':
-            setShowSettings(true)
-            break
-          case 'detach-preview':
-            toggleDetached()
-            break
-          case 'toggle-terminal':
-            if (claudeOn) setShowClaude((c) => !c)
-            break
-          case 'reload-preview':
-            setReloadKey((k) => k + 1)
-            break
-          case 'find':
-            find(false)
-            break
-          case 'replace':
-            find(true)
-            break
-          case 'find-in-site':
-            findInSite(false)
-            break
-          case 'replace-in-site':
-            findInSite(true)
-            break
-          case 'paste-plain':
-            void pastePlain()
-            break
-        }
-      }),
-    [save, toggleDetached, find, findInSite, claudeOn]
+    () => window.api.setMenuState({ site: !!repo, page: !!file, preview: !!previewUrl }),
+    [repo, file, previewUrl]
   )
 
   if (repo === undefined) return null
@@ -877,9 +944,7 @@ export default function App(): React.JSX.Element | null {
     new RegExp(`^${currentListKey()}:`, 'm').test(parts.frontmatter) &&
     parts.body.trim() === ''
   const showBody = !blocksPage || bodyShownFor === file?.path
-  const newPageDir = file?.path.startsWith(site.contentDir + '/')
-    ? parentOf(file.path)
-    : site.contentDir
+  const newPageDir = pageDir()
   const selectIn = (part: Target['part']): Selection | undefined =>
     select && select.path === file?.path && select.part === part ? select : undefined
 
@@ -1116,6 +1181,7 @@ export default function App(): React.JSX.Element | null {
         {dialog?.kind === 'new-page' && (
           <NewPageDialog
             directory={dialog.dir}
+            initial={dialog.document}
             sectionUrl={
               dialog.dir.startsWith(site.contentDir + '/')
                 ? `/${dialog.dir.slice(site.contentDir.length + 1)}/`

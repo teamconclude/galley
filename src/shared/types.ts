@@ -299,6 +299,22 @@ export type MenuCommand =
   | 'find-in-site'
   | 'replace-in-site'
   | 'paste-plain'
+  | 'new-page'
+  | 'new-page-from-document'
+  | 'new-folder'
+  | 'add-images'
+  | 'duplicate-page'
+  | 'rename-page'
+  | 'trash-page'
+  | 'open-in-browser'
+  | 'show-in-finder'
+
+// What the menu's items can act on: an open site, an open page in it, and its preview.
+export interface MenuState {
+  site: boolean
+  page: boolean
+  preview: boolean
+}
 
 // Git conveniences for editors who are not git users; both on unless turned off.
 export interface Preferences {

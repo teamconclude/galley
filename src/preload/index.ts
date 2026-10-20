@@ -31,6 +31,7 @@ const api: Api = {
     mkdir: (rel) => ipcRenderer.invoke('repo:mkdir', rel),
     rename: (from, to) => ipcRenderer.invoke('repo:rename', from, to),
     trash: (rel) => ipcRenderer.invoke('repo:trash', rel),
+    chooseImages: () => ipcRenderer.invoke('repo:chooseImages'),
     reveal: (rel) => ipcRenderer.invoke('repo:reveal', rel),
     placement: (rel) => ipcRenderer.invoke('repo:placement', rel),
     newest: (dir) => ipcRenderer.invoke('repo:newest', dir),
@@ -128,6 +129,7 @@ const api: Api = {
     onStatus: (cb) => on('update:status', cb)
   },
   onMenu: (cb) => on('menu', cb),
+  setMenuState: (state) => ipcRenderer.send('menu:state', state),
   openExternal: (url) => ipcRenderer.send('open-external', url)
 }
 

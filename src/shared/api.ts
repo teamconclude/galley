@@ -13,6 +13,7 @@ import type {
   Identity,
   Layout,
   MenuCommand,
+  MenuState,
   Preferences,
   PreviewMode,
   PreviewState,
@@ -54,6 +55,8 @@ export interface Api {
     mkdir: (rel: string) => Promise<void>
     rename: (from: string, to: string) => Promise<void>
     trash: (rel: string) => Promise<void>
+    // Pictures picked in an open dialog, as paths on disk.
+    chooseImages: () => Promise<string[]>
     // Shows the file or folder in the Finder.
     reveal: (rel: string) => Promise<void>
     // What to make of a file about to be dropped at this path.
@@ -167,5 +170,7 @@ export interface Api {
     onStatus: (cb: (status: UpdateStatus) => void) => Unsubscribe
   }
   onMenu: (cb: (command: MenuCommand) => void) => Unsubscribe
+  // Tells the menu what its items can act on.
+  setMenuState: (state: MenuState) => void
   openExternal: (url: string) => void
 }
