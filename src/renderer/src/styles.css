@@ -321,7 +321,7 @@ button.primary:disabled:hover {
 /* Beside the large icons of the detailed view, a folder's arrow takes as much room, so
    folder and file names line up. */
 .tree.detailed .tree-arrow {
-  width: 28px;
+  width: 25px;
   display: flex;
   justify-content: center;
 }
