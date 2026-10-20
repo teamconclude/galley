@@ -4,6 +4,7 @@ import { isDev } from './env'
 
 interface Actions {
   about: () => void
+  manual: () => void
   openRepo: () => void
   checkUpdates: () => void
   command: (command: MenuCommand) => void
@@ -136,7 +137,11 @@ export function buildMenu(actions: Actions): Menu {
         ...devItems
       ]
     },
-    { role: 'windowMenu' }
+    { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [{ label: 'Galley Manual', accelerator: 'CmdOrCtrl+?', click: actions.manual }]
+    }
   ]
   return Menu.buildFromTemplate(template)
 }

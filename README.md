@@ -7,6 +7,9 @@ the git steps needed to get a change reviewed.
 
 ![Galley editing the home page next to the live preview](docs/screenshot.png)
 
+The [Galley manual](docs/manual/README.md) explains how to use it, step by step; Galley
+shows the same manual under **Help ▸ Galley Manual**.
+
 ## Installation
 
 You need a Mac running macOS 12 or later and access to the `teamconclude` organisation on GitHub.
@@ -43,6 +46,8 @@ down and click **Open Anyway**. The Terminal line above avoids this, since macOS
 files that a browser downloaded.
 
 ## Using Galley
+
+In brief; the [manual](docs/manual/README.md) has the details.
 
 **Getting the site.** On first start, choose the folder where the site is checked out, or
 pick **Clone** to get a fresh copy from GitHub. Galley remembers the checkout.

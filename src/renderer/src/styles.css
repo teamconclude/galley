@@ -951,6 +951,22 @@ body.dragging .terminal-host {
   max-width: 760px;
 }
 
+.manual {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 36px 40px 60px;
+}
+
+.manual > * {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.manual img {
+  display: block;
+  border: 1px solid var(--border);
+}
+
 .text-preview h1 {
   font-size: 1.7em;
   margin: 0.4em 0 0.6em;
@@ -1328,6 +1344,7 @@ body.dragging .terminal-host {
 }
 
 .modal .pane-bar select {
+  max-width: 200px;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 3px 6px;
@@ -1641,6 +1658,12 @@ body.dragging .terminal-host {
 
 .dialog-row button {
   flex: none;
+}
+
+/* A long document name beside a button wraps rather than running out of the dialog. */
+.dialog-row .dialog-note {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dialog-drop {

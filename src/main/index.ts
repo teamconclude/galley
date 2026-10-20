@@ -174,6 +174,48 @@ function createWindow(): void {
   }
 }
 
+// The manual, Galley's own renderer page at #manual, opens beside the main window; links
+// out of it go to the browser.
+let manualWin: BrowserWindow | null = null
+
+function showManual(): void {
+  if (manualWin) {
+    manualWin.focus()
+    return
+  }
+  manualWin = new BrowserWindow({
+    width: 900,
+    height: 900,
+    minWidth: 500,
+    minHeight: 400,
+    title: 'Galley Manual',
+    show: false,
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
+  })
+  if (win) {
+    const main = win.getBounds()
+    const [width, height] = manualWin.getSize()
+    manualWin.setPosition(
+      Math.round(main.x + (main.width - width) / 2),
+      Math.round(main.y + Math.max(0, (main.height - height) / 2))
+    )
+  }
+  manualWin.on('page-title-updated', (e) => e.preventDefault())
+  manualWin.on('ready-to-show', () => manualWin?.show())
+  manualWin.on('closed', () => {
+    manualWin = null
+  })
+  manualWin.webContents.setWindowOpenHandler((details) => {
+    void shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+    void manualWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#manual')
+  } else {
+    void manualWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'manual' })
+  }
+}
+
 // The detached preview is Galley's own renderer page in preview mode, so it can show the
 // rendered page or the markdown twin alike and follow the cursor as the embedded one does.
 function detachPreview(state: PreviewState): void {
@@ -501,6 +543,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(
     buildMenu({
       about: () => showAbout(win),
+      manual: showManual,
       openRepo: () => void chooseRepo(),
       checkUpdates: () => void updater.check(true),
       zoom,
