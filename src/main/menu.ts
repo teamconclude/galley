@@ -59,6 +59,8 @@ export function buildMenu(actions: Actions): Menu {
         item('new-folder', 'New Folder…'),
         item('add-images', 'Add Images…'),
         { type: 'separator' },
+        item('find-page', 'Find Page…', 'CmdOrCtrl+P'),
+        { type: 'separator' },
         item('save', 'Save', 'CmdOrCtrl+S'),
         item('duplicate-page', 'Duplicate Page…'),
         item('rename-page', 'Rename Page…'),

@@ -4,6 +4,22 @@ export interface DirEntry {
   isDir: boolean
 }
 
+// A page as Hugo lists it, for finding pages and naming them in the tree. Dates are ISO
+// strings, null where the page sets none.
+export interface PageInfo {
+  path: string
+  title: string
+  url: string
+  date: string | null
+  publishDate: string | null
+  expiryDate: string | null
+  draft: boolean
+  kind: string
+  section: string
+  // Earlier addresses that forward to the page.
+  aliases: string[]
+}
+
 export interface RepoInfo {
   path: string
   name: string
@@ -196,6 +212,8 @@ export interface Layout {
   frontmatterHeight: number
   sidebarTab: SidebarTab
   showAllFiles: boolean
+  // Content folders list pages by title and date rather than by file name.
+  showTitles: boolean
   // The rendered page, or its markdown twin for LLMs.
   previewMode: PreviewMode
 }
@@ -301,6 +319,7 @@ export type MenuCommand =
   | 'paste-plain'
   | 'new-page'
   | 'new-page-from-document'
+  | 'find-page'
   | 'new-folder'
   | 'add-images'
   | 'duplicate-page'

@@ -319,6 +319,85 @@ button.primary:disabled:hover {
   text-overflow: ellipsis;
 }
 
+/* The settings' visibility badge, compact, at the end of a tree row or finder title. */
+.page-badge.compact {
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.finder-backdrop {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.finder {
+  width: min(640px, 90vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.finder input {
+  margin: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.finder-list {
+  flex: 1;
+  overflow: auto;
+  padding: 0 6px 6px;
+}
+
+.finder-row {
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.finder-row.active {
+  background: var(--green1);
+}
+
+.finder-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finder-title span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finder-title .page-badge.compact {
+  margin-left: 0;
+}
+
+.finder-url {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finder-empty {
+  padding: 16px 8px;
+  color: var(--text-muted);
+}
+
 .splitter {
   flex: none;
   box-sizing: content-box;

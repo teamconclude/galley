@@ -14,6 +14,7 @@ import type {
   Layout,
   MenuCommand,
   MenuState,
+  PageInfo,
   Preferences,
   PreviewMode,
   PreviewState,
@@ -51,6 +52,8 @@ export interface Api {
     chooseDocument: () => Promise<ImportedDocument | null>
     // Addresses links may point to, and the site's own hosts, for marking broken links.
     linkTargets: () => Promise<{ targets: string[]; hosts: string[] }>
+    // Every page with its title, address, dates and aliases.
+    pages: () => Promise<PageInfo[]>
     create: (rel: string, text: string) => Promise<void>
     mkdir: (rel: string) => Promise<void>
     rename: (from: string, to: string) => Promise<void>

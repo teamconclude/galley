@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { DirEntry } from '../../../shared/types'
+import type { DirEntry, PageInfo } from '../../../shared/types'
 import {
   ChevronRight,
   ChevronsDownUp,
@@ -7,11 +7,14 @@ import {
   EyeOff,
   FilePlus,
   FolderPlus,
-  RefreshCw
+  Heading,
+  RefreshCw,
+  Search
 } from 'lucide-react'
 import FileIcon from './FileIcon'
 import Tip from './Tip'
 import { useSchemas } from '../lib/contexts'
+import { pageState, stateDetail, stateLabel } from '../lib/pages'
 
 interface Props {
   name: string
@@ -27,6 +30,11 @@ interface Props {
   onCollapseAll: () => void
   showAll: boolean
   onToggleShowAll: () => void
+  // Pages by path, for naming content files by their titles.
+  pages: Map<string, PageInfo>
+  showTitles: boolean
+  onToggleTitles: () => void
+  onFindPage: () => void
   version: number
 }
 
@@ -40,12 +48,18 @@ const hasFiles = (e: React.DragEvent): boolean => e.dataTransfer.types.includes(
 
 export default function FileTree(props: Props): React.JSX.Element {
   const { name, onNewPage, onNewFolder, onRefresh, onCollapseAll, showAll, onToggleShowAll } = props
+  const { showTitles, onToggleTitles, onFindPage } = props
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   return (
     <div className="tree">
       <div className="tree-root">
         <span className="tree-title">{name}</span>
         <span className="tree-actions">
+          <Tip text="Find page (⌘P)">
+            <button aria-label="Find page" onClick={onFindPage}>
+              <Search size={16} />
+            </button>
+          </Tip>
           <Tip text="New page">
             <button aria-label="New page" onClick={onNewPage}>
               <FilePlus size={16} />
@@ -64,6 +78,15 @@ export default function FileTree(props: Props): React.JSX.Element {
           <Tip text="Collapse all">
             <button aria-label="Collapse all" onClick={onCollapseAll}>
               <ChevronsDownUp size={16} />
+            </button>
+          </Tip>
+          <Tip text={showTitles ? 'Show file names' : 'Show page titles'}>
+            <button
+              aria-label={showTitles ? 'Show file names' : 'Show page titles'}
+              className={showTitles ? 'on' : ''}
+              onClick={onToggleTitles}
+            >
+              <Heading size={16} />
             </button>
           </Tip>
           <Tip text={showAll ? 'Show content files only' : 'Show all files'}>
@@ -98,6 +121,7 @@ interface ChildrenProps extends Props {
 function Children(props: ChildrenProps): React.JSX.Element {
   const { path, depth, expanded, onToggle, selected, onSelect, version } = props
   const { onContextMenu, onDropFiles, dropTarget, setDropTarget, showAll } = props
+  const { pages, showTitles } = props
   const [entries, setEntries] = useState<DirEntry[]>([])
   // What an editor works in: pages, images and downloads, and the menus and authors.
   const { site } = useSchemas()
@@ -116,18 +140,53 @@ function Children(props: ChildrenProps): React.JSX.Element {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, version, showAll, site])
+  // The open file comes into view once its folder has loaded, e.g. after the page finder
+  // opened it deep in a long section.
+  useEffect(() => {
+    if (!selected || !entries.some((e) => e.path === selected)) return
+    document
+      .querySelector(`.tree-item[data-path="${CSS.escape(selected)}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [entries, selected])
+
+  // The page a file is, or a page bundle's folder stands for.
+  const pageOf = (entry: DirEntry): PageInfo | undefined =>
+    entry.isDir ? pages.get(`${entry.path}/index.md`) : pages.get(entry.path)
+  const inContent = path === site.contentDir || path.startsWith(site.contentDir + '/')
+  const titled = showTitles && inContent
+  const label = (entry: DirEntry): string => (titled && pageOf(entry)?.title) || entry.name
+  // By title, folders first, then the section's own page, then pages newest first; pages
+  // without a date follow by title.
+  const shown = titled ? [...entries].sort((a, b) => order(a) - order(b) || compare(a, b)) : entries
+  function order(entry: DirEntry): number {
+    if (/^_?index\.md$/.test(entry.name)) return 0
+    if (entry.isDir && !pageOf(entry)) return 1
+    return pageOf(entry) ? 2 : 3
+  }
+  function compare(a: DirEntry, b: DirEntry): number {
+    const [pa, pb] = [pageOf(a), pageOf(b)]
+    const byDate = (pb?.date ?? '').localeCompare(pa?.date ?? '')
+    return byDate || label(a).localeCompare(label(b))
+  }
+
   return (
     <>
-      {entries.map((entry) => {
+      {shown.map((entry) => {
         const dropDir = entry.isDir ? entry.path : parentOf(entry.path)
         const open = entry.isDir && expanded.has(entry.path)
         const classes = ['tree-item']
         if (selected === entry.path) classes.push('selected')
         if (dropTarget === dropDir) classes.push('drop-target')
+        const page = pageOf(entry)
+        const tip = page
+          ? [titled ? entry.name : page.title, stateDetail(page)].filter(Boolean).join('\n')
+          : undefined
         return (
           <div key={entry.path}>
             <div
               className={classes.join(' ')}
+              data-path={entry.path}
+              title={tip}
               style={{ paddingLeft: rowStart + depth * indent }}
               onClick={() => (entry.isDir ? onToggle(entry.path) : onSelect(entry.path))}
               onContextMenu={(e) => {
@@ -159,7 +218,8 @@ function Children(props: ChildrenProps): React.JSX.Element {
               ) : (
                 <FileIcon name={entry.name} />
               )}
-              <span className="tree-name">{entry.name}</span>
+              <span className="tree-name">{label(entry)}</span>
+              {badge(pageOf(entry))}
             </div>
             {open && <Children {...props} path={entry.path} depth={depth + 1} />}
           </div>
@@ -167,4 +227,10 @@ function Children(props: ChildrenProps): React.JSX.Element {
       })}
     </>
   )
+}
+
+// Marks a page that is not on the live site.
+function badge(page: PageInfo | undefined): React.JSX.Element | null {
+  const state = page && pageState(page)
+  return state ? <span className={`page-badge compact ${state}`}>{stateLabel[state]}</span> : null
 }

@@ -6,10 +6,10 @@ the web repository, and the work that follows from it.
 
 ## Status
 
-Phases 1 to 4 are done on develop, unreleased (2026-10-20). The site names in the Publishing
+Phases 1 to 5 are done on develop, unreleased (2026-10-20). The site names in the Publishing
 section need a `baseURL` in `config/staging/` and `config/production/` of the web
 repository, which today passes it on the command line only. The web side of phase 2 is
-on its branch `lars/claude-content-editing`. Phase 5 is next.
+on its branch `lars/claude-content-editing`. Phase 6 is next.
 
 ## What the feedback showed
 
@@ -182,12 +182,19 @@ Uploads go beside the picture a field already shows, else to the section's folde
 picture. "New on this branch" lists files under the images folder that are untracked,
 staged as added, or added by commits since the merge base with the base branch.
 
-### Phase 5: finding pages
+### Phase 5: finding pages (done)
 
 1. A page finder (⌘P) over titles, URLs, aliases and file names, from all the columns of
    `hugo list all`.
 2. Content folders can show titles instead of file names, sort by date, and mark drafts and
    scheduled pages.
+
+`hugo list all` gives the title, dates, draft flag and address of every page, drafts and
+future pages included, in about 0.2 s for the site; Galley lists it again a second after
+any change under `content/`. Aliases come from the pages' settings. The finder ranks
+title matches first, then address, alias and file name, newest first; without a query it
+lists the newest pages. Titles are the default in the tree, folders keep their names, and
+a page bundle's folder takes its page's title. Badges reuse the settings pane's.
 
 ### Phase 6: deep links
 

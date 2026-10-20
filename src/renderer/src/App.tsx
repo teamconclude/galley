@@ -32,6 +32,7 @@ import {
   SwitchBranchDialog
 } from './components/GitDialogs'
 import Frontmatter from './components/Frontmatter'
+import PageFinder from './components/PageFinder'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import { imagePath, imageUrl, sectionImageFolder, useSiteInfo } from './lib/site'
@@ -49,6 +50,7 @@ import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
+import { usePages } from './lib/pages'
 import { currentListKey } from './lib/schema'
 
 interface OpenFile {
@@ -164,9 +166,12 @@ export default function App(): React.JSX.Element | null {
   const [claudeHeight, setClaudeHeight] = useState(layout.claudeHeight)
   const [frontmatterHeight, setFrontmatterHeight] = useState(layout.frontmatterHeight)
   const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
+  const [showTitles, setShowTitles] = useState(layout.showTitles)
   const [previewMode, setPreviewMode] = useState(layout.previewMode)
   const [bodyShownFor, setBodyShownFor] = useState<string | null>(null)
   const site = useSiteInfo(repo?.path ?? null)
+  const pages = usePages(repo?.path ?? null, site.contentDir)
+  const [finding, setFinding] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -775,6 +780,7 @@ export default function App(): React.JSX.Element | null {
       frontmatterHeight,
       sidebarTab,
       showAllFiles,
+      showTitles,
       previewMode
     })
   }, [
@@ -787,6 +793,7 @@ export default function App(): React.JSX.Element | null {
     frontmatterHeight,
     sidebarTab,
     showAllFiles,
+    showTitles,
     previewMode
   ])
 
@@ -893,6 +900,9 @@ export default function App(): React.JSX.Element | null {
         break
       case 'new-page':
         setDialog({ kind: 'new-page', dir: pageDir() })
+        break
+      case 'find-page':
+        setFinding(true)
         break
       case 'new-page-from-document':
         void newPageFromDocument()
@@ -1029,6 +1039,10 @@ export default function App(): React.JSX.Element | null {
                 onCollapseAll={() => setExpanded(new Set())}
                 showAll={showAllFiles}
                 onToggleShowAll={() => setShowAllFiles(!showAllFiles)}
+                pages={pages}
+                showTitles={showTitles}
+                onToggleTitles={() => setShowTitles(!showTitles)}
+                onFindPage={() => setFinding(true)}
                 version={treeVersion}
               />
             ) : (
@@ -1176,6 +1190,16 @@ export default function App(): React.JSX.Element | null {
             y={menu.y}
             items={menuItems(menu.entry)}
             onClose={() => setMenu(null)}
+          />
+        )}
+        {finding && (
+          <PageFinder
+            pages={pages}
+            onOpen={(path) => {
+              reveal(path)
+              void open(path)
+            }}
+            onClose={() => setFinding(false)}
           />
         )}
         {dialog?.kind === 'new-page' && (

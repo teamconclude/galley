@@ -10,6 +10,7 @@ import type {
   DirEntry,
   FieldDef,
   FieldType,
+  PageInfo,
   RepoInfo,
   SiteInfo,
   Snippet
@@ -42,6 +43,9 @@ export class Repo {
   private snippetCache: Promise<Snippet[]> | null = null
   private imageCache: string[] | null = null
   private targetCache: string[] | null = null
+  // Pages as Hugo last listed them, and with their aliases for the page finder.
+  private listed: Omit<PageInfo, 'aliases'>[] = []
+  private pageCache: PageInfo[] | null = null
   private ownRenames = new Set<string>()
 
   constructor(
@@ -235,7 +239,7 @@ export class Repo {
     if (this.targetCache) return this.targetCache
     await this.refreshPages()
     if (this.pages.size === 0) return []
-    const { contentDir, staticDir } = await this.site()
+    const { staticDir } = await this.site()
     const targets = new Set([...this.pages.values()].map(slashed))
     const walk = async (dir: string, visit: (rel: string) => Promise<void>): Promise<void> => {
       for (const e of await fs
@@ -247,19 +251,50 @@ export class Repo {
         else await visit(rel)
       }
     }
-    await walk(contentDir, async (rel) => {
-      if (!/\.md$/.test(rel)) return
-      const text = await fs.readFile(join(this.path, rel), 'utf8').catch(() => '')
-      const block = text.match(/^aliases:\s*\n((?:\s+-.*\n)+)/m)?.[1] ?? ''
-      for (const m of block.matchAll(/-\s*['"]?([^'"\s]+)/g)) targets.add(slashed(m[1]))
-      const inline = text.match(/^aliases:\s*\[(.*)\]/m)?.[1] ?? ''
-      for (const m of inline.matchAll(/['"]?([^'",\s]+)/g)) targets.add(slashed(m[1]))
-    })
+    for (const list of (await this.aliases()).values()) {
+      for (const alias of list) targets.add(alias)
+    }
     await walk(staticDir, async (rel) => {
       targets.add(rel.slice(staticDir.length))
     })
     this.targetCache = [...targets]
     return this.targetCache
+  }
+
+  // Every page with its aliases, listed again after any change to the content.
+  async pageList(): Promise<PageInfo[]> {
+    if (this.pageCache) return this.pageCache
+    await this.refreshPages()
+    const aliases = await this.aliases()
+    this.pageCache = this.listed.map((p) => ({ ...p, aliases: aliases.get(p.path) ?? [] }))
+    return this.pageCache
+  }
+
+  // The addresses each page forwards from, by its path, in block or inline form.
+  private async aliases(): Promise<Map<string, string[]>> {
+    const { contentDir } = await this.site()
+    const out = new Map<string, string[]>()
+    const walk = async (dir: string): Promise<void> => {
+      for (const e of await fs
+        .readdir(join(this.path, dir), { withFileTypes: true })
+        .catch(() => [])) {
+        if (e.name.startsWith('.')) continue
+        const rel = `${dir}/${e.name}`
+        if (e.isDirectory()) await walk(rel)
+        else if (rel.endsWith('.md')) {
+          const text = await fs.readFile(join(this.path, rel), 'utf8').catch(() => '')
+          const block = text.match(/^aliases:\s*\n((?:\s+-.*\n)+)/m)?.[1] ?? ''
+          const inline = text.match(/^aliases:\s*\[(.*)\]/m)?.[1] ?? ''
+          const found = [
+            ...[...block.matchAll(/-\s*['"]?([^'"\s]+)/g)].map((m) => slashed(m[1])),
+            ...[...inline.matchAll(/['"]?([^'",\s]+)/g)].map((m) => slashed(m[1]))
+          ]
+          if (found.length > 0) out.set(rel, found)
+        }
+      }
+    }
+    await walk(contentDir)
+    return out
   }
 
   // Same, for an image addressed by the URL path of its folder.
@@ -307,7 +342,9 @@ export class Repo {
 
   private async refreshPages(): Promise<void> {
     const bin = await findHugo(this.path)
-    if (bin) this.pages = await listPages(bin, this.path)
+    if (!bin) return
+    this.listed = await listPages(bin, this.path)
+    this.pages = new Map(this.listed.map((p) => [p.path, p.url]))
   }
 
   watch(): void {
@@ -334,6 +371,8 @@ export class Repo {
       this.targetCache = null
       void this.refreshPages()
     }
+    // Titles, dates and drafts live in the pages' settings, so any edit may change them.
+    if (paths.some((p) => p.startsWith(this.folders.contentDir + '/'))) this.pageCache = null
     if (paths.some((p) => p.startsWith(this.folders.staticDir + '/'))) this.targetCache = null
     if (paths.some((p) => p.startsWith(this.folders.componentsDir + '/')))
       this.componentCache = null

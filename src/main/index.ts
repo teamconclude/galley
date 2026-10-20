@@ -263,6 +263,7 @@ function registerIpc(): void {
     const src = result.filePaths[0]
     return src ? importDocument(src) : null
   })
+  ipcMain.handle('repo:pages', () => current().pageList())
   ipcMain.handle('repo:linkTargets', async () => ({
     targets: await current().linkTargets(),
     hosts: await environmentSites(current().path)

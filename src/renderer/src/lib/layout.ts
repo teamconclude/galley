@@ -10,6 +10,7 @@ const defaults: Layout = {
   frontmatterHeight: 280,
   sidebarTab: 'files',
   showAllFiles: false,
+  showTitles: true,
   previewMode: 'html'
 }
 

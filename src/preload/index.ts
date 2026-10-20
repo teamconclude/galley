@@ -33,6 +33,7 @@ const api: Api = {
     trash: (rel) => ipcRenderer.invoke('repo:trash', rel),
     chooseImages: () => ipcRenderer.invoke('repo:chooseImages'),
     reveal: (rel) => ipcRenderer.invoke('repo:reveal', rel),
+    pages: () => ipcRenderer.invoke('repo:pages'),
     placement: (rel) => ipcRenderer.invoke('repo:placement', rel),
     newest: (dir) => ipcRenderer.invoke('repo:newest', dir),
     search: (query, options) => ipcRenderer.invoke('repo:search', query, options),

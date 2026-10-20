@@ -2,7 +2,7 @@ import { app, net } from 'electron'
 import { ChildProcess, execFile, spawn } from 'child_process'
 import { existsSync, promises as fs } from 'fs'
 import { join } from 'path'
-import type { HugoStatus } from '../shared/types'
+import type { HugoStatus, PageInfo } from '../shared/types'
 import { loadSettings, saveSettings } from './settings'
 import { resolveCommand } from './shell'
 import { pretendMissing } from './tools'
@@ -220,23 +220,34 @@ export class HugoServer {
   }
 }
 
-// Maps content file paths to their URL paths, from `hugo list all`.
-export function listPages(bin: string, repo: string): Promise<Map<string, string>> {
+// The site's pages, from `hugo list all`, which also lists drafts and future pages.
+export function listPages(bin: string, repo: string): Promise<Omit<PageInfo, 'aliases'>[]> {
   return new Promise((resolve) => {
     const opts = { cwd: repo, maxBuffer: 16 * 1024 * 1024 }
     execFile(bin, ['list', 'all'], opts, (err, stdout) => {
-      const map = new Map<string, string>()
-      if (err) return resolve(map)
+      if (err) return resolve([])
       const [header, ...rows] = stdout.split('\n')
       const cols = parseCsvLine(header)
-      const pathCol = cols.indexOf('path')
-      const urlCol = cols.indexOf('permalink')
-      if (pathCol < 0 || urlCol < 0) return resolve(map)
-      for (const row of rows) {
-        const f = parseCsvLine(row)
-        if (f[pathCol] && f[urlCol]) map.set(f[pathCol], f[urlCol].replace(/^https?:\/\/[^/]+/, ''))
-      }
-      resolve(map)
+      const at = (f: string[], name: string): string => f[cols.indexOf(name)] ?? ''
+      // Hugo writes the zero time for dates a page does not set.
+      const date = (value: string): string | null =>
+        value && !value.startsWith('0001-') ? value : null
+      if (!cols.includes('path') || !cols.includes('permalink')) return resolve([])
+      const pages = rows
+        .map(parseCsvLine)
+        .filter((f) => at(f, 'path') && at(f, 'permalink'))
+        .map((f) => ({
+          path: at(f, 'path'),
+          title: at(f, 'title').trim(),
+          url: at(f, 'permalink').replace(/^https?:\/\/[^/]+/, ''),
+          date: date(at(f, 'date')),
+          publishDate: date(at(f, 'publishDate')),
+          expiryDate: date(at(f, 'expiryDate')),
+          draft: at(f, 'draft') === 'true',
+          kind: at(f, 'kind'),
+          section: at(f, 'section')
+        }))
+      resolve(pages)
     })
   })
 }
