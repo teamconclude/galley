@@ -1194,6 +1194,13 @@ body.dragging .terminal-host {
   padding: 4px 8px;
 }
 
+.modal .pane-bar select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--bg);
+}
+
 .image-scroll {
   flex: 1;
   overflow: auto;
@@ -2336,6 +2343,11 @@ body.dragging .terminal-host {
   flex: none;
   display: flex;
   gap: 6px;
+}
+
+.dialog.dropping {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
 }
 
 .claude.dropping .terminal-host {

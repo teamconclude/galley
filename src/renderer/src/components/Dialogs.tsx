@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { documentParts, slugify, type DocumentParts } from '../lib/newPage'
 
 interface DialogProps {
@@ -7,11 +8,20 @@ interface DialogProps {
   canSubmit: boolean
   onSubmit: () => void
   onCancel: () => void
+  // Files dropped anywhere on the dialog.
+  onFiles?: (files: File[]) => void
   children: React.ReactNode
 }
 
+// Dialogs render at the top of the page, so the styles of whatever opened them, e.g. the
+// compact buttons of a toolbar, do not reach them.
 export function Dialog(props: DialogProps): React.JSX.Element {
-  const { title, submitLabel, canSubmit, onSubmit, onCancel, children } = props
+  const { title, submitLabel, canSubmit, onSubmit, onCancel, onFiles, children } = props
+  // Drag events fire for each element inside the dialog; counted, they tell when a drag
+  // leaves the dialog itself.
+  const [over, setOver] = useState(0)
+  const carriesFiles = (e: React.DragEvent): boolean =>
+    !!onFiles && e.dataTransfer.types.includes('Files')
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onCancel()
@@ -19,11 +29,21 @@ export function Dialog(props: DialogProps): React.JSX.Element {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel])
-  return (
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={onCancel}>
       <form
-        className="dialog"
+        className={'dialog' + (over > 0 ? ' dropping' : '')}
         onMouseDown={(e) => e.stopPropagation()}
+        onDragEnter={(e) => carriesFiles(e) && setOver((n) => n + 1)}
+        onDragLeave={(e) => carriesFiles(e) && setOver((n) => Math.max(0, n - 1))}
+        onDragOver={(e) => carriesFiles(e) && e.preventDefault()}
+        onDrop={(e) => {
+          if (!carriesFiles(e)) return
+          e.preventDefault()
+          e.stopPropagation()
+          setOver(0)
+          onFiles?.([...e.dataTransfer.files])
+        }}
         onSubmit={(e) => {
           e.preventDefault()
           if (canSubmit) onSubmit()
@@ -40,7 +60,8 @@ export function Dialog(props: DialogProps): React.JSX.Element {
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   )
 }
 

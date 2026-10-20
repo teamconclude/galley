@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSchemas } from '../lib/contexts'
 import { imageFolder, imagePath, imageUrl, sectionImageFolder } from '../lib/site'
 
@@ -79,7 +80,9 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
     </button>
   )
 
-  return (
+  // Rendered at the top of the page, out of reach of the styles of the toolbar or form
+  // field that opened it.
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="pane-bar">
@@ -135,6 +138,7 @@ export default function ImagePicker({ value, onPick, onClose }: Props): React.JS
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

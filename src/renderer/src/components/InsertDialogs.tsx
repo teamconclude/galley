@@ -66,11 +66,9 @@ export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.
     const url = await importImage(folder)
     if (url) setPath(url)
   }
-  const drop = async (e: React.DragEvent): Promise<void> => {
-    const file = [...e.dataTransfer.files].find((f) => imageFile.test(f.name))
+  const drop = async (files: File[]): Promise<void> => {
+    const file = files.find((f) => imageFile.test(f.name))
     if (!file) return
-    e.preventDefault()
-    e.stopPropagation()
     const rel = await window.api.repo.importFile(
       window.api.files.pathFor(file),
       imagePath(site, folder)
@@ -85,6 +83,7 @@ export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.
         canSubmit={path.trim() !== ''}
         onSubmit={() => onSubmit({ path: path.trim(), alt: alt.trim() })}
         onCancel={onCancel}
+        onFiles={(files) => void drop(files)}
       >
         <label className="dialog-field">
           <span>Image</span>
@@ -108,15 +107,11 @@ export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.
             </button>
           </span>
         </label>
-        <div
-          className="dialog-drop"
-          onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
-          onDrop={(e) => void drop(e)}
-        >
+        <div className="dialog-drop">
           {isImageUrl(site, path) ? (
             <img className="dialog-preview" src={`galley://repo/${imagePath(site, path)}`} alt="" />
           ) : (
-            <span>Or drop a picture here</span>
+            <span>Or drop a picture onto this dialog</span>
           )}
         </div>
         <label className="dialog-field">
