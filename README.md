@@ -48,14 +48,15 @@ files that a browser downloaded.
 pick **Clone** to get a fresh copy from GitHub. Galley remembers the checkout.
 
 **Pages.** The left side lists the files of the site. The `content` folder holds the
-pages, one markdown file each, grouped by section and newest first, each with its title
-below its file name and drafts and scheduled pages marked; the **H** button hides the
-titles. **Find Page** (⌘P) finds a page by words of its title, its address, an old address
-or its file name. The `+` button and the right-click menu create, rename, duplicate and
-delete files; the File menu does the same for the open page, and makes a page from a Word
-or Markdown document or adds images to the section. A new page copies the settings of the
-newest page in the same folder, so it fits its section. Dropping images onto the tree or
-into a text puts them under `static/images`.
+pages, one markdown file each, grouped by section and newest first. Each file shows a
+second line: a page's title, with drafts and scheduled pages marked, or the size of other
+files and when they last changed; the rows button switches to one line per file. **Find
+Page** (⌘P) finds a page by words of its title, its address, an old address or its file
+name. The `+` button and the right-click menu create, rename, duplicate and delete files;
+the File menu does the same for the open page, and makes a page from a Word or Markdown
+document or adds images to the section. A new page copies the settings of the newest page
+in the same folder, so it fits its section. Dropping images onto the tree or into a text
+puts them under `static/images`.
 
 **Editing.** A page opens as a form of its settings. Marketing pages are built from content
 blocks, shown as cards that can be opened, reordered, duplicated and removed, with a menu to

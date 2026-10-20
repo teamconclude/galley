@@ -2,6 +2,10 @@ export interface DirEntry {
   name: string
   path: string
   isDir: boolean
+  // For files: bytes, and when the file last changed, by its last commit unless it has
+  // changed since.
+  size?: number
+  changed?: number
 }
 
 // A page as Hugo lists it, for finding pages and naming them in the tree. Dates are ISO

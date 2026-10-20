@@ -318,6 +318,14 @@ button.primary:disabled:hover {
   transform: rotate(90deg);
 }
 
+/* Beside the large icons of the detailed view, a folder's arrow takes as much room, so
+   folder and file names line up. */
+.tree.detailed .tree-arrow {
+  width: 28px;
+  display: flex;
+  justify-content: center;
+}
+
 .tree-item .file-icon {
   flex: none;
 }
@@ -357,7 +365,7 @@ button.primary:disabled:hover {
   line-height: 17px;
 }
 
-.tree-page-title {
+.tree-detail {
   font-size: 11px;
   line-height: 14px;
   color: var(--text-muted);

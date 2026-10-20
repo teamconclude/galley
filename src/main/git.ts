@@ -617,6 +617,44 @@ export class Git {
     return [...new Set([...committed, ...staged, ...untracked])].sort()
   }
 
+  // When each file directly in dir last changed: its last commit, for files without
+  // changes since. A checkout gives every file the same time on disk, so the disk only
+  // speaks for changed and new files, which are left out here.
+  async changeTimes(dir: string): Promise<Map<string, number>> {
+    const scope = dir || '.'
+    const [log, status] = await Promise.all([
+      this.git([
+        '-c',
+        'core.quotePath=false',
+        'log',
+        '--format=%x00%at',
+        '--name-only',
+        '--no-renames',
+        '--',
+        scope
+      ]).catch(() => ''),
+      this.git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', scope]).catch(
+        () => ''
+      )
+    ])
+    const dirty = new Set(
+      status
+        .split('\0')
+        .filter((e) => e.length > 3)
+        .map((e) => e.slice(3))
+    )
+    const times = new Map<string, number>()
+    let time = 0
+    for (const line of log.split('\n')) {
+      if (line.startsWith('\0')) time = Number(line.slice(1)) * 1000
+      else if (line && !dirty.has(line) && !times.has(line)) {
+        const rest = dir ? line.slice(dir.length + 1) : line
+        if (!rest.includes('/')) times.set(line, time)
+      }
+    }
+    return times
+  }
+
   // A review in progress in this checkout, while it is on the reviewed branch.
   private reviewOf(branch: string): Review | null {
     const review = loadSettings().review

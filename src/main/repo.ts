@@ -83,7 +83,7 @@ export class Repo {
 
   async list(rel: string): Promise<DirEntry[]> {
     const entries = await fs.readdir(this.absolute(rel), { withFileTypes: true })
-    return entries
+    const listed = entries
       .filter((e) => !e.name.startsWith('.') && !(rel === '' && hiddenAtRoot.has(e.name)))
       .map((e) => ({
         name: e.name,
@@ -91,6 +91,13 @@ export class Repo {
         isDir: e.isDirectory()
       }))
       .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name))
+    return Promise.all(
+      listed.map(async (entry) => {
+        if (entry.isDir) return entry
+        const stat = await fs.stat(this.absolute(entry.path)).catch(() => null)
+        return stat ? { ...entry, size: stat.size, changed: stat.mtimeMs } : entry
+      })
+    )
   }
 
   read(rel: string): Promise<string> {

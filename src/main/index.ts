@@ -225,7 +225,11 @@ function registerIpc(): void {
   }
   ipcMain.handle('repo:get', () => repo?.info() ?? null)
   ipcMain.handle('repo:choose', () => chooseRepo())
-  ipcMain.handle('repo:list', (_e, rel: string) => current().list(rel))
+  ipcMain.handle('repo:list', async (_e, rel: string) => {
+    const entries = await current().list(rel)
+    const times = await git?.changeTimes(rel).catch(() => null)
+    return entries.map((e) => (e.isDir ? e : { ...e, changed: times?.get(e.path) ?? e.changed }))
+  })
   ipcMain.handle('repo:read', (_e, rel: string) => current().read(rel))
   ipcMain.handle('repo:write', (_e, rel: string, text: string) => current().write(rel, text))
   ipcMain.handle('repo:pageUrl', (_e, rel: string) => current().pageUrl(rel))

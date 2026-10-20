@@ -7,14 +7,15 @@ import {
   EyeOff,
   FilePlus,
   FolderPlus,
-  Heading,
   RefreshCw,
+  Rows2,
   Search
 } from 'lucide-react'
 import FileIcon from './FileIcon'
 import Tip from './Tip'
 import { useSchemas } from '../lib/contexts'
 import { pageState, stateDetail, stateLabel } from '../lib/pages'
+import { ago } from '../lib/time'
 
 interface Props {
   name: string
@@ -51,7 +52,7 @@ export default function FileTree(props: Props): React.JSX.Element {
   const { showTitles, onToggleTitles, onFindPage } = props
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   return (
-    <div className="tree">
+    <div className={showTitles ? 'tree detailed' : 'tree'}>
       <div className="tree-root">
         <span className="tree-title">{name}</span>
         <span className="tree-actions">
@@ -80,13 +81,13 @@ export default function FileTree(props: Props): React.JSX.Element {
               <ChevronsDownUp size={18} />
             </button>
           </Tip>
-          <Tip text={showTitles ? 'Hide page titles' : 'Show page titles'}>
+          <Tip text={showTitles ? 'One line per file' : 'Show titles, sizes and dates'}>
             <button
-              aria-label={showTitles ? 'Hide page titles' : 'Show page titles'}
+              aria-label={showTitles ? 'One line per file' : 'Show titles, sizes and dates'}
               className={showTitles ? 'on' : ''}
               onClick={onToggleTitles}
             >
-              <Heading size={18} />
+              <Rows2 size={18} />
             </button>
           </Tip>
           <Tip text={showAll ? 'Show content files only' : 'Show all files'}>
@@ -180,7 +181,10 @@ function Children(props: ChildrenProps): React.JSX.Element {
         const tip = page
           ? [titled ? null : page.title, stateDetail(page)].filter(Boolean).join('\n') || undefined
           : undefined
-        if (titled && page?.title) classes.push('two-line')
+        // In the detailed view every file has a second line: a page's title, or what the
+        // file is. Folders keep one line.
+        const second = !showTitles || entry.isDir ? null : (titled && page?.title) || facts(entry)
+        if (second) classes.push('two-line')
         if (entry.isDir) classes.push('folder')
         return (
           <div key={entry.path}>
@@ -217,12 +221,12 @@ function Children(props: ChildrenProps): React.JSX.Element {
                   <ChevronRight size={16} />
                 </span>
               ) : (
-                <FileIcon name={entry.name} size={titled && page?.title ? 28 : 16} />
+                <FileIcon name={entry.name} size={second ? 28 : 16} />
               )}
-              {titled && page?.title ? (
+              {second ? (
                 <span className="tree-label">
                   <span className="tree-name">{entry.name}</span>
-                  <span className="tree-page-title">{page.title}</span>
+                  <span className="tree-detail">{second}</span>
                 </span>
               ) : (
                 <span className="tree-name">{entry.name}</span>
@@ -241,4 +245,17 @@ function Children(props: ChildrenProps): React.JSX.Element {
 function badge(page: PageInfo | undefined): React.JSX.Element | null {
   const state = page && pageState(page)
   return state ? <span className={`page-badge compact ${state}`}>{stateLabel[state]}</span> : null
+}
+
+const bytes = (n: number): string =>
+  n < 1000
+    ? `${n} bytes`
+    : n < 1_000_000
+      ? `${Math.round(n / 1000)} KB`
+      : `${(n / 1_000_000).toFixed(1)} MB`
+
+// A file's size and when it last changed, e.g. "84 KB · 3 Oct".
+function facts(entry: DirEntry): string | null {
+  if (entry.size === undefined) return null
+  return entry.changed ? `${bytes(entry.size)} · ${ago(entry.changed)}` : bytes(entry.size)
 }
