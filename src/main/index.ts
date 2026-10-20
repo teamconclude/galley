@@ -456,7 +456,7 @@ app.whenReady().then(() => {
   if (isDev) app.dock?.setIcon(icon)
   Menu.setApplicationMenu(
     buildMenu({
-      about: showAbout,
+      about: () => showAbout(win),
       openRepo: () => void chooseRepo(),
       checkUpdates: () => void updater.check(true),
       zoom,

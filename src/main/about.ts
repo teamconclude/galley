@@ -120,8 +120,9 @@ function page(): string {
 }
 
 // Galley's own About window: the version that matters to editors and the license, which
-// the standard macOS panel cannot show.
-export function showAbout(): void {
+// the standard macOS panel cannot show. It opens centred over the main window, on
+// whichever screen that is.
+export function showAbout(over: BrowserWindow | null): void {
   if (about) {
     about.focus()
     return
@@ -140,6 +141,14 @@ export function showAbout(): void {
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     webPreferences: { sandbox: true }
   })
+  if (over) {
+    const parent = over.getBounds()
+    const [width, height] = about.getSize()
+    about.setPosition(
+      Math.round(parent.x + (parent.width - width) / 2),
+      Math.round(parent.y + (parent.height - height) / 2)
+    )
+  }
   about.on('ready-to-show', () => about?.show())
   about.on('closed', () => {
     about = null
