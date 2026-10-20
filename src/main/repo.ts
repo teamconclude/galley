@@ -270,6 +270,15 @@ export class Repo {
     return this.pageCache
   }
 
+  // The page at an address or one of its aliases, listed afresh, e.g. right after a
+  // branch switch brought it.
+  async pageAt(url: string): Promise<string | null> {
+    this.pageCache = null
+    const list = await this.pageList()
+    const page = list.find((p) => p.url === url) ?? list.find((p) => p.aliases.includes(url))
+    return page?.path ?? null
+  }
+
   // The addresses each page forwards from, by its path, in block or inline form.
   private async aliases(): Promise<Map<string, string[]>> {
     const { contentDir } = await this.site()

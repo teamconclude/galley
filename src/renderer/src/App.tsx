@@ -33,6 +33,7 @@ import {
 } from './components/GitDialogs'
 import Frontmatter from './components/Frontmatter'
 import PageFinder from './components/PageFinder'
+import ReviewDialog from './components/ReviewDialog'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import { imagePath, imageUrl, sectionImageFolder, useSiteInfo } from './lib/site'
@@ -51,6 +52,7 @@ import { join, split } from './lib/frontmatter'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
 import { usePages } from './lib/pages'
+import { pageAddress, reviewLink as makeReviewLink, type ReviewLink } from '../../shared/reviewLink'
 import { currentListKey } from './lib/schema'
 
 interface OpenFile {
@@ -172,6 +174,8 @@ export default function App(): React.JSX.Element | null {
   const site = useSiteInfo(repo?.path ?? null)
   const pages = usePages(repo?.path ?? null, site.contentDir)
   const [finding, setFinding] = useState(false)
+  const [reviewLink, setReviewLink] = useState<ReviewLink | null>(null)
+  const [pastingLink, setPastingLink] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['content']))
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -703,6 +707,72 @@ export default function App(): React.JSX.Element | null {
     if (file) await reopen(file.path)
   }
 
+  // Review links: one Galley was opened with, one arriving later, or one pasted.
+  useEffect(() => {
+    const take = (): void => {
+      void window.api.link.take().then((link) => link && setReviewLink(link))
+    }
+    take()
+    return window.api.link.onArrived(take)
+  }, [])
+
+  // The page a review link names: its path, or the page or alias at its address.
+  const linkedPage = (link: ReviewLink): string | null => {
+    if (link.page) return link.page.startsWith(site.contentDir + '/') ? link.page : null
+    if (!link.url) return null
+    const url = pageAddress(link.url)
+    const all = [...pages.values()]
+    return (
+      (all.find((p) => p.url === url) ?? all.find((p) => p.aliases.includes(url)))?.path ?? null
+    )
+  }
+
+  // Commits the editor's own changes where they are, switches to the reviewed branch and
+  // opens the linked page. Errors surface in the dialog.
+  const openReview = async (link: ReviewLink): Promise<void> => {
+    await save()
+    const changes = (gitStatus?.changes ?? []).filter((c) => !c.warning)
+    if (gitStatus?.branch !== link.branch) {
+      if (changes.length > 0) {
+        await window.api.git.commit(
+          `Work in progress, before reviewing ${link.branch}`,
+          changes.map((c) => c.path)
+        )
+      }
+      await window.api.git.startReview(link.branch)
+    }
+    setReviewLink(null)
+    setDiff(null)
+    setSidebarTab('files')
+    // The page may exist only on the branch just opened, so its address is looked up anew.
+    const path =
+      linkedPage(link) ?? (link.url ? await window.api.repo.pageAt(pageAddress(link.url)) : null)
+    if (path) {
+      reveal(path)
+      await open(path)
+    } else if (file) await reopen(file.path)
+  }
+
+  const endReview = async (): Promise<void> => {
+    await save()
+    await gitAction(() => window.api.git.endReview())
+    setDiff(null)
+    if (file) await reopen(file.path)
+  }
+
+  // A link to the branch on GitHub, and to the open page, for a colleague to review.
+  const copyReviewLink = async (): Promise<boolean> => {
+    const repoName = gitStatus?.remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
+    if (!gitStatus?.branch || !gitStatus.upstream) {
+      fail(new Error('Push the branch first, so others can get it from GitHub.'))
+      return false
+    }
+    const page = file?.path.startsWith(site.contentDir + '/') ? file.path : null
+    const branch = gitStatus.upstream.replace(/^origin\//, '')
+    await window.api.clipboardWrite(makeReviewLink({ repo: repoName ?? null, branch, page }))
+    return true
+  }
+
   const openSwitchBranch = async (): Promise<void> => {
     try {
       setBranches(await window.api.git.branches())
@@ -904,6 +974,9 @@ export default function App(): React.JSX.Element | null {
       case 'find-page':
         setFinding(true)
         break
+      case 'open-review-link':
+        setPastingLink(true)
+        break
       case 'new-page-from-document':
         void newPageFromDocument()
         break
@@ -992,6 +1065,15 @@ export default function App(): React.JSX.Element | null {
             )}
           </div>
         </header>
+        {gitStatus?.review && (
+          <div className="review-bar">
+            <span>
+              Reviewing <strong>{gitStatus.review.branch}</strong>. Edits you commit here go to that
+              branch.
+            </span>
+            <button onClick={() => void endReview()}>Back to {gitStatus.review.from}</button>
+          </div>
+        )}
         <div className="body">
           <aside className="sidebar" style={{ width: sidebarWidth }}>
             <div className="sidebar-tabs">
@@ -1069,6 +1151,7 @@ export default function App(): React.JSX.Element | null {
                 onRelease={setReleaseDialog}
                 onPublish={setReleaseDialog}
                 onSwitchBranch={() => void openSwitchBranch()}
+                onCopyLink={copyReviewLink}
               />
             )}
           </aside>
@@ -1190,6 +1273,37 @@ export default function App(): React.JSX.Element | null {
             y={menu.y}
             items={menuItems(menu.entry)}
             onClose={() => setMenu(null)}
+          />
+        )}
+        {reviewLink && (
+          <ReviewDialog
+            link={reviewLink}
+            status={gitStatus}
+            me={identity}
+            page={pages.get(linkedPage(reviewLink) ?? '') ?? null}
+            onOpen={() => openReview(reviewLink)}
+            onChooseRepo={() => {
+              setReviewLink(null)
+              void window.api.repo.choose()
+            }}
+            onCancel={() => setReviewLink(null)}
+          />
+        )}
+        {pastingLink && (
+          <PromptDialog
+            title="Open review link"
+            label="Review link"
+            initial=""
+            submitLabel="Open"
+            onCancel={() => setPastingLink(false)}
+            onSubmit={(text) => {
+              setPastingLink(false)
+              void window.api.link
+                .parse(text)
+                .then((link) =>
+                  link ? setReviewLink(link) : fail(new Error(`${text} is not a review link.`))
+                )
+            }}
           />
         )}
         {finding && (

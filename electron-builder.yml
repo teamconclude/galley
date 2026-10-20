@@ -29,3 +29,7 @@ publish:
   repo: galley
   releaseType: release
 npmRebuild: false
+# Review links, galley://open?branch=…, open the app; see src/shared/reviewLink.ts.
+protocols:
+  - name: Galley review link
+    schemes: [galley]

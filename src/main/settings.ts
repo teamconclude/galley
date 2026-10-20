@@ -14,6 +14,8 @@ export interface Settings {
   setupSeen?: string
   prefs?: Partial<Preferences>
   zoom?: number
+  // A branch opened for review in the checkout at repo, and the one it was opened from.
+  review?: { repo: string; branch: string; from: string }
 }
 
 const file = (): string => join(app.getPath('userData'), 'settings.json')

@@ -60,6 +60,7 @@ export function buildMenu(actions: Actions): Menu {
         item('add-images', 'Add Images…'),
         { type: 'separator' },
         item('find-page', 'Find Page…', 'CmdOrCtrl+P'),
+        item('open-review-link', 'Open Review Link…'),
         { type: 'separator' },
         item('save', 'Save', 'CmdOrCtrl+S'),
         item('duplicate-page', 'Duplicate Page…'),
@@ -145,7 +146,8 @@ const siteCommands: MenuCommand[] = [
   'new-page-from-document',
   'new-folder',
   'add-images',
-  'find-page'
+  'find-page',
+  'open-review-link'
 ]
 const pageCommands: MenuCommand[] = [
   'save',

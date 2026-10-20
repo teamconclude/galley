@@ -106,6 +106,14 @@ them to the Trash, or add them after a warning. New files in odd places, a docum
 the pages or a file name with spaces, are marked and left out of the commit until ticked,
 and images dropped among the pages go to the section's images folder.
 
+**Review links.** Once a branch is on GitHub, **Copy review link** (branch menu, or next to
+"In sync with GitHub") copies a link to it and the open page, e.g.
+`https://conclude.io/galley/open/?branch=buket/pylon&page=content/compare/pylon.md`. The
+page there hands it to `galley://open`, which opens the colleague's Galley; pull requests
+Galley opens carry the link too. Galley first shows the branch's commits and authors, then
+commits the reader's own changes to their branch, switches, and opens the page. A bar
+offers the way back. **File ▸ Open Review Link…** takes a pasted link.
+
 ## Development
 
 Galley is an Electron app written in TypeScript with React, built with electron-vite. The

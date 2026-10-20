@@ -36,6 +36,7 @@ import { clone, Git } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
 import { dropPlacement } from './placement'
+import { parseReviewLink, type ReviewLink } from '../shared/reviewLink'
 import { showAbout } from './about'
 import { buildMenu, setMenuState } from './menu'
 import { Repo } from './repo'
@@ -264,6 +265,7 @@ function registerIpc(): void {
     return src ? importDocument(src) : null
   })
   ipcMain.handle('repo:pages', () => current().pageList())
+  ipcMain.handle('repo:pageAt', (_e, url: string) => current().pageAt(url))
   ipcMain.handle('repo:linkTargets', async () => ({
     targets: await current().linkTargets(),
     hosts: await environmentSites(current().path)
@@ -319,6 +321,10 @@ function registerIpc(): void {
   ipcMain.handle('git:mergeToBase', () => currentGit().mergeToBase())
   ipcMain.handle('git:moveToBranch', (_e, name: string) => currentGit().moveToBranch(name))
   ipcMain.handle('git:log', (_e, range: CommitRange) => currentGit().log(range))
+  ipcMain.handle('git:repoSlug', () => currentGit().repoSlug())
+  ipcMain.handle('git:fetchBranch', (_e, name: string) => currentGit().fetchBranch(name))
+  ipcMain.handle('git:startReview', (_e, name: string) => currentGit().startReview(name))
+  ipcMain.handle('git:endReview', () => currentGit().endReview())
   ipcMain.handle('git:include', (_e, rel: string) => currentGit().include(rel))
   ipcMain.handle('git:added', (_e, dir: string) => currentGit().added(dir))
   ipcMain.handle('git:committedImage', (_e, rel: string) => currentGit().committedImage(rel))
@@ -394,6 +400,13 @@ function registerIpc(): void {
   ipcMain.handle('prefs:get', () => prefs())
   ipcMain.on('zoom', (_e, step: number | null) => zoom(step))
   ipcMain.handle('clipboard:text', () => clipboard.readText())
+  ipcMain.handle('clipboard:write', (_e, text: string) => clipboard.writeText(text))
+  ipcMain.handle('link:take', () => {
+    const link = pendingLink
+    pendingLink = null
+    return link
+  })
+  ipcMain.handle('link:parse', (_e, text: string) => parseReviewLink(text))
   ipcMain.handle('prefs:set', (_e, p: Preferences) => saveSettings({ ...loadSettings(), prefs: p }))
   ipcMain.handle('setup:status', () => setup.status)
   ipcMain.handle('setup:retry', (_e, step: SetupStepId) => setup.retry(step))
@@ -438,6 +451,32 @@ function registerRepoProtocol(): void {
   })
 }
 
+// Review links: macOS hands galley://open?… to the app, also to launch it, before it is
+// ready. The link waits until the window asks for it; it only names a branch and a page,
+// which the window shows before anything happens.
+let pendingLink: ReviewLink | null = null
+
+function receiveLink(text: string): void {
+  const link = parseReviewLink(text)
+  if (!link) {
+    if (app.isReady()) dialog.showErrorBox('Not a review link', `Galley cannot open ${text}`)
+    return
+  }
+  pendingLink = link
+  if (!app.isReady()) return
+  if (!win) createWindow()
+  else {
+    if (win.isMinimized()) win.restore()
+    win.focus()
+    send('link:arrived')
+  }
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  receiveLink(url)
+})
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'galley', privileges: { standard: true, secure: true, supportFetchAPI: true } }
 ])
@@ -466,6 +505,9 @@ app.whenReady().then(() => {
   )
   registerIpc()
   registerRepoProtocol()
+  // Links reach whichever Galley registered last; a development build takes them over
+  // until the installed app starts again.
+  app.setAsDefaultProtocolClient('galley')
   const { repoPath } = loadSettings()
   if (repoPath && Repo.isSite(repoPath)) openRepo(repoPath)
   if (offerMoveToApplications()) return

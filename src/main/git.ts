@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import { extname, join } from 'path'
 import type {
+  Review,
   Change,
   ChangeKind,
   Commit,
@@ -15,11 +16,12 @@ import type {
   SiteInfo
 } from '../shared/types'
 import { splitDiff } from '../shared/diff'
+import { reviewLink } from '../shared/reviewLink'
 import { publish } from './github'
 import { environmentSite } from './hugoConfig'
 import { placementWarning } from './placement'
 import { defaultSiteInfo } from '../shared/siteInfo'
-import { prefs } from './settings'
+import { loadSettings, prefs, saveSettings } from './settings'
 import { findGit, gitEnv } from './tools'
 
 const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'develop'])
@@ -228,7 +230,8 @@ export class Git {
       remoteUrl,
       lastFetch: this.lastFetch,
       fetchError: this.fetchError,
-      busy: this.busy
+      busy: this.busy,
+      review: this.reviewOf(branch)
     }
   }
 
@@ -280,6 +283,7 @@ export class Git {
   async log(range: CommitRange): Promise<Commit[]> {
     const status = await this.status()
     const { upstream, base } = status
+    const reviewable = range.kind === 'review' && (await this.validBranch(range.branch))
     const revs = ((): string | null => {
       switch (range.kind) {
         case 'incoming':
@@ -290,6 +294,8 @@ export class Git {
           return `HEAD..origin/${base}`
         case 'branch':
           return `origin/${base}..HEAD`
+        case 'review':
+          return reviewable ? `origin/${base}..origin/${range.branch}` : null
         case 'release': {
           const known = status.releases.some((s) => s.from === range.from && s.to === range.to)
           return known ? `origin/${range.to}..origin/${range.from}` : null
@@ -513,7 +519,10 @@ export class Git {
 
   // A base branch that only takes pull requests gets one, merged right away.
   private async pullRequestInto(branch: string, base: string): Promise<void> {
-    const result = await publish(await this.slug(), branch, base)
+    const slug = await this.slug()
+    const link = reviewLink({ repo: slug, branch, page: null })
+    const body = `Opened from Galley.\n\n[Review ${branch} in Galley](${link})`
+    const result = await publish(slug, branch, base, body)
     if (!result.merged) {
       throw new Error(
         `${base} only takes pull requests. One is open at ${result.url}; ${result.error ?? 'merge it on GitHub'}.`
@@ -606,6 +615,67 @@ export class Git {
     ])
     const untracked = await this.lines(['ls-files', '--others', '--exclude-standard', '--', dir])
     return [...new Set([...committed, ...staged, ...untracked])].sort()
+  }
+
+  // A review in progress in this checkout, while it is on the reviewed branch.
+  private reviewOf(branch: string): Review | null {
+    const review = loadSettings().review
+    if (!review || review.repo !== this.path || review.branch !== branch) return null
+    return { branch: review.branch, from: review.from }
+  }
+
+  private validBranch(name: string): Promise<boolean> {
+    return this.git(['check-ref-format', '--branch', name]).then(
+      () => true,
+      () => false
+    )
+  }
+
+  // The repository on GitHub, as owner/name, or null.
+  async repoSlug(): Promise<string | null> {
+    return this.slug().catch(() => null)
+  }
+
+  // Brings a colleague's branch from GitHub without touching the checkout; false when
+  // GitHub has no such branch, e.g. after it was merged and removed.
+  async fetchBranch(name: string): Promise<boolean> {
+    if (!(await this.validBranch(name))) throw new Error(`${name} is not a branch name`)
+    return this.op(`Getting ${name}…`, async () => {
+      const ref = `+refs/heads/${name}:refs/remotes/origin/${name}`
+      const found = await this.git(['fetch', 'origin', ref]).then(
+        () => true,
+        () => false
+      )
+      this.lastFetch = Date.now()
+      return found
+    })
+  }
+
+  // Switches to a fetched branch, up to date with GitHub, and remembers the branch to go
+  // back to. Opening a second review keeps the first way back.
+  async startReview(name: string): Promise<void> {
+    if (!(await this.validBranch(name))) throw new Error(`${name} is not a branch name`)
+    const { branch, review } = await this.status()
+    const from = review?.from ?? branch
+    await this.op(`Opening ${name}…`, async () => {
+      await this.git(['switch', name])
+      await this.git(['merge', '--ff-only', `origin/${name}`]).catch(() => undefined)
+    })
+    if (from && from !== name) {
+      saveSettings({ ...loadSettings(), review: { repo: this.path, branch: name, from } })
+    }
+    await this.refresh()
+  }
+
+  // Back to the branch the review started from.
+  async endReview(): Promise<void> {
+    const review = loadSettings().review
+    if (!review || review.repo !== this.path) return
+    await this.switchBranch(review.from)
+    const settings = loadSettings()
+    delete settings.review
+    saveSettings(settings)
+    await this.refresh()
   }
 
   // An image as last committed, for comparing it with the one in the checkout.

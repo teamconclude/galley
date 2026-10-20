@@ -2494,3 +2494,30 @@ body.dragging .terminal-host {
   border: none;
   align-self: center;
 }
+
+.review-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 12px;
+  background: var(--blue1);
+  color: var(--blue3);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.review-bar button {
+  margin-left: auto;
+}
+
+.review-commits {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.dialog-note.error {
+  color: var(--danger);
+}

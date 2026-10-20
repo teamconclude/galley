@@ -28,6 +28,7 @@ import type {
   SetupStepId,
   UpdateStatus
 } from './types'
+import type { ReviewLink } from './reviewLink'
 
 export type Unsubscribe = () => void
 
@@ -54,6 +55,8 @@ export interface Api {
     linkTargets: () => Promise<{ targets: string[]; hosts: string[] }>
     // Every page with its title, address, dates and aliases.
     pages: () => Promise<PageInfo[]>
+    // The page at an address or alias, from a fresh listing.
+    pageAt: (url: string) => Promise<string | null>
     create: (rel: string, text: string) => Promise<void>
     mkdir: (rel: string) => Promise<void>
     rename: (from: string, to: string) => Promise<void>
@@ -96,6 +99,13 @@ export interface Api {
     committedImage: (path: string) => Promise<string | null>
     // Files under a folder this branch brings, new or added since the base branch.
     added: (dir: string) => Promise<string[]>
+    // The repository on GitHub, as owner/name, or null.
+    repoSlug: () => Promise<string | null>
+    // A colleague's branch from GitHub, without switching; false when GitHub has none.
+    fetchBranch: (name: string) => Promise<boolean>
+    // Switches to a fetched branch for review, and back to the editor's own.
+    startReview: (name: string) => Promise<void>
+    endReview: () => Promise<void>
     release: (from: string, to: string) => Promise<void>
     publish: (from: string, to: string) => Promise<PublishResult>
     // A new file is moved to the Trash.
@@ -148,6 +158,14 @@ export interface Api {
   zoom: (step: number | null) => void
   // The clipboard's plain text, for Paste as plain text.
   clipboardText: () => Promise<string>
+  clipboardWrite: (text: string) => Promise<void>
+  link: {
+    // The review link Galley was opened with, once.
+    take: () => Promise<ReviewLink | null>
+    onArrived: (cb: () => void) => Unsubscribe
+    // A pasted link's parts, or null for anything else.
+    parse: (text: string) => Promise<ReviewLink | null>
+  }
   prefs: {
     get: () => Promise<Preferences>
     set: (prefs: Preferences) => Promise<void>

@@ -113,7 +113,12 @@ interface PullRequest {
 
 // Opens (or reuses) a pull request from head to base and merges it; without a sign-in
 // or when GitHub refuses the merge, the caller sends the user to the page instead.
-export async function publish(slug: string, head: string, base: string): Promise<PublishResult> {
+export async function publish(
+  slug: string,
+  head: string,
+  base: string,
+  body = 'Opened from Galley.'
+): Promise<PublishResult> {
   const tok = token()
   if (!tok) {
     return {
@@ -131,7 +136,7 @@ export async function publish(slug: string, head: string, base: string): Promise
       title: `Publish ${head} to ${base}`,
       head,
       base,
-      body: 'Opened from Galley.'
+      body
     })) as PullRequest)
   try {
     await request('PUT', `/repos/${slug}/pulls/${pr.number}/merge`, tok, { merge_method: 'merge' })

@@ -158,6 +158,8 @@ export interface OutsideEntry {
 export type CommitRange =
   | { kind: 'incoming' | 'outgoing' | 'base' | 'branch' }
   | { kind: 'release'; from: string; to: string }
+  // A colleague's branch opened from a review link: what it adds to the base.
+  | { kind: 'review'; branch: string }
 
 export interface Commit {
   hash: string
@@ -194,6 +196,14 @@ export interface GitStatus {
   lastFetch: number | null
   fetchError: string | null
   busy: string | null
+  // Set while the checkout is on a branch opened from a review link, with the branch to
+  // go back to.
+  review: Review | null
+}
+
+export interface Review {
+  branch: string
+  from: string
 }
 
 export interface Identity {
@@ -320,6 +330,7 @@ export type MenuCommand =
   | 'new-page'
   | 'new-page-from-document'
   | 'find-page'
+  | 'open-review-link'
   | 'new-folder'
   | 'add-images'
   | 'duplicate-page'

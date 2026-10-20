@@ -13,6 +13,8 @@ plutil -replace CFBundleName -string Galley "$plist"
 plutil -replace CFBundleDisplayName -string Galley "$plist"
 plutil -replace CFBundleExecutable -string Galley "$plist"
 plutil -replace CFBundleIdentifier -string io.conclude.galley.dev "$plist"
+# Review links, galley://open?…, reach a running development build too.
+plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"Galley review link","CFBundleURLSchemes":["galley"]}]' "$plist"
 printf 'Galley.app/Contents/MacOS/Galley' > node_modules/electron/path.txt
 
 [ -f build/icon.icns ] || scripts/make-icns

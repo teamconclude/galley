@@ -34,6 +34,7 @@ const api: Api = {
     chooseImages: () => ipcRenderer.invoke('repo:chooseImages'),
     reveal: (rel) => ipcRenderer.invoke('repo:reveal', rel),
     pages: () => ipcRenderer.invoke('repo:pages'),
+    pageAt: (url) => ipcRenderer.invoke('repo:pageAt', url),
     placement: (rel) => ipcRenderer.invoke('repo:placement', rel),
     newest: (dir) => ipcRenderer.invoke('repo:newest', dir),
     search: (query, options) => ipcRenderer.invoke('repo:search', query, options),
@@ -64,6 +65,10 @@ const api: Api = {
     include: (path) => ipcRenderer.invoke('git:include', path),
     committedImage: (path) => ipcRenderer.invoke('git:committedImage', path),
     added: (dir) => ipcRenderer.invoke('git:added', dir),
+    repoSlug: () => ipcRenderer.invoke('git:repoSlug'),
+    fetchBranch: (name) => ipcRenderer.invoke('git:fetchBranch', name),
+    startReview: (name) => ipcRenderer.invoke('git:startReview', name),
+    endReview: () => ipcRenderer.invoke('git:endReview'),
     release: (from, to) => ipcRenderer.invoke('git:release', from, to),
     publish: (from, to) => ipcRenderer.invoke('git:publish', from, to),
     discard: (path, isNew) => ipcRenderer.invoke('git:discard', path, isNew),
@@ -105,6 +110,12 @@ const api: Api = {
   },
   zoom: (step) => ipcRenderer.send('zoom', step),
   clipboardText: () => ipcRenderer.invoke('clipboard:text'),
+  clipboardWrite: (text) => ipcRenderer.invoke('clipboard:write', text),
+  link: {
+    take: () => ipcRenderer.invoke('link:take'),
+    onArrived: (cb) => on('link:arrived', cb),
+    parse: (text) => ipcRenderer.invoke('link:parse', text)
+  },
   prefs: {
     get: () => ipcRenderer.invoke('prefs:get'),
     set: (prefs) => ipcRenderer.invoke('prefs:set', prefs)

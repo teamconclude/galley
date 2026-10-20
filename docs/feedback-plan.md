@@ -6,10 +6,11 @@ the web repository, and the work that follows from it.
 
 ## Status
 
-Phases 1 to 5 are done on develop, unreleased (2026-10-20). The site names in the Publishing
+Phases 1 to 6 are done on develop, unreleased (2026-10-20). The site names in the Publishing
 section need a `baseURL` in `config/staging/` and `config/production/` of the web
 repository, which today passes it on the command line only. The web side of phase 2 is
-on its branch `lars/claude-content-editing`. Phase 6 is next.
+on its branch `lars/claude-content-editing`; the forwarding page of phase 6 on
+`lars/galley-review-links`. Phase 7 waits for a need.
 
 ## What the feedback showed
 
@@ -196,7 +197,7 @@ title matches first, then address, alias and file name, newest first; without a 
 lists the newest pages. Titles are the default in the tree, folders keep their names, and
 a page bundle's folder takes its page's title. Badges reuse the settings pane's.
 
-### Phase 6: deep links
+### Phase 6: deep links (done)
 
 `galley://open?repo=teamconclude/Conclude-web&branch=buket/pylon&page=content/compare/pylon.md`
 opens a colleague's branch for review. `page` is optional; `url=/compare/pylon/` resolves
@@ -214,6 +215,16 @@ through the page list instead.
    the link; branches in the expanded commit lists get Open in Galley.
 5. The branch name is checked with `git check-ref-format` and the page must lie inside the
    checkout. Nothing in the link runs.
+
+As built: the forwarding page is `static/galley/open/` in the web repo (kept out of
+robots.txt), so links read `https://conclude.io/galley/open/?branch=…&page=…`. Galley
+checks the repository against the checkout it has open; without one, the link waits until
+the welcome screen has opened or cloned the site. A shared branch with uncommitted changes
+cannot be left for a review; the dialog asks for New branch first. The review and the
+branch to go back to are kept in the settings, so the bar survives a restart. Not built:
+Open in Galley on branches in the commit lists, which list commits already merged, whose
+branches are mostly gone. Links reach whichever Galley registered last, so a development
+build takes them over until the installed app starts again.
 
 A second window on a worktree would keep the editor's own work untouched, at the cost of
 one repository, git and Hugo server per window. Only if switching proves annoying.
