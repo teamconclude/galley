@@ -34,10 +34,10 @@ Your work moves through a few stages:
    you, such as `anna/pricing-update`. Galley saves every edit on your Mac as you type.
 2. **Commit.** When a piece of work is ready, you commit it: Galley records the changed
    files with a short note on what you did, and sends them to your branch on GitHub.
-3. **Merge into develop.** `develop` is the branch the whole team shares. Merging adds your
-   work to it.
-4. **Publish.** From `develop`, the team's work moves on to the test site, conclude.dev,
-   and finally to `production`, the live site, conclude.io.
+3. **Merge into develop.** `develop` is the branch the whole team shares, and the test
+   site, conclude.dev, shows it. Merging adds your work to it.
+4. **Publish.** From `develop`, the team's work moves on to `production`, the live site,
+   conclude.io.
 
 The **Changes** tab at the left shows where you stand and offers the next step each time.
 
@@ -258,14 +258,14 @@ commits behind it: who made them, when, and which files they touched.
 
 ## Publishing
 
-When your work is ready, **Merge into develop…** in the Changes tab adds it to `develop`.
-The dialog lists what goes along. Afterwards you carry on with your own branch.
+When your work is ready, **Merge into develop…** in the Changes tab adds it to `develop`,
+and the test site, conclude.dev, shows it a few minutes later. The dialog lists what goes
+along. Afterwards you carry on with your own branch.
 
-The **Publishing** section at the bottom of the Changes tab moves `develop` on towards the
-live site, one step at a time, and names the site each step updates: first the test site,
-conclude.dev, where the team checks the result, then **Publish…** for the live site,
-conclude.io. The sites rebuild within a few minutes. Each step first shows whose work goes
-along, so check with your colleagues before publishing their work.
+The **Publishing** section at the bottom of the Changes tab puts `develop` live. Once the
+team has checked the result on conclude.dev, **Publish…** updates the live site,
+conclude.io, within a few minutes. It first shows whose work goes along, so check with
+your colleagues before publishing their work.
 
 ## Sharing work for review
 
@@ -345,9 +345,8 @@ every few minutes; the ⋯ menu in the Changes tab has **Check for updates now**
 
 **Galley says it is not signed in to GitHub.** Open **Galley ▸ Setup…** and sign in again.
 
-**My change is not on conclude.dev.** Check the Changes tab: the change must be committed,
-merged into develop, and moved on to the test site in the Publishing section. The site
-takes a few minutes to rebuild.
+**My change is not on conclude.dev.** Check the Changes tab: the change must be committed
+and merged into develop. The site takes a few minutes to rebuild.
 
 **A link has a red wavy underline.** No page or file lives at that address. Check for a
 typo, or use Find Page to look up the right address.

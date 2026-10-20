@@ -101,8 +101,8 @@ or the picture for an image. Work happens on a branch: the branch menu creates o
 after you. Write a short message and **Commit** the selected files; **Push** uploads them
 to your branch on GitHub, where nothing goes live yet. **Merge into develop** adds your
 commits to the shared branch and you carry on with your own. The Publishing section moves
-the shared branches on, `develop` to `staging` and `staging` to `production`, named after
-the site each one builds when its Hugo environment (`config/<branch>/`) sets a `baseURL`.
+the shared branches on along `develop`, `staging` and `production`, whichever exist on
+GitHub, named after the site each one builds when its Hugo environment (`config/<branch>/`) sets a `baseURL`.
 Every count opens into its commits with author, date and files, and the merge and publish
 confirmations name whose work goes along. Galley checks GitHub every few minutes and
 offers **Pull** when a colleague added to your branch and **Update** when the base moved
