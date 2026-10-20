@@ -9,6 +9,9 @@ import { pretendMissing } from './tools'
 import { isNewer } from './updater'
 
 const week = 7 * 24 * 60 * 60 * 1000
+// A server that dies is started again, but one that keeps dying is left stopped with its
+// error showing: past this many restarts in a minute, something else is wrong.
+const maxRestarts = 3
 
 const ownDir = (): string => join(app.getPath('userData'), 'hugo')
 const ownBinary = (version: string): string => join(ownDir(), version, 'hugo')
@@ -113,6 +116,8 @@ export class HugoServer {
   private bin: string | null = null
   private repo: string | null = null
   private recovering = false
+  private restarts: number[] = []
+  private restartTimer: NodeJS.Timeout | null = null
   status: HugoStatus = { state: 'stopped' }
 
   constructor(private onStatus: (status: HugoStatus) => void) {}
@@ -153,6 +158,7 @@ export class HugoServer {
     proc.on('exit', (code) => {
       if (this.proc !== proc) return
       this.proc = null
+      if (this.restartAfterCrash(repo)) return
       const tail = output.trim().split('\n').slice(-3).join('\n')
       this.set({ state: 'error', message: `Hugo exited (code ${code}).\n${tail}` })
     })
@@ -173,6 +179,21 @@ export class HugoServer {
       this.recovering = false
       if (this.proc === proc) void this.start(repo)
     }, 1500)
+  }
+
+  // Hugo's file watcher can crash the whole server, e.g. when a rebase rewrites many files
+  // at once. It is started again after a moment; false when it crashed too often lately.
+  private restartAfterCrash(repo: string): boolean {
+    const now = Date.now()
+    this.restarts = this.restarts.filter((t) => now - t < 60_000)
+    if (this.restarts.length >= maxRestarts) return false
+    this.restarts.push(now)
+    this.set({ state: 'starting', message: 'The preview server stopped; starting it again…' })
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null
+      void this.start(repo)
+    }, 1500)
+    return true
   }
 
   async install(repo: string): Promise<void> {
@@ -208,6 +229,8 @@ export class HugoServer {
   }
 
   stop(): void {
+    if (this.restartTimer) clearTimeout(this.restartTimer)
+    this.restartTimer = null
     const proc = this.proc
     this.proc = null
     proc?.kill()
