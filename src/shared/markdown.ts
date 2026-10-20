@@ -1,5 +1,5 @@
 import TurndownService from 'turndown'
-import { gfm } from 'turndown-plugin-gfm'
+import { highlightedCodeBlock, strikethrough, taskListItems } from 'turndown-plugin-gfm'
 
 // HTML becomes Markdown by rule, not by retyping: headings, lists, emphasis, tables and
 // links come through exactly as written. Used for dropped documents in the main process
@@ -12,7 +12,8 @@ function service(): TurndownService {
     strongDelimiter: '**',
     codeBlockStyle: 'fenced'
   })
-  td.use(gfm)
+  // GitHub's flavour, except tables, which follow their own rule below.
+  td.use([highlightedCodeBlock, strikethrough, taskListItems])
   td.remove(['style', 'script', 'meta', 'title', 'head', 'noscript'])
   // One space after the list marker, as people write lists, instead of turndown's three.
   td.addRule('listItem', {
@@ -21,8 +22,7 @@ function service(): TurndownService {
       const parent = node.parentNode as HTMLElement | null
       let prefix = '- '
       if (parent?.nodeName === 'OL') {
-        const start = Number(parent.getAttribute('start') ?? 1)
-        prefix = `${start + Array.prototype.indexOf.call(parent.children, node)}. `
+        prefix = `${listStart(parent) + Array.prototype.indexOf.call(parent.children, node)}. `
       }
       // Items wrapped in paragraphs, as Google Docs and Word copy them, stay a tight list.
       const text = content
@@ -45,8 +45,7 @@ function service(): TurndownService {
       const style = (node as HTMLElement).getAttribute('style') ?? ''
       if (!content.trim()) return content
       // Headings are bold by their nature; Docs says so on every heading's span.
-      const inHeading = !!(node as HTMLElement).closest?.('h1, h2, h3, h4, h5, h6')
-      const bold = !inHeading && /font-weight:\s*(bold|[6-9]00)/.test(style)
+      const bold = !inHeading(node) && /font-weight:\s*(bold|[6-9]00)/.test(style)
       const italic = /font-style:\s*italic/.test(style)
       const [lead, core, trail] = content.match(/^(\s*)([\s\S]*?)(\s*)$/)!.slice(1)
       const mark = (bold ? '**' : '') + (italic ? '*' : '')
@@ -54,7 +53,87 @@ function service(): TurndownService {
       return lead + mark + core + close + trail
     }
   })
+  // Word marks headings bold as well.
+  td.addRule('headingBold', {
+    filter: (node) => (node.nodeName === 'STRONG' || node.nodeName === 'B') && inHeading(node),
+    replacement: (content) => content
+  })
+  // Tables become Markdown tables with the first row as their header, whatever the source
+  // marks as header cells: Word marks every row or none. A table whose cells hold lists,
+  // pictures or tables of their own stays HTML, on one line so Markdown keeps it whole.
+  td.addRule('table', {
+    filter: 'table',
+    replacement(_content, node) {
+      const table = node as HTMLElement
+      const rows = tableRows(table)
+      if (rows.length === 0) return ''
+      if (table.querySelector('td table, th table, td ul, th ul, td ol, th ol, td img, th img')) {
+        return '\n\n' + table.outerHTML.replace(/\s*\n\s*/g, ' ') + '\n\n'
+      }
+      const cells = rows.map((row) =>
+        Array.from(row.children)
+          .filter((c) => c.nodeName === 'TD' || c.nodeName === 'TH')
+          .map((c) => cellText(c as HTMLElement))
+      )
+      const width = Math.max(...cells.map((r) => r.length))
+      const line = (r: string[]): string =>
+        '| ' + Array.from({ length: width }, (_, i) => r[i] ?? '').join(' | ') + ' |'
+      const header = cells[0].map((c) => c.replace(/^\*\*([\s\S]*)\*\*$/, '$1'))
+      const rule = '|' + ' --- |'.repeat(width)
+      return '\n\n' + [line(header), rule, ...cells.slice(1).map(line)].join('\n') + '\n\n'
+    }
+  })
   return td
+}
+
+// Where a numbered list starts. Word continues numbered steps across a picture between
+// them, which arrives as separate lists; a list right after another with only pictures in
+// between continues its count.
+function listStart(ol: HTMLElement): number {
+  const start = ol.getAttribute('start')
+  if (start) return Number(start)
+  let prev = ol.previousSibling
+  while (prev && isPictureOnly(prev)) prev = prev.previousSibling
+  if (prev?.nodeName !== 'OL') return 1
+  const items = Array.from((prev as HTMLElement).children).filter((c) => c.nodeName === 'LI')
+  return listStart(prev as HTMLElement) + items.length
+}
+
+function isPictureOnly(node: Node): boolean {
+  if (node.nodeType === 3) return !(node.textContent ?? '').trim()
+  const el = node as HTMLElement
+  return (
+    el.nodeName === 'IMG' ||
+    (el.nodeName === 'P' && !!el.querySelector?.('img') && !el.textContent?.trim())
+  )
+}
+
+function inHeading(node: Node): boolean {
+  for (let n = node.parentNode; n; n = n.parentNode) if (/^H[1-6]$/.test(n.nodeName)) return true
+  return false
+}
+
+// The rows of a table itself, not of tables inside its cells.
+function tableRows(table: HTMLElement): HTMLElement[] {
+  const rows: HTMLElement[] = []
+  for (const child of Array.from(table.children)) {
+    if (child.nodeName === 'TR') rows.push(child as HTMLElement)
+    else if (/^(THEAD|TBODY|TFOOT)$/.test(child.nodeName)) {
+      for (const row of Array.from(child.children))
+        if (row.nodeName === 'TR') rows.push(row as HTMLElement)
+    }
+  }
+  return rows
+}
+
+// A cell's text as Markdown on one line: paragraphs joined by line breaks, pipes escaped.
+function cellText(cell: HTMLElement): string {
+  return service()
+    .turndown(cell.innerHTML)
+    .trim()
+    .replace(/\n{2,}/g, '<br>')
+    .replace(/\n/g, ' ')
+    .replace(/\|/g, '\\|')
 }
 
 // Google rewrites links in some copies as https://www.google.com/url?q=<target>&…
@@ -81,6 +160,11 @@ export function htmlToMarkdown(html: string): string {
       // its own in such a paragraph is a picture, not a heading.
       .replace(/^#{1,6}[ \t]*$/gm, '')
       .replace(/^#{1,6}[ \t]+(!\[[^\]]*\]\([^)]*\))[ \t]*$/gm, '$1')
+      // A number opening a heading needs no escaping; in a paragraph it would be a list.
+      .replace(/^(#{1,6} +\d+)\\\./gm, '$1.')
+      // Bullets typed by hand, one paragraph each, become a list.
+      .replace(/^[•●▪◦][ \t]*/gm, '- ')
+      .replace(/^(- .*)\n\n(?=- )/gm, '$1\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim() + '\n'
   )

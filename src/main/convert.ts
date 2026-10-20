@@ -18,6 +18,8 @@ export async function docxToMarkdown(src: string, dir: string): Promise<string> 
   const result = await mammoth.convertToHtml(
     { path: src },
     {
+      // Word's Title style is the document's headline; its Subtitle stays a paragraph.
+      styleMap: ["p[style-name='Title'] => h1:fresh", "p[style-name='Subtitle'] => p:fresh"],
       convertImage: mammoth.images.imgElement(async (image) => {
         const ext = (image.contentType.split('/')[1] ?? 'png').replace('jpeg', 'jpg')
         const file = `${name}-image-${++count}.${ext}`

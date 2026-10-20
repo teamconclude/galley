@@ -70,15 +70,26 @@ export interface DocumentParts {
 }
 
 // A document's headline becomes the page title and what follows it the text; anything
-// above the headline is set apart as notes.
+// above the headline is set apart as notes. The headline is the first top-level heading,
+// or a short first paragraph in bold throughout, as a title set by hand in Word looks.
+// The page's title is its only top-level heading, so when the text uses them for its
+// sections, every heading moves down a level.
 export function documentParts(markdown: string): DocumentParts {
   const { frontmatter, body: rest } = split(markdown)
   const fmTitle = frontmatter
     ? (parseDocument(frontmatter).get('title') as string | undefined)
     : undefined
-  const heading = rest.match(/^# +(.+?)\s*$/m)
+  const first = rest.match(/^\s*\*\*([^*\n]{1,120})\*\*[ \t]*$/m)
+  const firstIsTitle = first !== null && rest.slice(0, first.index).trim() === ''
+  const heading = firstIsTitle ? first : rest.match(/^# +(.+?)\s*$/m)
   if (!heading) {
-    return { frontmatter, title: fmTitle ?? '', notes: '', slug: null, body: rest.trim() + '\n' }
+    return {
+      frontmatter,
+      title: fmTitle ?? '',
+      notes: '',
+      slug: null,
+      body: demote(rest.trim()) + '\n'
+    }
   }
   const at = heading.index!
   const notes = rest.slice(0, at).trim()
@@ -88,10 +99,9 @@ export function documentParts(markdown: string): DocumentParts {
     title: fmTitle ?? heading[1].replace(/\*\*|__/g, '').trim(),
     notes,
     slug: address ? address[1] : null,
-    body:
-      rest
-        .slice(at + heading[0].length)
-        .replace(/^\s+/, '')
-        .trimEnd() + '\n'
+    body: demote(rest.slice(at + heading[0].length).trim()) + '\n'
   }
 }
+
+const demote = (text: string): string =>
+  /^# /m.test(text) ? text.replace(/^(#{1,5}) /gm, '#$1 ') : text

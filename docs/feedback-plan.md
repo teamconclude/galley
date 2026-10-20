@@ -159,7 +159,13 @@ Done on develop, unreleased (2026-10-19).
    alias or static file are underlined. The targets come from `hugo list all`, the
    `aliases` in front matter and the static folder, cached until pages move.
 
-Tables without a header row stay HTML: Markdown tables need one, and Hugo renders the HTML.
+Word documents (checked on the Teams test guide): tables become Markdown tables with the
+first row as header, since Word marks every row or none as a header (mammoth reads
+`tblHeader w:val="0"` as a header); cells holding lists, pictures or tables stay HTML on
+one line. Word's Title style, or a short bold first paragraph, is the headline, and the
+text's headings move down a level when it uses top-level ones. Numbered steps split by a
+screenshot keep counting, typed "•" bullets become a list, and the text above the
+headline can be put on the page from the dialog.
 
 ### Phase 4: images
 

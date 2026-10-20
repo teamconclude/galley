@@ -108,6 +108,7 @@ export function NewPageDialog(props: NewPageProps): React.JSX.Element {
   })
   const [document, setDocument] = useState<NewPage['document']>(null)
   const [docName, setDocName] = useState('')
+  const [keepNotes, setKeepNotes] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const shownSlug = slugEdited ? slug : slugify(title)
   const valid = title.trim() !== '' && /^[a-z0-9][a-z0-9-]*$/.test(shownSlug) && date !== ''
@@ -119,6 +120,7 @@ export function NewPageDialog(props: NewPageProps): React.JSX.Element {
       if (!doc) return
       const parts = documentParts(doc.markdown)
       setDocument({ parts, images: doc.images })
+      setKeepNotes(false)
       setDocName(doc.name)
       if (parts.title) setTitle(parts.title)
       if (parts.slug) {
@@ -141,7 +143,17 @@ export function NewPageDialog(props: NewPageProps): React.JSX.Element {
           title: title.trim(),
           filename: shownSlug + '.md',
           date: new Date(date),
-          document
+          document:
+            document && keepNotes
+              ? {
+                  ...document,
+                  parts: {
+                    ...document.parts,
+                    notes: '',
+                    body: document.parts.notes + '\n\n' + document.parts.body
+                  }
+                }
+              : document
         })
       }
       onCancel={onCancel}
@@ -160,8 +172,20 @@ export function NewPageDialog(props: NewPageProps): React.JSX.Element {
       {error && <p className="dialog-note error">{error}</p>}
       {document?.parts.notes && (
         <details className="dialog-notes">
-          <summary>Notes above the headline, not put on the page</summary>
+          <summary>
+            {keepNotes
+              ? 'Text above the headline, put on the page'
+              : 'Notes above the headline, not put on the page'}
+          </summary>
           <pre>{document.parts.notes}</pre>
+          <label className="dialog-check">
+            <input
+              type="checkbox"
+              checked={keepNotes}
+              onChange={(e) => setKeepNotes(e.target.checked)}
+            />
+            <span>This is part of the page; put it on the page too</span>
+          </label>
         </details>
       )}
       <label className="dialog-field">
