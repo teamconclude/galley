@@ -73,7 +73,7 @@ out of the checkout, set Claude's model back, and use Publish… rather than ask
 
 ## Work items
 
-### Phase 1: a Changes panel that can be trusted
+### Phase 1: a Changes panel that can be trusted (done)
 
 1. Shared branches are read-only. They get neither Update nor a merging Pull. A clean
    shared branch that is behind GitHub fast-forwards by itself after a fetch or a switch;
@@ -107,7 +107,7 @@ documents at the root shows under "Not part of the site", and adding it warns fi
 leaves its files unticked; expanding
 "N commits to push" lists them.
 
-### Phase 2: Claude in Galley
+### Phase 2: Claude in Galley (done)
 
 What concerns the site (how a blog post is built, where images go, how internal links are
 written) belongs in the web repository, where developers see it too. What concerns the
@@ -139,7 +139,7 @@ visible link survive conversion; the ten link runs that disappear are Google Doc
 on a single space. In the pane, Claude named the open page from the hook, `git push` was
 refused, and both skills are listed.
 
-### Phase 3: content in without Claude
+### Phase 3: content in without Claude (done)
 
 Done on develop, unreleased (2026-10-19).
 
