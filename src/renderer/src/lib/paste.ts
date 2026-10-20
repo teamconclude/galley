@@ -1,6 +1,7 @@
 import type { Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { htmlToMarkdown, looksLikeMarkdown, onlyStylesText } from '../../../shared/markdown'
+import { siteAddress, siteFile } from './linkCheck'
 
 export interface PasteHooks {
   // Saves a pasted picture, given as data or by address, into the site and returns its
@@ -52,14 +53,23 @@ export function pasteMarkdown(hooks: { current: PasteHooks | undefined }): Exten
       event.preventDefault()
       void insertAsync(view, async () => {
         const doc = new DOMParser().parseFromString(html, 'text/html')
+        // The site's own pictures are used where they are; others are saved once each.
+        const saved = new Map<string, Promise<string | null>>()
         for (const img of [...doc.querySelectorAll('img')]) {
           const src = img.getAttribute('src') ?? ''
-          const saved = pasteImage && src ? await pasteImage(src).catch(() => null) : null
-          if (saved) img.setAttribute('src', saved)
+          const own = src ? siteFile(src) : null
+          if (own === null && src && pasteImage && !saved.has(src)) {
+            saved.set(
+              src,
+              pasteImage(src).catch(() => null)
+            )
+          }
+          const result = own ?? (await saved.get(src)) ?? null
+          if (result) img.setAttribute('src', result)
           else if (src.startsWith('data:') || !src) img.remove()
           if (!img.getAttribute('alt')) img.setAttribute('alt', 'Description')
         }
-        return htmlToMarkdown(doc.body.innerHTML).trimEnd()
+        return htmlToMarkdown(doc.body.innerHTML, { link: siteAddress }).trimEnd()
       })
       return true
     }

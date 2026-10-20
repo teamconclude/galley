@@ -22,13 +22,32 @@ export function setLinkTargets(list: string[], siteHosts: string[]): void {
   }
 }
 
+const localHost = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
+
+// A full address on one of the site's hosts, or on the local preview, as the path the
+// site's pages use; other addresses as they are. Copies from a browser carry full
+// addresses even where the page wrote paths.
+export function siteAddress(url: string): string {
+  const full = url.match(/^https?:\/\/([^/?#]+)([^#]*?)?(#.*)?$/i)
+  if (!full) return url
+  const host = full[1].toLowerCase().replace(/^www\./, '')
+  if (!hosts.includes(host) && !localHost.test(host)) return url
+  return (full[2] || '/') + (full[3] ?? '')
+}
+
+// The site's own file a picture address names, e.g. /images/logo.webp, or null.
+export function siteFile(url: string): string | null {
+  const path = siteAddress(url).replace(/[?#].*$/, '')
+  return path.startsWith('/') && targets?.has(path) ? path : null
+}
+
 // The path a link leads to within the site, or null for links elsewhere and anchors.
 function sitePath(url: string): string | null {
   let path = url
   const full = url.match(/^https?:\/\/([^/]+)(\/.*)?$/i)
   if (full) {
     const host = full[1].toLowerCase().replace(/^www\./, '')
-    if (!hosts.includes(host)) return null
+    if (!hosts.includes(host) && !localHost.test(host)) return null
     path = full[2] ?? '/'
   }
   if (!path.startsWith('/') || path.startsWith('//')) return null

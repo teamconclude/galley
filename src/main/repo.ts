@@ -201,9 +201,10 @@ export class Repo {
   async importUrl(url: string, dir: string, name: string): Promise<string> {
     const res = await net.fetch(url)
     if (!res.ok) throw new Error(`Could not download ${url}: ${res.status}`)
-    const type = res.headers.get('content-type') ?? ''
-    const ext =
-      imageExtensions[type.split(';')[0].trim()] ?? (extname(new URL(url).pathname) || '.png')
+    // Servers answer unknown addresses with a page; only a picture is worth saving.
+    const type = (res.headers.get('content-type') ?? '').split(';')[0].trim()
+    if (!type.startsWith('image/')) throw new Error(`${url} is not a picture but ${type}`)
+    const ext = imageExtensions[type] ?? (extname(new URL(url).pathname) || '.png')
     return this.importBytes(new Uint8Array(await res.arrayBuffer()), dir, name, ext)
   }
 

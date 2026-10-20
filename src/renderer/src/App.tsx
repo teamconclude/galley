@@ -46,7 +46,7 @@ import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
 import { mergeSettings, newPageText } from './lib/newPage'
-import { setLinkTargets } from './lib/linkCheck'
+import { setLinkTargets, siteFile } from './lib/linkCheck'
 import { currentListKey } from './lib/schema'
 
 interface OpenFile {
@@ -426,9 +426,14 @@ export default function App(): React.JSX.Element | null {
   }
 
   // A pasted picture, as data or by address, is saved under the page's name. Pictures
-  // already in the site stay where they are.
+  // already in the site stay where they are. One that cannot be saved keeps its address,
+  // without a message for each of the many a pasted web page may hold.
   const pasteImage = async (source: Blob | string): Promise<string | null> => {
-    if (typeof source === 'string' && source.startsWith(site.imagesUrl + '/')) return source
+    if (typeof source === 'string') {
+      const own = siteFile(source)
+      if (own) return own
+      if (source.startsWith(site.imagesUrl + '/')) return source
+    }
     const dir = sectionImages()
     const name = (file?.path.split('/').pop() ?? 'image').replace(/\.[^.]+$/, '') + '-image'
     try {
@@ -448,7 +453,7 @@ export default function App(): React.JSX.Element | null {
       } else return null
       return imageUrl(site, rel)
     } catch (e) {
-      fail(e)
+      console.warn('Pasted picture not saved:', e)
       return null
     }
   }

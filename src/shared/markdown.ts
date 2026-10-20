@@ -53,6 +53,14 @@ function service(): TurndownService {
       return lead + mark + core + close + trail
     }
   })
+  // A heading on several lines, e.g. split by a line break for the layout, stays one heading.
+  td.addRule('heading', {
+    filter: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+    replacement(content, node) {
+      const text = content.replace(/\s*\n\s*/g, ' ').trim()
+      return text ? `\n\n${'#'.repeat(Number(node.nodeName[1]))} ${text}\n\n` : ''
+    }
+  })
   // Word marks headings bold as well.
   td.addRule('headingBold', {
     filter: (node) => (node.nodeName === 'STRONG' || node.nodeName === 'B') && inHeading(node),
@@ -142,15 +150,25 @@ function cleanHref(href: string): string {
   return m ? decodeURIComponent(m[1]) : href
 }
 
-export function htmlToMarkdown(html: string): string {
+// Pasting can map addresses, e.g. full addresses of the site's own pages to the paths
+// its pages use.
+export interface MarkdownOptions {
+  link?: (href: string) => string
+}
+
+export function htmlToMarkdown(html: string, options: MarkdownOptions = {}): string {
   const td = service()
   td.addRule('link', {
     filter: (node) => node.nodeName === 'A' && !!(node as HTMLElement).getAttribute('href'),
     replacement(content, node) {
-      const href = cleanHref((node as HTMLElement).getAttribute('href') ?? '')
+      const raw = cleanHref((node as HTMLElement).getAttribute('href') ?? '')
+      const href = options.link ? options.link(raw) : raw
       const title = (node as HTMLElement).getAttribute('title')
-      if (!content.trim()) return content
-      return `[${content}](${href}${title ? ` "${title.replace(/"/g, '\\"')}"` : ''})`
+      // A link around blocks, such as a button holding a paragraph, keeps its text on one
+      // line; a break inside the brackets would end the link.
+      const text = content.replace(/\s*\n\s*/g, ' ').trim()
+      if (!text) return content
+      return `[${text}](${href}${title ? ` "${title.replace(/"/g, '\\"')}"` : ''})`
     }
   })
   return (
