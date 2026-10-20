@@ -32,7 +32,7 @@ import {
 import Frontmatter from './components/Frontmatter'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
-import { imageUrl, useSiteInfo } from './lib/site'
+import { imagePath, imageUrl, sectionImageFolder, useSiteInfo } from './lib/site'
 import SearchPanel, { type SearchRequest } from './components/SearchPanel'
 import { BodyFollower } from './components/PreviewFollow'
 import Splitter from './components/Splitter'
@@ -410,11 +410,7 @@ export default function App(): React.JSX.Element | null {
   }
 
   // Images dropped or pasted into a page body land in the images folder of its section.
-  const sectionImages = (): string => {
-    const parts = file?.path.split('/') ?? []
-    const section = parts[0] === site.contentDir && parts.length > 2 ? parts[1] : 'pages'
-    return `${site.imagesDir}/${section}`
-  }
+  const sectionImages = (): string => imagePath(site, sectionImageFolder(site, file?.path ?? null))
 
   const importImages = async (files: File[]): Promise<string[]> => {
     const urls: string[] = []
@@ -888,7 +884,7 @@ export default function App(): React.JSX.Element | null {
     select && select.path === file?.path && select.part === part ? select : undefined
 
   return (
-    <SchemaProvider repoPath={repo.path} site={site}>
+    <SchemaProvider repoPath={repo.path} site={site} page={file?.path ?? null}>
       <div
         className="app"
         onDragOver={(e) => e.preventDefault()}

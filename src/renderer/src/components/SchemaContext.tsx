@@ -6,12 +6,13 @@ import { setImagesUrl, setKeys } from '../lib/schema'
 interface Props {
   repoPath: string
   site: SiteInfo
+  page: string | null
   children: React.ReactNode
 }
 
 // Loads the component schemas, data pickers and image list from the checkout and keeps
 // them current when those files change.
-export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.Element {
+export function SchemaProvider({ repoPath, site, page, children }: Props): React.JSX.Element {
   const [components, setComponents] = useState<ComponentSchema[]>([])
   const [lists, setLists] = useState<DataLists>(emptyLists)
   const [images, setImages] = useState<string[]>([])
@@ -60,13 +61,14 @@ export function SchemaProvider({ repoPath, site, children }: Props): React.JSX.E
       lists,
       snippets,
       images,
+      page,
       importImage: async (dir) => {
         const path = await window.api.repo.importImage(dir)
         if (path) setImages(await window.api.repo.images())
         return path
       }
     }),
-    [site, components, lists, snippets, images]
+    [site, components, lists, snippets, images, page]
   )
 
   return <SchemaContext.Provider value={value}>{children}</SchemaContext.Provider>

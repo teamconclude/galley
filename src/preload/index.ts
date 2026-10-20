@@ -61,6 +61,7 @@ const api: Api = {
     log: (range) => ipcRenderer.invoke('git:log', range),
     include: (path) => ipcRenderer.invoke('git:include', path),
     committedImage: (path) => ipcRenderer.invoke('git:committedImage', path),
+    added: (dir) => ipcRenderer.invoke('git:added', dir),
     release: (from, to) => ipcRenderer.invoke('git:release', from, to),
     publish: (from, to) => ipcRenderer.invoke('git:publish', from, to),
     discard: (path, isNew) => ipcRenderer.invoke('git:discard', path, isNew),

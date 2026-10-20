@@ -6,10 +6,10 @@ the web repository, and the work that follows from it.
 
 ## Status
 
-Phases 1 to 3 are done on develop, unreleased (2026-10-19). The site names in the Publishing
+Phases 1 to 4 are done on develop, unreleased (2026-10-20). The site names in the Publishing
 section need a `baseURL` in `config/staging/` and `config/production/` of the web
 repository, which today passes it on the command line only. The web side of phase 2 is
-on its branch `lars/claude-content-editing`. Phase 4 is next.
+on its branch `lars/claude-content-editing`. Phase 5 is next.
 
 ## What the feedback showed
 
@@ -167,7 +167,7 @@ text's headings move down a level when it uses top-level ones. Numbered steps sp
 screenshot keep counting, typed "•" bullets become a list, and the text above the
 headline can be put on the page from the dialog.
 
-### Phase 4: images
+### Phase 4: images (done)
 
 1. Upload… next to Choose… in the image dialog and on image fields: one step into the
    section's image folder.
@@ -176,6 +176,11 @@ headline can be put on the page from the dialog.
 3. Done in phase 1: images dropped on the tree among the pages go to the images folder
    and the new file opens.
 4. Done in phase 3: pasting a picture into the body.
+
+Uploads go beside the picture a field already shows, else to the section's folder
+(`/images/pages` for pages outside a section). The image dialog also takes a dropped
+picture. "New on this branch" lists files under the images folder that are untracked,
+staged as added, or added by commits since the merge base with the base branch.
 
 ### Phase 5: finding pages
 

@@ -88,6 +88,8 @@ export interface Api {
     include: (path: string) => Promise<void>
     // The committed version of a file as a data URL, for showing changed images.
     committedImage: (path: string) => Promise<string | null>
+    // Files under a folder this branch brings, new or added since the base branch.
+    added: (dir: string) => Promise<string[]>
     release: (from: string, to: string) => Promise<void>
     publish: (from: string, to: string) => Promise<PublishResult>
     // A new file is moved to the Trash.

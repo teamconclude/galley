@@ -3,6 +3,9 @@ import type { ImageValues, LinkValues } from '../lib/inline'
 import { Dialog } from './Dialogs'
 import ImagePicker from './ImagePicker'
 import { useSchemas } from '../lib/contexts'
+import { imagePath, imageUrl, isImageUrl, uploadFolder } from '../lib/site'
+
+const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 interface LinkProps {
   initial: LinkValues
@@ -54,10 +57,26 @@ interface ImageProps {
 }
 
 export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.JSX.Element {
-  const { site } = useSchemas()
+  const { site, page, importImage } = useSchemas()
   const [path, setPath] = useState(initial.path)
   const [alt, setAlt] = useState(initial.alt)
   const [picking, setPicking] = useState(false)
+  const folder = uploadFolder(site, page, path)
+  const upload = async (): Promise<void> => {
+    const url = await importImage(folder)
+    if (url) setPath(url)
+  }
+  const drop = async (e: React.DragEvent): Promise<void> => {
+    const file = [...e.dataTransfer.files].find((f) => imageFile.test(f.name))
+    if (!file) return
+    e.preventDefault()
+    e.stopPropagation()
+    const rel = await window.api.repo.importFile(
+      window.api.files.pathFor(file),
+      imagePath(site, folder)
+    )
+    setPath(imageUrl(site, rel))
+  }
   return (
     <>
       <Dialog
@@ -80,9 +99,26 @@ export function ImageDialog({ initial, onSubmit, onCancel }: ImageProps): React.
             <button type="button" onClick={() => setPicking(true)}>
               Choose…
             </button>
+            <button
+              type="button"
+              onClick={() => void upload()}
+              title={`Copies a picture from your computer into ${imagePath(site, folder)}`}
+            >
+              Upload…
+            </button>
           </span>
         </label>
-        {path && <img className="dialog-preview" src={`galley://repo/static${path}`} alt="" />}
+        <div
+          className="dialog-drop"
+          onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
+          onDrop={(e) => void drop(e)}
+        >
+          {isImageUrl(site, path) ? (
+            <img className="dialog-preview" src={`galley://repo/${imagePath(site, path)}`} alt="" />
+          ) : (
+            <span>Or drop a picture here</span>
+          )}
+        </div>
         <label className="dialog-field">
           <span>Description</span>
           <input

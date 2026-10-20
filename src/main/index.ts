@@ -269,7 +269,7 @@ function registerIpc(): void {
   )
   ipcMain.handle('repo:importImage', async (_e, dir: string) => {
     const result = await dialog.showOpenDialog({
-      title: 'Add image',
+      title: 'Upload image',
       properties: ['openFile'],
       filters: [
         { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'] }
@@ -300,6 +300,7 @@ function registerIpc(): void {
   ipcMain.handle('git:moveToBranch', (_e, name: string) => currentGit().moveToBranch(name))
   ipcMain.handle('git:log', (_e, range: CommitRange) => currentGit().log(range))
   ipcMain.handle('git:include', (_e, rel: string) => currentGit().include(rel))
+  ipcMain.handle('git:added', (_e, dir: string) => currentGit().added(dir))
   ipcMain.handle('git:committedImage', (_e, rel: string) => currentGit().committedImage(rel))
   ipcMain.handle('git:release', (_e, from: string, to: string) => currentGit().release(from, to))
   ipcMain.handle('git:publish', (_e, from: string, to: string) => currentGit().publish(from, to))

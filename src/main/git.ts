@@ -160,10 +160,7 @@ export class Git {
     const head = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
     const branch = head === 'HEAD' ? '' : head
     const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
-    const originHead = await this.git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
-      .then((s) => s.trim().replace(/^origin\//, ''))
-      .catch(() => 'main')
-    const base = remotes.includes('origin/develop') ? 'develop' : originHead
+    const base = await this.base(remotes)
     const isProtected = protectedBranches.has(branch)
     const upstream = await this.tracking(branch, remotes)
     let ahead = 0
@@ -233,6 +230,15 @@ export class Git {
       fetchError: this.fetchError,
       busy: this.busy
     }
+  }
+
+  // The branch work starts from and returns to: develop where there is one, else the
+  // branch GitHub opens with.
+  private async base(remotes: string[]): Promise<string> {
+    if (remotes.includes('origin/develop')) return 'develop'
+    return this.git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+      .then((s) => s.trim().replace(/^origin\//, ''))
+      .catch(() => 'main')
   }
 
   private async count(revs: string[], fallback = 0): Promise<number> {
@@ -580,6 +586,26 @@ export class Git {
     }
     await this.git(['add', '--intent-to-add', '--', path])
     await this.refresh()
+  }
+
+  // Files under <dir> this branch brings: new in the checkout, or added by its commits
+  // since it left the base branch.
+  async added(dir: string): Promise<string[]> {
+    const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
+    const base = `origin/${await this.base(remotes)}`
+    const committed = remotes.includes(base)
+      ? await this.lines(['diff', '--name-only', '--diff-filter=A', `${base}...HEAD`, '--', dir])
+      : []
+    const staged = await this.lines([
+      'diff',
+      '--cached',
+      '--name-only',
+      '--diff-filter=A',
+      '--',
+      dir
+    ])
+    const untracked = await this.lines(['ls-files', '--others', '--exclude-standard', '--', dir])
+    return [...new Set([...committed, ...staged, ...untracked])].sort()
   }
 
   // An image as last committed, for comparing it with the one in the checkout.

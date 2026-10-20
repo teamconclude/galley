@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { setValue, type Path } from '../lib/yamlEdit'
 import { useEdit, useSchemas } from '../lib/contexts'
-import { imageFolder, imagePath, imageUrl, isImageUrl } from '../lib/site'
+import { imagePath, imageUrl, isImageUrl, uploadFolder } from '../lib/site'
 import type { EditorView } from '@codemirror/view'
 import { useActiveEditor } from '../lib/activeEditor'
 import Editor from './Editor'
@@ -172,10 +172,14 @@ export function ChoiceListControl({
 export function ImageControl({ path, value }: ControlProps): React.JSX.Element {
   const edit = useEdit()
   const [open, setOpen] = useState(false)
-  const { site } = useSchemas()
+  const { site, page, importImage } = useSchemas()
   const text = asText(value)
   const set = (v: string): void => edit((doc) => setValue(doc, path, v))
-  const folder = imageFolder(site, text)
+  const folder = uploadFolder(site, page, text)
+  const upload = async (): Promise<void> => {
+    const url = await importImage(folder)
+    if (url) set(url)
+  }
   const drop = async (e: React.DragEvent): Promise<void> => {
     const file = [...e.dataTransfer.files].find((f) =>
       /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(f.name)
@@ -206,6 +210,12 @@ export function ImageControl({ path, value }: ControlProps): React.JSX.Element {
           onChange={(e) => set(e.target.value)}
         />
         <button onClick={() => setOpen(true)}>Choose…</button>
+        <button
+          onClick={() => void upload()}
+          title={`Copies a picture from your computer into ${imagePath(site, folder)}`}
+        >
+          Upload…
+        </button>
       </div>
       {open && (
         <ImagePicker

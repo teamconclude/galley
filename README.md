@@ -56,7 +56,9 @@ them under `static/images`.
 **Editing.** A page opens as a form of its settings. Marketing pages are built from content
 blocks, shown as cards that can be opened, reordered, duplicated and removed, with a menu to
 add new ones. Text fields with formatting get a markdown editor and the toolbar at the top.
-Images are chosen from the site's images or dropped in. **YAML** at the top right shows the
+Images are chosen from the site's images, uploaded or dropped in; the picker shows the
+images new on the branch first and one folder at a time, starting at the page's section.
+**YAML** at the top right shows the
 raw settings for the rare case the form does not cover something. Below the settings, **Show
 body text** opens the page's prose. Everything is saved as you type.
 

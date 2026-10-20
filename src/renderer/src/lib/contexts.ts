@@ -17,6 +17,8 @@ export interface Schemas {
   lists: DataLists
   snippets: Snippet[]
   images: string[]
+  // The open page, whose section decides where uploaded pictures go.
+  page: string | null
   importImage: (dir: string) => Promise<string | null>
 }
 
@@ -29,6 +31,7 @@ export const SchemaContext = createContext<Schemas>({
   lists: emptyLists,
   snippets: [],
   images: [],
+  page: null,
   importImage: async () => null
 })
 

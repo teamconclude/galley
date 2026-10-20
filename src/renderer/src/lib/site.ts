@@ -36,3 +36,16 @@ export const isImageUrl = (site: SiteInfo, url: string): boolean =>
 // The folder an image URL lives in, or the images root.
 export const imageFolder = (site: SiteInfo, url: string): string =>
   isImageUrl(site, url) ? url.slice(0, url.lastIndexOf('/')) : site.imagesUrl
+
+// Where pictures for a page go: the images folder named after its section, e.g.
+// /images/blog for content/blog/post.md, and /images/pages for pages outside sections.
+export function sectionImageFolder(site: SiteInfo, page: string | null): string {
+  const parts = page?.split('/') ?? []
+  const section = parts[0] === site.contentDir && parts.length > 2 ? parts[1] : 'pages'
+  return `${site.imagesUrl}/${section}`
+}
+
+// Where a picture for an image setting goes: beside the one it replaces, else with the
+// page's section.
+export const uploadFolder = (site: SiteInfo, page: string | null, current: string): string =>
+  isImageUrl(site, current) ? imageFolder(site, current) : sectionImageFolder(site, page)
