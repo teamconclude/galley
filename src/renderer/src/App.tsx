@@ -34,6 +34,7 @@ import {
 import Frontmatter from './components/Frontmatter'
 import PageFinder from './components/PageFinder'
 import ReviewDialog from './components/ReviewDialog'
+import ShareButton from './components/ShareButton'
 import Preview from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import { imagePath, imageUrl, sectionImageFolder, useSiteInfo } from './lib/site'
@@ -760,17 +761,16 @@ export default function App(): React.JSX.Element | null {
     if (file) await reopen(file.path)
   }
 
-  // A link to the branch on GitHub, and to the open page, for a colleague to review.
-  const copyReviewLink = async (): Promise<boolean> => {
-    const repoName = gitStatus?.remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
-    if (!gitStatus?.branch || !gitStatus.upstream) {
-      fail(new Error('Push the branch first, so others can get it from GitHub.'))
-      return false
-    }
+  // A link to the branch on GitHub, and to the open page, for a colleague to review;
+  // copied, and returned to show what was copied.
+  const shareReview = async (): Promise<string | null> => {
+    if (!gitStatus?.branch || !gitStatus.upstream) return null
+    const repoName = gitStatus.remoteUrl?.match(/github\.com[:/]([^/]+\/[^/.]+)(?:\.git)?$/)?.[1]
     const page = file?.path.startsWith(site.contentDir + '/') ? file.path : null
     const branch = gitStatus.upstream.replace(/^origin\//, '')
-    await window.api.clipboardWrite(makeReviewLink({ repo: repoName ?? null, branch, page }))
-    return true
+    const link = makeReviewLink({ repo: repoName ?? null, branch, page })
+    await window.api.clipboardWrite(link)
+    return link
   }
 
   const openSwitchBranch = async (): Promise<void> => {
@@ -1049,6 +1049,11 @@ export default function App(): React.JSX.Element | null {
               {file ? (saving ? 'Saving…' : dirty ? 'Unsaved' : 'Saved') : ''}
             </span>
             <UpdateButton />
+            <ShareButton
+              status={gitStatus}
+              page={file?.path.startsWith(site.contentDir + '/') ? file.path : null}
+              onShare={shareReview}
+            />
             <button
               className={showPreview || detached ? 'on' : ''}
               title={
@@ -1151,7 +1156,6 @@ export default function App(): React.JSX.Element | null {
                 onRelease={setReleaseDialog}
                 onPublish={setReleaseDialog}
                 onSwitchBranch={() => void openSwitchBranch()}
-                onCopyLink={copyReviewLink}
               />
             )}
           </aside>

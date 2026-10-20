@@ -80,9 +80,9 @@ export default function FileTree(props: Props): React.JSX.Element {
               <ChevronsDownUp size={16} />
             </button>
           </Tip>
-          <Tip text={showTitles ? 'Show file names' : 'Show page titles'}>
+          <Tip text={showTitles ? 'Hide page titles' : 'Show page titles'}>
             <button
-              aria-label={showTitles ? 'Show file names' : 'Show page titles'}
+              aria-label={showTitles ? 'Hide page titles' : 'Show page titles'}
               className={showTitles ? 'on' : ''}
               onClick={onToggleTitles}
             >
@@ -154,9 +154,8 @@ function Children(props: ChildrenProps): React.JSX.Element {
     entry.isDir ? pages.get(`${entry.path}/index.md`) : pages.get(entry.path)
   const inContent = path === site.contentDir || path.startsWith(site.contentDir + '/')
   const titled = showTitles && inContent
-  const label = (entry: DirEntry): string => (titled && pageOf(entry)?.title) || entry.name
-  // By title, folders first, then the section's own page, then pages newest first; pages
-  // without a date follow by title.
+  // Folders first, then the section's own page, then pages newest first; pages without
+  // a date follow by file name.
   const shown = titled ? [...entries].sort((a, b) => order(a) - order(b) || compare(a, b)) : entries
   function order(entry: DirEntry): number {
     if (/^_?index\.md$/.test(entry.name)) return 0
@@ -166,7 +165,7 @@ function Children(props: ChildrenProps): React.JSX.Element {
   function compare(a: DirEntry, b: DirEntry): number {
     const [pa, pb] = [pageOf(a), pageOf(b)]
     const byDate = (pb?.date ?? '').localeCompare(pa?.date ?? '')
-    return byDate || label(a).localeCompare(label(b))
+    return byDate || a.name.localeCompare(b.name)
   }
 
   return (
@@ -179,8 +178,9 @@ function Children(props: ChildrenProps): React.JSX.Element {
         if (dropTarget === dropDir) classes.push('drop-target')
         const page = pageOf(entry)
         const tip = page
-          ? [titled ? entry.name : page.title, stateDetail(page)].filter(Boolean).join('\n')
+          ? [titled ? null : page.title, stateDetail(page)].filter(Boolean).join('\n') || undefined
           : undefined
+        if (titled && page?.title) classes.push('two-line')
         return (
           <div key={entry.path}>
             <div
@@ -218,7 +218,14 @@ function Children(props: ChildrenProps): React.JSX.Element {
               ) : (
                 <FileIcon name={entry.name} />
               )}
-              <span className="tree-name">{label(entry)}</span>
+              {titled && page?.title ? (
+                <span className="tree-label">
+                  <span className="tree-name">{entry.name}</span>
+                  <span className="tree-title">{page.title}</span>
+                </span>
+              ) : (
+                <span className="tree-name">{entry.name}</span>
+              )}
               {badge(pageOf(entry))}
             </div>
             {open && <Children {...props} path={entry.path} depth={depth + 1} />}

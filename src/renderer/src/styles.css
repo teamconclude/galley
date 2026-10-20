@@ -319,6 +319,35 @@ button.primary:disabled:hover {
   text-overflow: ellipsis;
 }
 
+/* A page in a content folder: its file name, and its title below. */
+.tree-item.two-line {
+  height: auto;
+  min-height: 22px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  align-items: flex-start;
+}
+
+.tree-item.two-line > svg,
+.tree-item.two-line > .page-badge {
+  margin-top: 2px;
+}
+
+.tree-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 17px;
+}
+
+.tree-title {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The settings' visibility badge, compact, at the end of a tree row or finder title. */
 .page-badge.compact {
   margin-left: auto;
@@ -2520,4 +2549,53 @@ body.dragging .terminal-host {
 
 .dialog-note.error {
   color: var(--danger);
+}
+
+.share {
+  position: relative;
+  display: flex;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.share-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.share-popover code {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--bg-muted);
+  font: 11px/1.4 var(--mono);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.share-popover span {
+  color: var(--text-muted);
 }

@@ -40,8 +40,6 @@ interface Props {
   onOutside: (entry: OutsideEntry, action: 'reveal' | 'include' | 'trash') => void
   onRelease: (step: ReleaseStep) => void
   onPublish: (step: ReleaseStep) => void
-  // Copies a review link for the branch and the open page; false when there is none.
-  onCopyLink: () => Promise<boolean>
 }
 
 const kindMark: Record<Change['kind'], string> = {
@@ -69,13 +67,7 @@ function pullRequestUrl(status: GitStatus): string | null {
 export default function ChangesPanel(props: Props): React.JSX.Element {
   const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch } = props
-  const { onMerge, onMove, onOutside, onRelease, onPublish, onCopyLink } = props
-  const [copied, setCopied] = useState(false)
-  const copyLink = async (): Promise<void> => {
-    if (!(await onCopyLink())) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
-  }
+  const { onMerge, onMove, onOutside, onRelease, onPublish } = props
   const [message, setMessage] = useState('')
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [menuOpen, setMenuOpen] = useState(false)
@@ -175,22 +167,6 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
             >
               Switch branch…
             </button>
-            {!status.protected && (
-              <button
-                disabled={!status.upstream}
-                title={
-                  status.upstream
-                    ? 'A link that opens this branch, and the open page, in a colleague’s Galley'
-                    : 'Push the branch first'
-                }
-                onClick={() => {
-                  setMenuOpen(false)
-                  void copyLink()
-                }}
-              >
-                Copy review link
-              </button>
-            )}
             <button
               onClick={() => {
                 setMenuOpen(false)
@@ -288,14 +264,6 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 {prUrl && changes.length === 0 && (
                   <button onClick={() => window.api.openExternal(prUrl)}>
                     Open pull request ↗
-                  </button>
-                )}
-                {!status.protected && status.aheadOfBase > 0 && (
-                  <button
-                    title="A link that opens this branch, and the open page, in a colleague’s Galley"
-                    onClick={() => void copyLink()}
-                  >
-                    {copied ? 'Copied ✓' : 'Copy review link'}
                   </button>
                 )}
               </div>

@@ -47,14 +47,15 @@ files that a browser downloaded.
 **Getting the site.** On first start, choose the folder where the site is checked out, or
 pick **Clone** to get a fresh copy from GitHub. Galley remembers the checkout.
 
-**Pages.** The left side lists the files of the site. The `content` folder holds the pages,
-one markdown file each, grouped by section, listed by title and newest first, with drafts
-and scheduled pages marked; the **H** button switches to file names. **Find Page** (⌘P)
-finds a page by words of its title, its address, an old address or its file name. The `+` button and the right-click menu create,
-rename, duplicate and delete files; the File menu does the same for the open page, and
-makes a page from a Word or Markdown document or adds images to the section. A new page copies the settings of the newest page in
-the same folder, so it fits its section. Dropping images onto the tree or into a text puts
-them under `static/images`.
+**Pages.** The left side lists the files of the site. The `content` folder holds the
+pages, one markdown file each, grouped by section and newest first, each with its title
+below its file name and drafts and scheduled pages marked; the **H** button hides the
+titles. **Find Page** (⌘P) finds a page by words of its title, its address, an old address
+or its file name. The `+` button and the right-click menu create, rename, duplicate and
+delete files; the File menu does the same for the open page, and makes a page from a Word
+or Markdown document or adds images to the section. A new page copies the settings of the
+newest page in the same folder, so it fits its section. Dropping images onto the tree or
+into a text puts them under `static/images`.
 
 **Editing.** A page opens as a form of its settings. Marketing pages are built from content
 blocks, shown as cards that can be opened, reordered, duplicated and removed, with a menu to
@@ -106,8 +107,8 @@ them to the Trash, or add them after a warning. New files in odd places, a docum
 the pages or a file name with spaces, are marked and left out of the commit until ticked,
 and images dropped among the pages go to the section's images folder.
 
-**Review links.** Once a branch is on GitHub, **Copy review link** (branch menu, or next to
-"In sync with GitHub") copies a link to it and the open page, e.g.
+**Review links.** Once a branch is on GitHub, the share button at the top right copies a
+link to it and the open page, e.g.
 `https://conclude.io/galley/open/?branch=buket/pylon&page=content/compare/pylon.md`. The
 page there hands it to `galley://open`, which opens the colleague's Galley; pull requests
 Galley opens carry the link too. Galley first shows the branch's commits and authors, then
