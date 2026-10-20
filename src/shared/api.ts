@@ -89,6 +89,10 @@ export interface Api {
     push: () => Promise<void>
     pull: () => Promise<void>
     update: () => Promise<void>
+    // After an update or pull stopped on conflicts: carry on once they are settled, or
+    // put everything back as it was.
+    continueRebase: () => Promise<void>
+    abortRebase: () => Promise<void>
     mergeToBase: () => Promise<void>
     // Moves local commits off a shared branch onto a new branch.
     moveToBranch: (name: string) => Promise<void>

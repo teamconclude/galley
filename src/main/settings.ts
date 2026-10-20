@@ -29,7 +29,6 @@ export function loadSettings(): Settings {
 }
 
 export const prefs = (): Preferences => ({
-  pushOnCommit: true,
   deleteMergedBranch: true,
   claude: true,
   claudeModel: 'opus',

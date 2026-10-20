@@ -364,6 +364,8 @@ function registerIpc(): void {
   ipcMain.handle('git:push', () => currentGit().push())
   ipcMain.handle('git:pull', () => currentGit().pull())
   ipcMain.handle('git:update', () => currentGit().update())
+  ipcMain.handle('git:continueRebase', () => currentGit().continueRebase())
+  ipcMain.handle('git:abortRebase', () => currentGit().abortRebase())
   ipcMain.handle('git:mergeToBase', () => currentGit().mergeToBase())
   ipcMain.handle('git:moveToBranch', (_e, name: string) => currentGit().moveToBranch(name))
   ipcMain.handle('git:log', (_e, range: CommitRange) => currentGit().log(range))

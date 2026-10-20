@@ -539,6 +539,11 @@ body.dragging .terminal-host {
   font-size: 12px;
 }
 
+.pane-bar button.primary {
+  padding: 2px 9px;
+  font-size: inherit;
+}
+
 .pane-title {
   flex: 1;
   color: var(--text-muted);
@@ -2270,6 +2275,73 @@ body.dragging .terminal-host {
   border-radius: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
+}
+
+.change-mark.resolved {
+  display: flex;
+  justify-content: center;
+  color: var(--accent-text);
+}
+
+.change-kind.conflict {
+  color: var(--red5);
+  background: var(--red1);
+  border-color: var(--red2);
+}
+
+.conflict-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.conflict-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.conflict-nav button {
+  display: flex;
+  padding: 2px 4px;
+}
+
+.conflict-note {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--yellow1);
+  color: var(--yellow5);
+}
+
+.cm-conflict-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 0 4px;
+  font-family: var(--font);
+}
+
+.cm-conflict-actions button {
+  padding: 1px 8px;
+}
+
+/* CodeMirror draws the selection behind the lines, so their tints have to let it show
+   through: the same shades as --bg-muted, --blue1 and --green1, but translucent. */
+.cm-line.cm-conflict-marker {
+  color: var(--text-muted);
+  background: rgb(0 0 0 / 3%);
+}
+
+.cm-line.cm-conflict-theirs {
+  background: rgb(78 95 191 / 8%);
+  box-shadow: inset 3px 0 var(--blue3);
+}
+
+.cm-line.cm-conflict-yours {
+  background: rgb(59 191 173 / 9%);
+  box-shadow: inset 3px 0 var(--green4);
 }
 
 .diff {

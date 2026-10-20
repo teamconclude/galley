@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { clearClaudeTerminal, setClaudeTerminal } from '../lib/claudeTerminal'
 
 interface Props {
   repoPath: string
@@ -51,6 +52,7 @@ export default function ClaudePane({ repoPath }: Props): React.JSX.Element {
     term.loadAddon(fit)
     term.open(el)
     termRef.current = term
+    setClaudeTerminal(term)
     fit.fit()
     window.api.terminal.start(term.cols, term.rows)
     const offData = window.api.terminal.onData((data) => term.write(data))
@@ -69,6 +71,7 @@ export default function ClaudePane({ repoPath }: Props): React.JSX.Element {
       offData()
       offExit()
       termRef.current = null
+      clearClaudeTerminal(term)
       term.dispose()
       window.api.terminal.kill()
     }

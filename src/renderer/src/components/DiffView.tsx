@@ -19,7 +19,8 @@ const kindLabel: Record<Change['kind'], string> = {
   deleted: 'Deleted',
   renamed: 'Renamed',
   untracked: 'New',
-  conflict: 'Conflict'
+  conflict: 'Conflict',
+  resolved: 'Resolved'
 }
 
 interface Row {

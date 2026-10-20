@@ -28,6 +28,10 @@ interface Props {
   select?: Selection
   // Hands out the CodeMirror view once mounted, and null when it goes away.
   onView?: (view: EditorView | null) => void
+  // More behaviour for this editor, fixed for its lifetime.
+  extensions?: Extension
+  // Text as it is, without the file type's highlighting or Markdown styling.
+  plain?: boolean
 }
 
 export interface Selection {
@@ -42,6 +46,7 @@ const imageFile = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 // Remount (change the React key) to open a different file.
 export default function Editor(props: Props): React.JSX.Element {
   const { filename, value, onChange, onSave, importImages, paste, prose, select, onView } = props
+  const { extensions, plain } = props
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
@@ -59,7 +64,7 @@ export default function Editor(props: Props): React.JSX.Element {
 
   useEffect(() => {
     const language = new Compartment()
-    const isMarkdown = markdownFile.test(filename)
+    const isMarkdown = !plain && markdownFile.test(filename)
     const view = new EditorView({
       state: EditorState.create({
         doc: value,
@@ -82,16 +87,19 @@ export default function Editor(props: Props): React.JSX.Element {
           }),
           trackFocus(),
           isMarkdown ? [markdownStyle, pasteMarkdown(pasteRef), linkCheck()] : [],
-          importImages ? dropImages(importImagesRef) : []
+          importImages ? dropImages(importImagesRef) : [],
+          extensions ?? []
         ]
       }),
       parent: host.current!
     })
     viewRef.current = view
     onViewRef.current?.(view)
-    void languageFor(filename).then((ext) => {
-      if (viewRef.current === view) view.dispatch({ effects: language.reconfigure(ext) })
-    })
+    if (!plain) {
+      void languageFor(filename).then((ext) => {
+        if (viewRef.current === view) view.dispatch({ effects: language.reconfigure(ext) })
+      })
+    }
     return () => {
       onViewRef.current?.(null)
       clearActiveEditor(view)

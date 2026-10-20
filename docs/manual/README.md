@@ -249,12 +249,42 @@ there.
 
 Galley checks GitHub every few minutes.
 
-- **Pull** appears when someone else added to your branch.
+- **Pull** appears when someone else added to your branch. Your own commits go on top of
+  theirs.
 - **Update** appears when `develop` has moved on since you started your branch. It brings
-  your branch up to date with the team's work.
+  your branch up to date with the team's work. If a colleague added to your branch, pull
+  first.
+
+Both send the result to GitHub straight away, so a review link always shows your latest
+work.
 
 Every count, such as "3 changes on develop not in this branch", opens into the list of
 commits behind it: who made them, when, and which files they touched.
+
+### When changes conflict
+
+Sometimes you and a colleague changed the same lines. Pull or Update then stops halfway,
+and the Changes tab says which files are affected; they are marked **!**. The first of
+them opens in the editor as plain text, settings and all, with both versions of each
+conflicting passage: the one from develop (or GitHub) in blue, yours in green, between
+marker lines. The preview pauses until the conflicts are settled.
+
+You have three ways out:
+
+- Settle each conflict in the editor: **Keep develop's version**, **Keep your version**,
+  or **Keep both**, then edit the text until it reads right. Click the other files marked
+  **!** in the Changes tab to open them. Then click **Continue**.
+- **Ask Claude to resolve** hands the files to Claude, which combines both versions and
+  tells you what it did. Check the result, then click **Continue**.
+- **Cancel** puts your branch and your edits back as they were before.
+
+If more of your commits touch the same lines, Galley stops again at the next one.
+
+Edits you have not committed yet are set aside while your branch is brought up to date,
+and put back at the end. If they clash with what came in, Galley stops in the same way,
+with your edit in green. Once you continue they are back as uncommitted
+edits; cancelling returns your branch and your edits to how they were before. Your branch
+goes to GitHub only after everything is settled.
 
 ## Publishing
 
@@ -305,8 +335,6 @@ screenshot. Word documents and web pages arrive as text with their links intact.
 
 **Galley ▸ Settings…** (⌘,):
 
-- **Push every commit to GitHub** (on): each commit goes to your branch on GitHub at once.
-  Turned off, a **Push** button sends them when you choose.
 - **Remove a merged branch from GitHub** (on): after you merge into develop, your branch
   disappears from GitHub to keep the list tidy. You keep working on it here, and your next
   commit brings it back.

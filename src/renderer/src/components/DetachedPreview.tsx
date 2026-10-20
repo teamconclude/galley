@@ -25,6 +25,7 @@ export default function DetachedPreview(): React.JSX.Element {
         onDetach={() => {}}
         onAttach={() => window.api.preview.attach()}
         targets={window.api.preview.onTarget}
+        notice={state?.notice ?? null}
       />
     </div>
   )

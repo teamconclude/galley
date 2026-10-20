@@ -21,6 +21,8 @@ interface Props {
   onAttach: () => void
   // Where scroll targets come from: the store in this window, or IPC in the detached one.
   targets: (cb: (target: PreviewTarget) => void) => () => void
+  // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
+  notice?: string | null
 }
 
 // A page's markdown rendition lives at its URL plus the suffix; a .txt is text as it is.
@@ -32,7 +34,7 @@ const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? fa
 
 export default function Preview(props: Props): React.JSX.Element {
   const { status, url, reloadKey, mode, onMode, version, detached, markdownSuffix } = props
-  const { onDetach, onAttach, targets } = props
+  const { onDetach, onAttach, targets, notice } = props
   const plainFile = isPlainFile(url)
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -84,6 +86,7 @@ export default function Preview(props: Props): React.JSX.Element {
         reloadKey={reloadKey + reloads}
         targets={targets}
         empty={status.message ?? statusText(status)}
+        notice={notice ?? null}
       />
     </div>
   )
@@ -98,11 +101,12 @@ interface ContentProps {
   // Where scroll targets come from: the store in this window, or IPC in the detached one.
   targets: (cb: (target: PreviewTarget) => void) => () => void
   empty: string
+  notice: string | null
 }
 
 // The page in a webview, or its text rendered; shared by the pane and the detached window.
 export function PreviewContent(props: ContentProps): React.JSX.Element {
-  const { url, mode, version, reloadKey, targets, empty, markdownSuffix } = props
+  const { url, mode, version, reloadKey, targets, empty, markdownSuffix, notice } = props
   const view = useRef<WebviewElement>(null)
   const textMode = isPlainFile(url) || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -140,6 +144,7 @@ export function PreviewContent(props: ContentProps): React.JSX.Element {
     return () => el.removeEventListener('did-finish-load', onLoad)
   }, [url, textMode])
 
+  if (notice) return <div className="pane-empty">{notice}</div>
   if (shownUrl && textMode) {
     return <TextPreview url={shownUrl} version={version} reloadKey={reloadKey} />
   }

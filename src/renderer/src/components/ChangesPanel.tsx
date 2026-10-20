@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Check,
   ChevronRight,
   Folder,
   FolderOpen,
@@ -14,6 +15,7 @@ import type {
   GitStatus,
   Identity,
   OutsideEntry,
+  RebaseState,
   ReleaseStep
 } from '../../../shared/types'
 import { ago } from '../lib/time'
@@ -32,6 +34,10 @@ interface Props {
   onPush: () => void
   onPull: () => void
   onUpdate: () => void
+  onContinue: () => void
+  onCancelRebase: () => void
+  // Hands the conflicting files to Claude; absent while the Claude pane is turned off.
+  onAskClaude?: (paths: string[], state: RebaseState) => void
   onFetch: () => void
   onNewBranch: () => void
   onSwitchBranch: () => void
@@ -48,7 +54,8 @@ const kindMark: Record<Change['kind'], string> = {
   deleted: 'D',
   renamed: 'R',
   untracked: 'N',
-  conflict: '!'
+  conflict: '!',
+  resolved: '✓'
 }
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -68,6 +75,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
   const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch } = props
   const { onMerge, onMove, onOutside, onRelease, onPublish } = props
+  const { onContinue, onCancelRebase, onAskClaude } = props
   const [message, setMessage] = useState('')
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [menuOpen, setMenuOpen] = useState(false)
@@ -88,6 +96,10 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
   const included = changes.filter((c) => !excluded.has(c.path))
   const busy = status.busy !== null
   const prUrl = pullRequestUrl(status)
+  const conflicts = changes.filter((c) => c.kind === 'conflict').map((c) => c.path)
+  const resolved = changes.filter((c) => c.kind === 'resolved').length
+  // The branch's own commits on GitHub come first; replacing the copy there would drop them.
+  const incoming = status.behind > 0 && !status.rebased
   const ownBranch = status.branch !== '' && !status.protected && status.branch !== status.base
   const canMerge =
     ownBranch &&
@@ -185,6 +197,15 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
             <span className="dot starting" />
             {status.busy}
           </div>
+        ) : status.rebase ? (
+          <RebaseRows
+            state={status.rebase}
+            conflicts={conflicts}
+            resolved={resolved}
+            onContinue={onContinue}
+            onCancel={onCancelRebase}
+            onAskClaude={onAskClaude}
+          />
         ) : (
           <>
             {status.fetchError && (
@@ -234,7 +255,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 { kind: 'base' },
                 status.baseAhead,
                 `${plural(status.baseAhead, 'change')} on ${status.base} not in this branch.`,
-                <button onClick={onUpdate}>Update</button>
+                incoming ? undefined : <button onClick={onUpdate}>Update</button>
               )}
             {!status.protected &&
               status.ahead > 0 &&
@@ -293,9 +314,11 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 </button>
               </>
             )}
-            <button className="danger" onClick={() => onDiscardAll(changes)} disabled={busy}>
-              Discard all
-            </button>
+            {!status.rebase && (
+              <button className="danger" onClick={() => onDiscardAll(changes)} disabled={busy}>
+                Discard all
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -369,7 +392,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
         )}
       </div>
 
-      {changes.length > 0 && (
+      {changes.length > 0 && !status.rebase && (
         <div className="commit-box">
           <textarea
             rows={3}
@@ -435,6 +458,57 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
         </div>
       )}
     </div>
+  )
+}
+
+// An update or pull that stopped because the same lines changed on both sides: in a
+// commit being moved, or in the edits not committed yet as they are put back. The
+// conflicting files carry git's markers until the editor or Claude settles them.
+function RebaseRows(props: {
+  state: RebaseState
+  conflicts: string[]
+  // Files whose conflicts are all settled.
+  resolved: number
+  onContinue: () => void
+  onCancel: () => void
+  onAskClaude?: (paths: string[], state: RebaseState) => void
+}): React.JSX.Element {
+  const { state, conflicts, resolved, onContinue, onCancel, onAskClaude } = props
+  const where = state.from === 'GitHub' ? 'on GitHub' : `on ${state.from}`
+  const files = plural(conflicts.length, 'file')
+  const howTo = 'Settle them in the editor, opening each file marked ! in turn, then continue.'
+  return (
+    <>
+      <div className="sync-row warn">
+        {conflicts.length === 0 && resolved > 0
+          ? `All conflicts are settled. Check the ${resolved === 1 ? 'file' : 'files'} marked ✓, then continue.`
+          : conflicts.length === 0
+            ? state.edits
+              ? 'Putting back your edits that were not committed yet stopped halfway.'
+              : `Bringing in the changes ${where} stopped halfway.`
+            : state.edits
+              ? `Your branch is up to date, but your edits that were not committed yet clash with the changes ${where} in ${files}. ${howTo}`
+              : `${files} changed both here and ${where}. ${howTo}`}
+      </div>
+      <div className="sync-row">
+        {onAskClaude && conflicts.length > 0 && (
+          <Tip text="Claude combines both versions; check its work, then continue">
+            <button className="primary" onClick={() => onAskClaude(conflicts, state)}>
+              Ask Claude to resolve
+            </button>
+          </Tip>
+        )}
+        <button
+          className={onAskClaude && conflicts.length > 0 ? '' : 'primary'}
+          onClick={onContinue}
+        >
+          Continue
+        </button>
+        <Tip text="Puts the branch and your edits back as they were before">
+          <button onClick={onCancel}>Cancel</button>
+        </Tip>
+      </div>
+    </>
   )
 }
 
@@ -609,7 +683,11 @@ function ChangeTree(props: TreeProps): React.JSX.Element {
           </Tip>
         )}
         <span className={`change-mark ${change.kind}`} title={change.kind}>
-          {kindMark[change.kind]}
+          {change.kind === 'resolved' ? (
+            <Check size={14} strokeWidth={3} aria-label="resolved" />
+          ) : (
+            kindMark[change.kind]
+          )}
         </span>
         <Tip
           text={

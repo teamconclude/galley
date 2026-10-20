@@ -116,7 +116,9 @@ export interface SiteInfo {
   textPreviews: Record<string, string>
 }
 
-export type ChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'
+// A conflict whose markers are all gone is resolved; git learns so on continuing.
+export type ChangeKind =
+  'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict' | 'resolved'
 
 export interface Change {
   path: string
@@ -180,6 +182,14 @@ export interface PublishResult {
   error?: string
 }
 
+// Where the conflicting changes came from: the base branch's name, or GitHub for the
+// branch's own copy there. Edits is set once the branch is rebased and the edits not
+// committed yet are the ones that clash, as they are put back.
+export interface RebaseState {
+  from: string
+  edits: boolean
+}
+
 export interface GitStatus {
   branch: string
   base: string
@@ -192,6 +202,8 @@ export interface GitStatus {
   behind: number
   // The upstream only holds older versions of this branch's commits, after a rebase.
   rebased: boolean
+  // An update or pull stopped halfway on edits that conflict, waiting to be settled.
+  rebase: RebaseState | null
   baseAhead: number
   aheadOfBase: number
   baseSite: string | null
@@ -243,6 +255,8 @@ export interface PreviewState {
   status: HugoStatus
   // The site's markdown rendition suffix, or null when it has none.
   markdownSuffix: string | null
+  // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
+  notice: string | null
 }
 
 export type SidebarTab = 'files' | 'changes' | 'search'
@@ -350,9 +364,8 @@ export interface MenuState {
   preview: boolean
 }
 
-// Git conveniences for editors who are not git users; both on unless turned off.
+// Git conveniences for editors who are not git users; on unless turned off.
 export interface Preferences {
-  pushOnCommit: boolean
   deleteMergedBranch: boolean
   // The Claude pane, and installing Claude Code during setup.
   claude: boolean

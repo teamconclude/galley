@@ -22,17 +22,6 @@ export default function SettingsDialog({ prefs, onChange, onClose }: Props): Rea
         <label className="dialog-check">
           <input
             type="checkbox"
-            checked={prefs.pushOnCommit}
-            onChange={(e) => onChange({ ...prefs, pushOnCommit: e.target.checked })}
-          />
-          <span>
-            Push every commit to GitHub
-            <small>Your branch on GitHub always matches this Mac.</small>
-          </span>
-        </label>
-        <label className="dialog-check">
-          <input
-            type="checkbox"
             checked={prefs.deleteMergedBranch}
             onChange={(e) => onChange({ ...prefs, deleteMergedBranch: e.target.checked })}
           />

@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
-import { extname, join } from 'path'
+import { extname, join, resolve } from 'path'
 import type {
   Review,
   Change,
@@ -28,6 +28,10 @@ const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'd
 // Work flows from personal branches into the first of these, then on to the next.
 const sharedChain = ['develop', 'staging', 'production']
 const fetchInterval = 5 * 60_000
+// Conflicts look the same on every Mac, whatever its git settings, as the Changes tab and
+// the request to Claude describe them.
+const plainMarkers = ['-c', 'merge.conflictStyle=merge']
+const markerLine = /^(<{7}|>{7})( |$)/m
 // Commits listed under one count; the count itself says how many there are in all.
 const maxLog = 100
 
@@ -116,6 +120,14 @@ const imageTypes: Record<string, string> = {
   ico: 'image/x-icon'
 }
 
+// Edits set aside during an update or pull: the stash holding them, the commit to return
+// to on cancelling, and where the changes being brought in come from.
+interface Aside {
+  stash: string
+  head: string
+  from: string
+}
+
 // Git state of one checkout, refreshed after every operation and on a fetch timer.
 export class Git {
   private lastFetch: number | null = null
@@ -160,9 +172,12 @@ export class Git {
 
   async status(): Promise<GitStatus> {
     const head = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
-    const branch = head === 'HEAD' ? '' : head
     const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
     const base = await this.base(remotes)
+    // Halfway through a rebase the checkout has no branch; it still belongs to the one
+    // being rebased.
+    const stopped = await this.stoppedRebase()
+    const branch = stopped?.branch ?? (head === 'HEAD' ? '' : head)
     const isProtected = protectedBranches.has(branch)
     const upstream = await this.tracking(branch, remotes)
     let ahead = 0
@@ -175,9 +190,17 @@ export class Git {
           `--cherry-pick --right-only HEAD...${upstream}`.split(' '),
           1
         )
-        rebased = unique === 0
+        const over = await this.rebasedOver(branch)
+        rebased = unique === 0 || (over !== '' && over === (await this.sha(upstream)))
       }
     }
+    const aside = await this.aside()
+    const fromBase =
+      stopped !== null &&
+      (await this.git(['merge-base', '--is-ancestor', stopped.onto, `origin/${base}`]).then(
+        () => true,
+        () => false
+      ))
     const hasBase = remotes.includes(`origin/${base}`)
     const baseAhead = hasBase ? await this.count([`HEAD..origin/${base}`]) : 0
     const aheadOfBase = hasBase ? await this.count([`origin/${base}..HEAD`]) : 0
@@ -203,6 +226,11 @@ export class Git {
       .then((out) => new Set(out.split('\n').filter(Boolean)))
       .catch(() => null)
     const { site: changes, outside } = splitOutside(all, tracked)
+    for (const change of changes) {
+      if (change.kind !== 'conflict') continue
+      const text = await fs.readFile(join(this.path, change.path), 'utf8').catch(() => null)
+      if (text !== null && !markerLine.test(text)) change.kind = 'resolved'
+    }
     const site = await this.site()
     for (const change of changes) {
       if (change.kind !== 'untracked' && change.kind !== 'added') continue
@@ -223,6 +251,9 @@ export class Git {
       ahead,
       behind,
       rebased,
+      rebase: stopped
+        ? { from: aside?.from ?? (fromBase ? base : 'GitHub'), edits: false }
+        : aside && { from: aside.from, edits: true },
       baseAhead,
       aheadOfBase,
       baseSite: hasBase ? await environmentSite(this.path, base) : null,
@@ -251,12 +282,59 @@ export class Git {
 
   // The configured upstream; a shared branch without one follows its namesake on origin.
   private async tracking(branch: string, remotes: string[]): Promise<string | null> {
+    if (!branch) return null
     const upstream = (
-      await this.git(['rev-parse', '--abbrev-ref', '@{upstream}']).catch(() => '')
+      await this.git(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`]).catch(() => '')
     ).trim()
     if (upstream) return upstream
     const own = `origin/${branch}`
     return protectedBranches.has(branch) && remotes.includes(own) ? own : null
+  }
+
+  private async sha(ref: string): Promise<string> {
+    return (await this.git(['rev-parse', ref]).catch(() => '')).trim()
+  }
+
+  // The rebase that stopped on conflicting edits: the branch it rewrites and the commit
+  // it puts that branch on; null when none is under way.
+  private async stoppedRebase(): Promise<{ branch: string; onto: string } | null> {
+    const dir = (await this.git(['rev-parse', '--git-path', 'rebase-merge']).catch(() => '')).trim()
+    if (!dir) return null
+    const read = (name: string): Promise<string | null> =>
+      fs.readFile(resolve(this.path, dir, name), 'utf8').then(
+        (s) => s.trim(),
+        () => null
+      )
+    const head = await read('head-name')
+    if (!head) return null
+    return { branch: head.replace(/^refs\/heads\//, ''), onto: (await read('onto')) ?? '' }
+  }
+
+  // Edits not committed yet are set aside while an update or pull rebases the branch, and
+  // put back at the end. The note names them and the commit the branch was on, so
+  // cancelling can return to both, also after a restart.
+  private async asideFile(): Promise<string> {
+    const rel = (await this.git(['rev-parse', '--git-path', 'galley-aside.json'])).trim()
+    return resolve(this.path, rel)
+  }
+
+  private async aside(): Promise<Aside | null> {
+    const file = await this.asideFile().catch(() => null)
+    if (!file) return null
+    return fs.readFile(file, 'utf8').then(
+      (s) => JSON.parse(s) as Aside,
+      () => null
+    )
+  }
+
+  // Settling conflicts during an update changes the commits, so GitHub's copy no longer
+  // looks like an older version of them. The copy an update replaced is noted, and while
+  // GitHub still has exactly that, pushing over it is safe.
+  private rebasedOver(branch: string): Promise<string> {
+    return this.git(['config', `branch.${branch}.galleyRebasedOver`]).then(
+      (s) => s.trim(),
+      () => ''
+    )
   }
 
   private async aheadBehind(ref: string): Promise<[number, number]> {
@@ -408,52 +486,200 @@ export class Git {
     })
   }
 
+  // The status, for an operation that needs the branch at rest rather than halfway
+  // through an update or pull.
+  private async ready(): Promise<GitStatus> {
+    const status = await this.status()
+    if (status.rebase) {
+      throw new Error('Bringing in changes stopped on a conflict; continue or cancel it first')
+    }
+    return status
+  }
+
   async commit(msg: string, paths: string[]): Promise<void> {
+    await this.ready()
     await this.op('Committing…', async () => {
       await this.git(['add', '-A', '--', ...paths])
       await this.git(['commit', '-m', msg])
     })
-    const { branch } = await this.status()
-    if (prefs().pushOnCommit && branch && !protectedBranches.has(branch)) await this.push()
+    await this.sync()
   }
 
   // After a rebase the upstream holds only older versions of our commits, so replacing
   // them is safe; the lease still refuses if someone else pushed in the meantime.
   async push(): Promise<void> {
-    const { branch, rebased, protected: isProtected } = await this.status()
+    const { branch, rebased, protected: isProtected } = await this.ready()
     if (isProtected) throw new Error(`${branch} is shared; move your commits to a branch first`)
     return this.op('Pushing…', async () => {
       await this.git(['push', '-u', ...(rebased ? ['--force-with-lease'] : []), 'origin', 'HEAD'])
       this.lastFetch = Date.now()
+      if (rebased) {
+        await this.git(['config', '--unset', `branch.${branch}.galleyRebasedOver`]).catch(
+          () => undefined
+        )
+      }
     })
   }
 
-  // A shared branch only fast-forwards; merging into it would make commits nobody can push.
+  // A branch of one's own is kept the same on GitHub as here, so a review link always
+  // shows the latest work.
+  private async sync(): Promise<void> {
+    const {
+      branch,
+      protected: isProtected,
+      upstream,
+      ahead,
+      rebased,
+      aheadOfBase
+    } = await this.status()
+    if (!branch || isProtected) return
+    if (ahead > 0 || rebased || (!upstream && aheadOfBase > 0)) await this.push()
+  }
+
+  // Own commits go on top of what others pushed to the branch. A shared branch only
+  // fast-forwards; merging into it would make commits nobody can push.
   async pull(): Promise<void> {
-    const { branch, upstream, protected: isProtected } = await this.status()
-    return this.op('Pulling…', async () => {
-      if (!isProtected) {
-        await this.git(['pull', '--no-rebase', '--no-edit'])
-        return
-      }
+    const { branch, upstream, protected: isProtected } = await this.ready()
+    const waiting = await this.op('Pulling…', async () => {
+      if (!isProtected) return this.rebaseWithEdits(['pull', '--rebase'], 'GitHub')
       if (!upstream) throw new Error(`${branch} is not on GitHub`)
       await this.git(['fetch', 'origin', branch])
       await this.git(['merge', '--ff-only', upstream])
+      return false
     })
+    if (!waiting) await this.sync()
   }
 
-  // Rebases the current branch onto the latest base branch; a conflict is rolled back.
+  // Rebases the current branch onto the latest base branch and replaces its copy on
+  // GitHub. Commits others pushed to the branch are pulled first, or replacing the copy
+  // would drop them.
   async update(): Promise<void> {
-    const { branch, base, protected: isProtected } = await this.status()
+    const { branch, base, upstream, protected: isProtected } = await this.ready()
     if (isProtected) throw new Error(`${branch} is shared and only follows GitHub`)
-    return this.op(`Updating from ${base}…`, async () => {
+    const waiting = await this.op(`Updating from ${base}…`, async () => {
       await this.git(['fetch', 'origin', base])
-      try {
-        await this.git(['rebase', '--autostash', `origin/${base}`])
-      } catch (e) {
-        await this.git(['rebase', '--abort']).catch(() => undefined)
-        throw new Error(`The changes on ${base} conflict with this branch. ${message(e)}`)
+      if (upstream) await this.git(['fetch', 'origin', branch]).catch(() => undefined)
+      const now = await this.status()
+      if (now.behind > 0 && !now.rebased) {
+        throw new Error(`${branch} has new commits on GitHub. Pull them first, then update.`)
       }
+      if (upstream) {
+        await this.git(['config', `branch.${branch}.galleyRebasedOver`, await this.sha(upstream)])
+      }
+      return this.rebaseWithEdits(['rebase', `origin/${base}`], base)
+    })
+    if (!waiting) await this.sync()
+  }
+
+  // Rebases with the edits in progress set aside and puts them back at the end; true when
+  // it waits on conflicts, in the rebase or in putting the edits back. GitHub only gets
+  // the result once nothing waits, so cancelling never has to undo a push.
+  private async rebaseWithEdits(args: string[], from: string): Promise<boolean> {
+    await this.setAside(from)
+    try {
+      if (await this.rebase(args)) return true
+    } catch (e) {
+      await this.putBack().catch(() => undefined)
+      throw e
+    }
+    return this.putBack()
+  }
+
+  private async setAside(from: string): Promise<void> {
+    const dirty = await this.git(['diff', '--quiet', 'HEAD']).then(
+      () => false,
+      () => true
+    )
+    if (!dirty) return
+    const head = await this.sha('HEAD')
+    await this.git(['stash', 'push', '-m', 'Galley: edits set aside while bringing in changes'])
+    const aside: Aside = { stash: await this.sha('stash@{0}'), head, from }
+    await fs.writeFile(await this.asideFile(), JSON.stringify(aside))
+  }
+
+  // True when some of the edits clash with what came in; they wait in the checkout with
+  // conflict markers, and the stash keeps them until they are settled.
+  private async putBack(): Promise<boolean> {
+    const aside = await this.aside()
+    if (!aside) return false
+    try {
+      await this.git([...plainMarkers, 'stash', 'apply', aside.stash])
+    } catch (e) {
+      if ((await this.unmerged()).length > 0) return true
+      throw e
+    }
+    await this.dropAside(aside)
+    return false
+  }
+
+  private async dropAside(aside: Aside): Promise<void> {
+    const index = (await this.lines(['stash', 'list', '--format=%H'])).indexOf(aside.stash)
+    if (index >= 0) await this.git(['stash', 'drop', '-q', `stash@{${index}}`])
+    await fs.unlink(await this.asideFile()).catch(() => undefined)
+  }
+
+  private unmerged(): Promise<string[]> {
+    return this.lines(['diff', '--name-only', '--diff-filter=U'])
+  }
+
+  // Runs a rebase; true when it stopped on conflicting edits, which wait in the checkout
+  // for the editor or Claude to settle them.
+  private async rebase(args: string[]): Promise<boolean> {
+    try {
+      await this.git([...plainMarkers, ...args])
+      return false
+    } catch (e) {
+      if (await this.stoppedRebase()) return true
+      throw e
+    }
+  }
+
+  // Carries on once the conflicts are settled; a later commit, or putting back the edits,
+  // may stop it again. A commit whose changes turn out to be in place already is left out.
+  // Settled edits stay uncommitted, as they were before.
+  async continueRebase(): Promise<void> {
+    const stopped = await this.stoppedRebase()
+    const aside = await this.aside()
+    if (!stopped && !aside) throw new Error('Nothing is waiting to continue')
+    const waiting = await this.op('Continuing…', async () => {
+      const unmerged = await this.unmerged()
+      const marked: string[] = []
+      for (const path of unmerged) {
+        const text = await fs.readFile(join(this.path, path), 'utf8').catch(() => '')
+        if (markerLine.test(text)) marked.push(path)
+      }
+      if (marked.length > 0) {
+        throw new Error(
+          `${marked.join(', ')} still ${marked.length === 1 ? 'has' : 'have'} conflict markers. ` +
+            'Keep what should stay and remove the lines starting <<<<<<<, ======= and >>>>>>>.'
+        )
+      }
+      if (stopped) {
+        await this.git(['add', '-u'])
+        const empty = await this.git(['diff', '--cached', '--quiet', 'HEAD']).then(
+          () => true,
+          () => false
+        )
+        const step = ['-c', 'core.editor=true', 'rebase', empty ? '--skip' : '--continue']
+        if (await this.rebase(step)) return true
+        return this.putBack()
+      }
+      // Putting the edits back failed without conflicts before; it is tried again.
+      if (unmerged.length === 0) return this.putBack()
+      await this.git(['reset', '-q', '--', ...unmerged])
+      await this.dropAside(aside!)
+      return false
+    })
+    if (!waiting) await this.sync()
+  }
+
+  // Puts the branch and the edits in progress back as they were before the update or pull.
+  abortRebase(): Promise<void> {
+    return this.op('Cancelling…', async () => {
+      const aside = await this.aside()
+      if (await this.stoppedRebase()) await this.git(['rebase', '--abort'])
+      else if (aside) await this.git(['reset', '-q', '--hard', aside.head])
+      await this.putBack()
     })
   }
 
@@ -461,7 +687,7 @@ export class Git {
   // with the base so work goes on here. By default its copy on GitHub is removed and comes
   // back with the next push.
   async mergeToBase(): Promise<void> {
-    const { branch, base, changes } = await this.status()
+    const { branch, base, changes } = await this.ready()
     if (!branch || branch === base) throw new Error(`Not on a branch to merge into ${base}`)
     if (changes.length > 0) throw new Error('Commit or discard your changes first')
     return this.op(`Merging into ${base}…`, async () => {

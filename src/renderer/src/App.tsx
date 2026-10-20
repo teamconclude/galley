@@ -10,6 +10,7 @@ import type {
   MenuCommand,
   RepoInfo,
   OutsideEntry,
+  RebaseState,
   ReleaseStep,
   Preferences,
   SearchMatch,
@@ -19,6 +20,7 @@ import type {
 import { EditorView } from '@codemirror/view'
 import ChangesPanel from './components/ChangesPanel'
 import ClaudePane from './components/ClaudePane'
+import ConflictEditor from './components/ConflictEditor'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
 import { NewPageDialog, PromptDialog, type NewPage } from './components/Dialogs'
 import CommitList from './components/CommitList'
@@ -50,6 +52,7 @@ import SettingsDialog from './components/SettingsDialog'
 import { UpdateButton } from './components/UpdateButton'
 import Welcome from './components/Welcome'
 import { join, split } from './lib/frontmatter'
+import { askClaude } from './lib/claudeTerminal'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
 import { usePages } from './lib/pages'
@@ -570,6 +573,31 @@ export default function App(): React.JSX.Element | null {
     return window.api.git.onStatus(setGitStatus)
   }, [repoPath])
 
+  // Files an update or pull left with conflicts, while it waits on them: those still
+  // with markers, and all of them, settled ones included, which keep their editor.
+  const rebaseState = gitStatus?.rebase ?? null
+  const ofKind = (...kinds: string[]): string[] =>
+    rebaseState
+      ? (gitStatus?.changes ?? []).filter((c) => kinds.includes(c.kind)).map((c) => c.path)
+      : []
+  const conflictPaths = ofKind('conflict')
+  const conflictFiles = ofKind('conflict', 'resolved')
+  const inConflict = (path: string | undefined): boolean =>
+    path !== undefined && conflictFiles.includes(path)
+
+  // When an update or pull stops on conflicts, the first conflicting file opens for
+  // settling, once per stop; one already open stays. Settling one does not move on.
+  const conflictKey = rebaseState ? `${rebaseState.edits}:${conflictFiles.join('\n')}` : ''
+  const shownConflicts = useRef('')
+  useEffect(() => {
+    if (conflictKey === shownConflicts.current) return
+    shownConflicts.current = conflictKey
+    if (conflictPaths.length === 0) return
+    if (inConflict(fileRef.current?.path)) setDiff(null)
+    else void open(conflictPaths[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflictKey])
+
   // Without a commit identity, the checkout asks for one on opening, once setup is not
   // busy: signing in to GitHub during setup provides it by itself.
   const setupBusy = setup?.steps.some((s) => ['running', 'action'].includes(s.state)) ?? true
@@ -666,6 +694,41 @@ export default function App(): React.JSX.Element | null {
     await gitAction(() => window.api.git.mergeToBase())
     setDiff(null)
     if (file) await reopen(file.path)
+  }
+
+  const continueRebase = async (): Promise<void> => {
+    await save()
+    await gitAction(() => window.api.git.continueRebase())
+    setDiff(null)
+  }
+
+  const cancelRebase = async (): Promise<void> => {
+    const question =
+      'Cancel bringing in the changes? Your branch and your edits go back to how they were before, and any conflicts you settled are lost.'
+    if (!window.confirm(question)) return
+    await save()
+    await gitAction(() => window.api.git.abortRebase())
+    setDiff(null)
+  }
+
+  // Claude settles the conflicts by editing the files; continuing stays the editor's call,
+  // once they have looked at the result.
+  const resolveWithClaude = (paths: string[], { from, edits }: RebaseState): void => {
+    const where = from === 'GitHub' ? 'my branch on GitHub' : from
+    const what = edits
+      ? `Putting back my edits that were not committed yet, after bringing in the changes from ${where},`
+      : `Bringing in the changes from ${where}`
+    setShowClaude(true)
+    const sent = askClaude(
+      `${what} stopped on conflicts in ${paths.join(', ')}. In each file, the part between ` +
+        `<<<<<<< and ======= is the version from ${where}, and the part between ======= and ` +
+        `>>>>>>> is ${edits ? 'my edit' : 'mine'}. Combine the two so that what each side ` +
+        'changed is kept, and remove the marker lines. Where they truly contradict each ' +
+        'other, ask me which to keep. Only edit these files and do not run git commands that ' +
+        'change anything. When you are done, tell me briefly what you combined, and that I ' +
+        'should click Continue in the Changes tab.'
+    )
+    if (!sent) window.alert('Claude is not running. Open the Claude pane and try again.')
   }
 
   const runRelease = async (step: ReleaseStep): Promise<void> => {
@@ -882,15 +945,21 @@ export default function App(): React.JSX.Element | null {
   // The text view fetches again when the file's text changes.
   const fileText = file?.text ?? ''
   const contentVersion = useMemo(() => hashText(fileText), [fileText])
+  // Hugo cannot build a site with conflict markers in it, and its error would only confuse.
+  const previewNotice =
+    conflictPaths.length > 0
+      ? 'The preview is paused while changes conflict.\n\nSettle the conflicts in the editor and click Continue; the preview comes back then.'
+      : null
   const previewState = useMemo(
     () => ({
       url: previewUrl,
       mode: previewMode,
       version: contentVersion,
       status: hugo,
-      markdownSuffix: site.markdownSuffix
+      markdownSuffix: site.markdownSuffix,
+      notice: previewNotice
     }),
-    [previewUrl, previewMode, contentVersion, hugo, site.markdownSuffix]
+    [previewUrl, previewMode, contentVersion, hugo, site.markdownSuffix, previewNotice]
   )
 
   // A preview in its own window follows what the bar in this window says; one that was
@@ -1149,13 +1218,16 @@ export default function App(): React.JSX.Element | null {
                 status={gitStatus}
                 me={identity}
                 selected={diff?.change.path ?? null}
-                onShowDiff={(c) => void showDiff(c)}
+                onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
                 onDiscard={(c) => void discardChange(c)}
                 onDiscardAll={(cs) => void discardAll(cs)}
                 onCommit={commit}
                 onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
                 onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
                 onUpdate={() => void save().then(() => gitAction(() => window.api.git.update()))}
+                onContinue={() => void continueRebase()}
+                onCancelRebase={() => void cancelRebase()}
+                onAskClaude={claudeOn ? resolveWithClaude : undefined}
                 onFetch={() => void gitAction(() => window.api.git.fetch())}
                 onNewBranch={() => setGitDialog('new-branch')}
                 onMerge={() => setGitDialog('merge')}
@@ -1185,6 +1257,19 @@ export default function App(): React.JSX.Element | null {
                     onOpen={() => void open(diff.change.path)}
                     onDiscard={() => void discardChange(diff.change)}
                     onRevertHunk={(i) => void revertHunk(diff.change, i)}
+                  />
+                ) : file && rebaseState && inConflict(file.path) ? (
+                  <ConflictEditor
+                    key={`conflict:${file.path}`}
+                    path={file.path}
+                    text={file.text}
+                    state={rebaseState}
+                    onChange={changeText}
+                    onSave={() => void save()}
+                    onContinue={() => void continueRebase()}
+                    onAskClaude={
+                      claudeOn ? () => resolveWithClaude(conflictPaths, rebaseState) : undefined
+                    }
                   />
                 ) : !file ? (
                   <div className="pane-empty">Choose a page on the left.</div>
@@ -1263,6 +1348,7 @@ export default function App(): React.JSX.Element | null {
                       onDetach={toggleDetached}
                       onAttach={toggleDetached}
                       targets={onShow}
+                      notice={previewNotice}
                     />
                   </section>
                 </>
