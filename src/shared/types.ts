@@ -349,7 +349,7 @@ export type MenuCommand =
   | 'setup'
   | 'settings'
   | 'new-site'
-  | 'clone-site'
+  | 'open-site'
   | 'find'
   | 'replace'
   | 'find-in-site'

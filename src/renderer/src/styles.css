@@ -2772,3 +2772,8 @@ body.dragging .terminal-host {
 .share-popover .share-warning {
   color: var(--yellow5);
 }
+
+.dialog-source {
+  align-self: flex-start;
+  margin-bottom: 4px;
+}

@@ -31,7 +31,7 @@ import {
   ConfirmDialog,
   IdentityDialog,
   NewSiteDialog,
-  CloneDialog,
+  OpenSiteDialog,
   NewBranchDialog,
   SwitchBranchDialog,
   DeleteBranchDialog
@@ -1048,8 +1048,8 @@ export default function App(): React.JSX.Element | null {
       case 'new-site':
         setSiteDialog('new')
         break
-      case 'clone-site':
-        setSiteDialog('clone')
+      case 'open-site':
+        setSiteDialog('open')
         break
       case 'settings':
         setShowSettings(true)
@@ -1400,7 +1400,7 @@ export default function App(): React.JSX.Element | null {
         </div>
         {showSetup && setup && <SetupDialog status={setup} onClose={() => setShowSetup(false)} />}
         {siteDialog === 'new' && <NewSiteDialog onCancel={() => setSiteDialog(null)} />}
-        {siteDialog === 'clone' && <CloneDialog onCancel={() => setSiteDialog(null)} />}
+        {siteDialog === 'open' && <OpenSiteDialog onCancel={() => setSiteDialog(null)} />}
         {menu && (
           <ContextMenu
             x={menu.x}

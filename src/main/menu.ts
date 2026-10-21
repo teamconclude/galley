@@ -6,7 +6,6 @@ import { isDev } from './env'
 interface Actions {
   about: () => void
   manual: () => void
-  openRepo: () => void
   // The sites opened before, newest first, for Open Recent.
   recent: string[]
   openRecent: (path: string) => void
@@ -76,8 +75,11 @@ function buildMenu(actions: Actions): Menu {
         item('show-in-finder', 'Show in Finder'),
         { type: 'separator' },
         { label: 'New Site…', click: () => actions.command('new-site') },
-        { label: 'Clone Site…', click: () => actions.command('clone-site') },
-        { label: 'Open Site Checkout…', accelerator: 'CmdOrCtrl+O', click: actions.openRepo },
+        {
+          label: 'Open Site…',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => actions.command('open-site')
+        },
         {
           label: 'Open Recent',
           submenu:

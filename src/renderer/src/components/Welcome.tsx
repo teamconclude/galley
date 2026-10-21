@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { SetupStatus } from '../../../shared/types'
-import { CloneDialog, NewSiteDialog } from './GitDialogs'
+import { NewSiteDialog, OpenSiteDialog } from './GitDialogs'
 import SetupDialog from './SetupDialog'
 
-export type SiteDialog = 'clone' | 'new' | null
+export type SiteDialog = 'open' | 'new' | null
 
 interface Props {
   dialog: SiteDialog
@@ -37,10 +37,9 @@ export default function Welcome({ dialog, onDialog: setDialog }: Props): React.J
           start a new one from the Galley template.
         </p>
         <div className="welcome-buttons">
-          <button className="primary" onClick={() => void window.api.repo.choose()}>
-            Open site checkout…
+          <button className="primary" onClick={() => setDialog('open')}>
+            Open site…
           </button>
-          <button onClick={() => setDialog('clone')}>Clone a site…</button>
           <button onClick={() => setDialog('new')}>New site…</button>
           <button onClick={() => setShowSetup(true)}>Setup…</button>
         </div>
@@ -57,7 +56,7 @@ export default function Welcome({ dialog, onDialog: setDialog }: Props): React.J
         )}
         {error && <p className="welcome-error">{error}</p>}
       </div>
-      {dialog === 'clone' && <CloneDialog onCancel={() => setDialog(null)} />}
+      {dialog === 'open' && <OpenSiteDialog onCancel={() => setDialog(null)} />}
       {dialog === 'new' && <NewSiteDialog onCancel={() => setDialog(null)} />}
       {showSetup && setup && <SetupDialog status={setup} onClose={() => setShowSetup(false)} />}
     </div>

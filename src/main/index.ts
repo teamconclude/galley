@@ -81,7 +81,6 @@ function refreshMenu(): void {
   installMenu({
     about: () => showAbout(win),
     manual: showManual,
-    openRepo: () => void chooseRepo(),
     recent: recentSites(),
     openRecent: (path) => {
       if (Repo.isSite(path)) openRepo(path)

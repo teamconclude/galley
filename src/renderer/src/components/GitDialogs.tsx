@@ -257,12 +257,14 @@ export function IdentityDialog({ initial, onSubmit, onCancel }: IdentityProps): 
   )
 }
 
-interface CloneProps {
+interface OpenSiteProps {
   onCancel: () => void
 }
 
-// Clones into <folder>/<repository name>; progress lines stream in from git.
-export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
+// Opens a checkout already on this Mac, or clones one from GitHub into
+// <folder>/<repository name> with git's progress streaming in.
+export function OpenSiteDialog({ onCancel }: OpenSiteProps): React.JSX.Element {
+  const [source, setSource] = useState<'local' | 'github'>('local')
   const [url, setUrl] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
   const [progress, setProgress] = useState<string[]>([])
@@ -284,6 +286,10 @@ export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
   const dest = folder && repoName ? `${folder}/${repoName}` : null
 
   const start = async (): Promise<void> => {
+    if (source === 'local') {
+      await window.api.repo.choose()
+      return
+    }
     if (!dest) return
     setRunning(true)
     setError(null)
@@ -297,40 +303,67 @@ export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
 
   return (
     <Frame
-      title="Clone a site"
-      submitLabel={running ? 'Cloning…' : 'Clone'}
-      canSubmit={!running && dest !== null && url.trim() !== ''}
+      title="Open a site"
+      submitLabel={source === 'local' ? 'Choose Folder…' : running ? 'Cloning…' : 'Clone'}
+      canSubmit={source === 'local' || (!running && dest !== null && url.trim() !== '')}
       onSubmit={() => void start()}
       onCancel={onCancel}
     >
-      <label className="dialog-field">
-        <span>Repository</span>
-        <input
-          autoFocus
-          value={url}
-          placeholder={siteRepoUrl}
-          onChange={(e) => setUrl(e.target.value)}
+      <div className="segmented dialog-source">
+        <button
+          type="button"
+          className={source === 'local' ? 'on' : ''}
           disabled={running}
-        />
-      </label>
-      <div className="dialog-field">
-        <span>Folder</span>
-        <div className="dialog-row">
-          <span className="dialog-path">{dest ?? 'Choose where to put the checkout'}</span>
-          <button
-            type="button"
-            disabled={running}
-            onClick={() => void window.api.git.chooseFolder().then((f) => f && setFolder(f))}
-          >
-            Choose…
-          </button>
-        </div>
+          onClick={() => setSource('local')}
+        >
+          On this Mac
+        </button>
+        <button
+          type="button"
+          className={source === 'github' ? 'on' : ''}
+          disabled={running}
+          onClick={() => setSource('github')}
+        >
+          From GitHub
+        </button>
       </div>
-      {progress.length > 0 && <pre className="dialog-log">{progress.join('\n')}</pre>}
-      {error && <p className="dialog-note error">{error}</p>}
-      <p className="dialog-note">
-        Needs access to the repository on GitHub with your SSH key or saved login.
-      </p>
+      {source === 'local' ? (
+        <p className="dialog-note">
+          Choose the folder that holds the site: the one with its Hugo configuration, such as
+          hugo.yaml or config.toml.
+        </p>
+      ) : (
+        <>
+          <label className="dialog-field">
+            <span>Repository</span>
+            <input
+              autoFocus
+              value={url}
+              placeholder={siteRepoUrl}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={running}
+            />
+          </label>
+          <div className="dialog-field">
+            <span>Folder</span>
+            <div className="dialog-row">
+              <span className="dialog-path">{dest ?? 'Choose where to put the checkout'}</span>
+              <button
+                type="button"
+                disabled={running}
+                onClick={() => void window.api.git.chooseFolder().then((f) => f && setFolder(f))}
+              >
+                Choose…
+              </button>
+            </div>
+          </div>
+          {progress.length > 0 && <pre className="dialog-log">{progress.join('\n')}</pre>}
+          {error && <p className="dialog-note error">{error}</p>}
+          <p className="dialog-note">
+            Needs access to the repository on GitHub with your SSH key or saved login.
+          </p>
+        </>
+      )}
     </Frame>
   )
 }

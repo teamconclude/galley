@@ -49,8 +49,8 @@ files that a browser downloaded.
 
 In brief; the [manual](docs/manual/README.md) has the details.
 
-**Getting the site.** On first start, choose the folder where the site is checked out, pick
-**Clone a site** to get a fresh copy from GitHub, or **New site** to start one from the
+**Getting the site.** **Open site** (⌘O) opens a checkout already on the Mac or clones one
+from GitHub; **New site** starts one from the
 [Galley template](https://github.com/teamconclude/galley-template). Galley remembers the
 sites it has opened; the Welcome screen and **File ▸ Open Recent** list them.
 
