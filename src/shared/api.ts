@@ -37,6 +37,14 @@ export interface Api {
   repo: {
     get: () => Promise<RepoInfo | null>
     choose: () => Promise<boolean>
+    // Sites opened before that are still there, newest first.
+    recent: () => Promise<string[]>
+    open: (path: string) => Promise<void>
+    // Makes a site at dest from the Galley template and opens it; progress arrives on
+    // git.onCloneProgress.
+    createSite: (name: string, dest: string, identity: Identity | null) => Promise<void>
+    // Who would commit in a new site: git's global setting, else the GitHub profile.
+    defaultIdentity: () => Promise<Identity | null>
     list: (rel: string) => Promise<DirEntry[]>
     read: (rel: string) => Promise<string>
     write: (rel: string, text: string) => Promise<void>

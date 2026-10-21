@@ -5,6 +5,8 @@ import { join } from 'path'
 
 export interface Settings {
   repoPath?: string
+  // Sites opened before, newest first; repoPath is the first.
+  recent?: string[]
   declinedMove?: boolean
   hugoChecked?: number
   windows?: { main?: Rectangle; preview?: Rectangle }

@@ -4,13 +4,13 @@ import {
   clipboard,
   dialog,
   ipcMain,
-  Menu,
   net,
   protocol,
   Rectangle,
   screen,
   shell
 } from 'electron'
+import { homedir } from 'os'
 import { basename } from 'path'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -32,13 +32,14 @@ import type {
 import { isDev } from './env'
 import { claudeArgs, receiveDrops, setContext } from './claude'
 import { importDocument } from './convert'
-import { clone, Git } from './git'
+import { clone, Git, run as runGit } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
 import { dropPlacement } from './placement'
 import { parseReviewLink, type ReviewLink } from '../shared/reviewLink'
 import { showAbout } from './about'
-import { buildMenu, setMenuState } from './menu'
+import { installMenu, setMenuState } from './menu'
+import { createSite } from './newSite'
 import { Repo } from './repo'
 import { replace, search } from './search'
 import { loadSettings, prefs, saveSettings } from './settings'
@@ -71,6 +72,40 @@ const terminal = new ClaudeTerminal(
   (code) => send('terminal:exit', code)
 )
 
+const maxRecent = 8
+
+// The recent sites that are still there.
+const recentSites = (): string[] => (loadSettings().recent ?? []).filter((p) => Repo.isSite(p))
+
+function refreshMenu(): void {
+  installMenu({
+    about: () => showAbout(win),
+    manual: showManual,
+    openRepo: () => void chooseRepo(),
+    recent: recentSites(),
+    openRecent: (path) => {
+      if (Repo.isSite(path)) openRepo(path)
+      else dialog.showErrorBox('Site not found', `${path} is no longer a site checkout.`)
+    },
+    checkUpdates: () => void updater.check(true),
+    zoom,
+    command: (command: MenuCommand) => send('menu', command)
+  })
+}
+
+// Who commits in a new site: git's own setting, else the GitHub profile.
+async function defaultIdentity(): Promise<Identity | null> {
+  const get = (key: string): Promise<string> =>
+    runGit(homedir(), ['config', '--global', key]).then(
+      (s) => s.trim(),
+      () => ''
+    )
+  const [name, email] = await Promise.all([get('user.name'), get('user.email')])
+  if (name && email) return { name, email }
+  const user = setup.status.user
+  return user?.name && user.email ? { name: user.name, email: user.email } : null
+}
+
 function openRepo(path: string): void {
   repo?.close()
   git?.stop()
@@ -87,7 +122,10 @@ function openRepo(path: string): void {
     () => opened.site()
   )
   git.start()
-  saveSettings({ ...loadSettings(), repoPath: path })
+  const settings = loadSettings()
+  const recent = [path, ...(settings.recent ?? []).filter((p) => p !== path)].slice(0, maxRecent)
+  saveSettings({ ...settings, repoPath: path, recent })
+  refreshMenu()
   void hugo.start(path).then(() => hugo.refresh())
   setup.siteOpened()
   send('repo:opened')
@@ -267,6 +305,19 @@ function registerIpc(): void {
   }
   ipcMain.handle('repo:get', () => repo?.info() ?? null)
   ipcMain.handle('repo:choose', () => chooseRepo())
+  ipcMain.handle('repo:recent', () => recentSites())
+  ipcMain.handle('repo:open', (_e, path: string) => {
+    if (!Repo.isSite(path)) throw new Error(`${path} is no longer a site checkout`)
+    openRepo(path)
+  })
+  ipcMain.handle('repo:defaultIdentity', () => defaultIdentity())
+  ipcMain.handle(
+    'repo:createSite',
+    async (_e, name: string, dest: string, identity: Identity | null) => {
+      await createSite(name, dest, identity, (line) => send('git:cloneProgress', line))
+      openRepo(dest)
+    }
+  )
   ipcMain.handle('repo:list', async (_e, rel: string) => {
     const entries = await current().list(rel)
     const times = await git?.changeTimes(rel).catch(() => null)
@@ -547,16 +598,7 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('io.conclude.galley')
   // The packaged app carries its own icon; in development the Dock shows Electron's.
   if (isDev) app.dock?.setIcon(icon)
-  Menu.setApplicationMenu(
-    buildMenu({
-      about: () => showAbout(win),
-      manual: showManual,
-      openRepo: () => void chooseRepo(),
-      checkUpdates: () => void updater.check(true),
-      zoom,
-      command: (command: MenuCommand) => send('menu', command)
-    })
-  )
+  refreshMenu()
   registerIpc()
   registerRepoProtocol()
   // Links reach whichever Galley registered last; a development build takes them over

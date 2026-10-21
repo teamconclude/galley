@@ -30,6 +30,8 @@ import FileTree from './components/FileTree'
 import {
   ConfirmDialog,
   IdentityDialog,
+  NewSiteDialog,
+  CloneDialog,
   NewBranchDialog,
   SwitchBranchDialog,
   DeleteBranchDialog
@@ -51,7 +53,7 @@ import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
 import SettingsDialog from './components/SettingsDialog'
 import { UpdateButton } from './components/UpdateButton'
-import Welcome from './components/Welcome'
+import Welcome, { type SiteDialog } from './components/Welcome'
 import { join, split } from './lib/frontmatter'
 import { branchPrefix } from '../../shared/branchPrefix'
 import { askClaude } from './lib/claudeTerminal'
@@ -165,6 +167,8 @@ export default function App(): React.JSX.Element | null {
   const [layout] = useState(loadLayout)
   const [setup, setSetup] = useState<SetupStatus | null>(null)
   const [showSetup, setShowSetup] = useState<boolean | null>(null)
+  // New site or Clone, from the Welcome screen or the File menu.
+  const [siteDialog, setSiteDialog] = useState<SiteDialog>(null)
   const [showPreview, setShowPreview] = useState(layout.showPreview)
   const [detached, setDetached] = useState(layout.detached)
   const [pagePath, setPagePath] = useState('/')
@@ -547,6 +551,8 @@ export default function App(): React.JSX.Element | null {
   }
 
   const repoPath = repo?.path
+  // A new or cloned site opening ends its dialog.
+  useEffect(() => window.api.repo.onOpened(() => setSiteDialog(null)), [])
 
   // Links in the editors are checked against the site's pages, reloaded after changes.
   useEffect(() => {
@@ -1039,6 +1045,12 @@ export default function App(): React.JSX.Element | null {
       case 'setup':
         setShowSetup(true)
         break
+      case 'new-site':
+        setSiteDialog('new')
+        break
+      case 'clone-site':
+        setSiteDialog('clone')
+        break
       case 'settings':
         setShowSettings(true)
         break
@@ -1114,7 +1126,7 @@ export default function App(): React.JSX.Element | null {
   )
 
   if (repo === undefined) return null
-  if (repo === null) return <Welcome />
+  if (repo === null) return <Welcome dialog={siteDialog} onDialog={setSiteDialog} />
 
   const isMarkdown = file ? markdownFile.test(file.path) : false
   const parts = file && isMarkdown ? split(file.text) : null
@@ -1387,6 +1399,8 @@ export default function App(): React.JSX.Element | null {
           </div>
         </div>
         {showSetup && setup && <SetupDialog status={setup} onClose={() => setShowSetup(false)} />}
+        {siteDialog === 'new' && <NewSiteDialog onCancel={() => setSiteDialog(null)} />}
+        {siteDialog === 'clone' && <CloneDialog onCancel={() => setSiteDialog(null)} />}
         {menu && (
           <ContextMenu
             x={menu.x}
@@ -1539,7 +1553,7 @@ export default function App(): React.JSX.Element | null {
                 ? `${gitStatus.base}, which ${gitStatus.baseSite} shows`
                 : gitStatus.base}
               . You keep working on {gitStatus.branch}
-              {prefs?.deleteMergedBranch === false
+              {prefs?.deleteMergedBranch === false || !gitStatus.remoteUrl
                 ? '.'
                 : '; its copy on GitHub is removed until your next push.'}
             </p>

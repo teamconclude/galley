@@ -11,6 +11,11 @@ const api: Api = {
   repo: {
     get: () => ipcRenderer.invoke('repo:get'),
     choose: () => ipcRenderer.invoke('repo:choose'),
+    recent: () => ipcRenderer.invoke('repo:recent'),
+    open: (path) => ipcRenderer.invoke('repo:open', path),
+    createSite: (name, dest, identity) =>
+      ipcRenderer.invoke('repo:createSite', name, dest, identity),
+    defaultIdentity: () => ipcRenderer.invoke('repo:defaultIdentity'),
     list: (rel) => ipcRenderer.invoke('repo:list', rel),
     read: (rel) => ipcRenderer.invoke('repo:read', rel),
     write: (rel, text) => ipcRenderer.invoke('repo:write', rel, text),

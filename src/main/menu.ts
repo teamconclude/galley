@@ -1,4 +1,5 @@
 import { app, Menu, MenuItemConstructorOptions } from 'electron'
+import { homedir } from 'os'
 import type { MenuCommand, MenuState } from '../shared/types'
 import { isDev } from './env'
 
@@ -6,13 +7,16 @@ interface Actions {
   about: () => void
   manual: () => void
   openRepo: () => void
+  // The sites opened before, newest first, for Open Recent.
+  recent: string[]
+  openRecent: (path: string) => void
   checkUpdates: () => void
   command: (command: MenuCommand) => void
   // Steps the text size up or down; null returns to the default.
   zoom: (step: number | null) => void
 }
 
-export function buildMenu(actions: Actions): Menu {
+function buildMenu(actions: Actions): Menu {
   const devItems: MenuItemConstructorOptions[] = isDev
     ? [{ type: 'separator' }, { role: 'toggleDevTools' }]
     : []
@@ -71,7 +75,19 @@ export function buildMenu(actions: Actions): Menu {
         item('open-in-browser', 'Open in Browser'),
         item('show-in-finder', 'Show in Finder'),
         { type: 'separator' },
-        { label: 'Open Site Checkout…', accelerator: 'CmdOrCtrl+O', click: actions.openRepo }
+        { label: 'New Site…', click: () => actions.command('new-site') },
+        { label: 'Clone Site…', click: () => actions.command('clone-site') },
+        { label: 'Open Site Checkout…', accelerator: 'CmdOrCtrl+O', click: actions.openRepo },
+        {
+          label: 'Open Recent',
+          submenu:
+            actions.recent.length > 0
+              ? actions.recent.map((path) => ({
+                  label: path.replace(homedir(), '~'),
+                  click: () => actions.openRecent(path)
+                }))
+              : [{ label: 'No recent sites', enabled: false }]
+        }
       ]
     },
     {
@@ -162,8 +178,18 @@ const pageCommands: MenuCommand[] = [
   'show-in-finder'
 ]
 
+let lastState: MenuState | null = null
+
+// Sets the application menu, again whenever the recent sites change, keeping which items
+// are enabled.
+export function installMenu(actions: Actions): void {
+  Menu.setApplicationMenu(buildMenu(actions))
+  if (lastState) setMenuState(lastState)
+}
+
 // Greys out the items that need an open site, an open page, or its preview.
 export function setMenuState(state: MenuState): void {
+  lastState = state
   const menu = Menu.getApplicationMenu()
   if (!menu) return
   for (const id of siteCommands) {

@@ -348,6 +348,8 @@ export type MenuCommand =
   | 'detach-preview'
   | 'setup'
   | 'settings'
+  | 'new-site'
+  | 'clone-site'
   | 'find'
   | 'replace'
   | 'find-in-site'

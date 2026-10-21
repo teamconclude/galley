@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { BranchInfo, Identity } from '../../../shared/types'
+import { siteRepoUrl } from '../../../shared/site'
 
 interface FrameProps {
   title: string
@@ -260,11 +261,9 @@ interface CloneProps {
   onCancel: () => void
 }
 
-const defaultUrl = 'https://github.com/teamconclude/Conclude-web.git'
-
 // Clones into <folder>/<repository name>; progress lines stream in from git.
 export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
-  const [url, setUrl] = useState(defaultUrl)
+  const [url, setUrl] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
   const [progress, setProgress] = useState<string[]>([])
   const [running, setRunning] = useState(false)
@@ -298,7 +297,7 @@ export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
 
   return (
     <Frame
-      title="Clone the site"
+      title="Clone a site"
       submitLabel={running ? 'Cloning…' : 'Clone'}
       canSubmit={!running && dest !== null && url.trim() !== ''}
       onSubmit={() => void start()}
@@ -306,7 +305,13 @@ export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
     >
       <label className="dialog-field">
         <span>Repository</span>
-        <input value={url} onChange={(e) => setUrl(e.target.value)} disabled={running} />
+        <input
+          autoFocus
+          value={url}
+          placeholder={siteRepoUrl}
+          onChange={(e) => setUrl(e.target.value)}
+          disabled={running}
+        />
       </label>
       <div className="dialog-field">
         <span>Folder</span>
@@ -325,6 +330,109 @@ export function CloneDialog({ onCancel }: CloneProps): React.JSX.Element {
       {error && <p className="dialog-note error">{error}</p>}
       <p className="dialog-note">
         Needs access to the repository on GitHub with your SSH key or saved login.
+      </p>
+    </Frame>
+  )
+}
+
+interface NewSiteProps {
+  onCancel: () => void
+}
+
+const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+// The folder name for a site name, e.g. "Acme Robotics" -> acme-robotics.
+const slug = (name: string): string =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+// Makes <folder>/<slug> from the Galley template. Asks who commits only when neither git
+// nor the GitHub sign-in says.
+export function NewSiteDialog({ onCancel }: NewSiteProps): React.JSX.Element {
+  const [name, setName] = useState('')
+  const [folder, setFolder] = useState<string | null>(null)
+  const [known, setKnown] = useState<Identity | null | undefined>(undefined)
+  const [author, setAuthor] = useState('')
+  const [email, setEmail] = useState('')
+  const [progress, setProgress] = useState<string[]>([])
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void window.api.repo.defaultIdentity().then(setKnown)
+    return window.api.git.onCloneProgress((line) => setProgress((p) => [...p.slice(-6), line]))
+  }, [])
+
+  const dest = folder && slug(name) ? `${folder}/${slug(name)}` : null
+  const identity: Identity | null =
+    known ??
+    (author.trim() && validEmail.test(email.trim())
+      ? { name: author.trim(), email: email.trim() }
+      : null)
+
+  const start = async (): Promise<void> => {
+    if (!dest || !identity) return
+    setRunning(true)
+    setError(null)
+    try {
+      await window.api.repo.createSite(name.trim(), dest, known ? null : identity)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setRunning(false)
+    }
+  }
+
+  return (
+    <Frame
+      title="New site"
+      submitLabel={running ? 'Creating…' : 'Create'}
+      canSubmit={!running && dest !== null && identity !== null}
+      onSubmit={() => void start()}
+      onCancel={onCancel}
+    >
+      <label className="dialog-field">
+        <span>Name</span>
+        <input
+          autoFocus
+          value={name}
+          placeholder="My site"
+          onChange={(e) => setName(e.target.value)}
+          disabled={running}
+        />
+      </label>
+      <div className="dialog-field">
+        <span>Folder</span>
+        <div className="dialog-row">
+          <span className="dialog-path">{dest ?? 'Choose where to put the site'}</span>
+          <button
+            type="button"
+            disabled={running}
+            onClick={() => void window.api.git.chooseFolder().then((f) => f && setFolder(f))}
+          >
+            Choose…
+          </button>
+        </div>
+      </div>
+      {known === null && (
+        <>
+          <label className="dialog-field">
+            <span>Your name</span>
+            <input value={author} onChange={(e) => setAuthor(e.target.value)} disabled={running} />
+          </label>
+          <label className="dialog-field">
+            <span>Your email</span>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={running} />
+          </label>
+        </>
+      )}
+      {progress.length > 0 && <pre className="dialog-log">{progress.join('\n')}</pre>}
+      {error && <p className="dialog-note error">{error}</p>}
+      <p className="dialog-note">
+        Starts from the Galley template: a home page built from blocks, an about page and a blog.
+        The site stays on this Mac until you add a GitHub repository for it.
       </p>
     </Frame>
   )
