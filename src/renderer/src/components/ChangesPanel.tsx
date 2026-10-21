@@ -275,7 +275,13 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                 `${plural(status.ahead, 'commit')} to push.`,
                 <PushButton onPush={onPush} />
               )}
+            {!status.remoteUrl && (
+              <div className="sync-row muted">
+                This site is only on this Mac. Add a GitHub repository as its origin to share it.
+              </div>
+            )}
             {!status.upstream &&
+              status.remoteUrl &&
               status.branch &&
               !status.protected &&
               (status.aheadOfBase > 0 ? (

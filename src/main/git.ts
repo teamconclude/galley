@@ -43,7 +43,7 @@ async function gitBinary(): Promise<string> {
   return tool.bin
 }
 
-async function run(cwd: string, args: string[]): Promise<string> {
+export async function run(cwd: string, args: string[]): Promise<string> {
   return (await runBuffer(cwd, args)).toString('utf8')
 }
 
@@ -203,9 +203,10 @@ export class Git {
         () => true,
         () => false
       ))
-    const hasBase = remotes.includes(`origin/${base}`)
-    const baseAhead = hasBase ? await this.count([`HEAD..origin/${base}`]) : 0
-    const aheadOfBase = hasBase ? await this.count([`origin/${base}..HEAD`]) : 0
+    const baseRef = await this.baseRef(base)
+    const hasBase = baseRef === base || remotes.includes(baseRef)
+    const baseAhead = hasBase ? await this.count([`HEAD..${baseRef}`]) : 0
+    const aheadOfBase = hasBase ? await this.count([`${baseRef}..HEAD`]) : 0
     const chain = sharedChain.filter((b) => remotes.includes(`origin/${b}`))
     const releases: ReleaseStep[] = []
     for (let i = 0; i + 1 < chain.length; i++) {
@@ -275,6 +276,20 @@ export class Git {
     return this.git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
       .then((s) => s.trim().replace(/^origin\//, ''))
       .catch(() => 'main')
+  }
+
+  // A site made with New site has no GitHub repository until the editor adds one; its
+  // branches then work against the local base.
+  private hasOrigin(): Promise<boolean> {
+    return this.git(['remote', 'get-url', 'origin']).then(
+      () => true,
+      () => false
+    )
+  }
+
+  // Where the base stands: on GitHub, or here for a site that is only on this Mac.
+  private async baseRef(base: string): Promise<string> {
+    return (await this.hasOrigin()) ? `origin/${base}` : base
   }
 
   private async count(revs: string[], fallback = 0): Promise<number> {
@@ -363,17 +378,18 @@ export class Git {
   async log(range: CommitRange): Promise<Commit[]> {
     const status = await this.status()
     const { upstream, base } = status
+    const baseRef = await this.baseRef(base)
     const reviewable = range.kind === 'review' && (await this.validBranch(range.branch))
     const revs = ((): string | null => {
       switch (range.kind) {
         case 'incoming':
           return upstream && `HEAD..${upstream}`
         case 'outgoing':
-          return upstream ? `${upstream}..HEAD` : `origin/${base}..HEAD`
+          return upstream ? `${upstream}..HEAD` : `${baseRef}..HEAD`
         case 'base':
-          return `HEAD..origin/${base}`
+          return `HEAD..${baseRef}`
         case 'branch':
-          return `origin/${base}..HEAD`
+          return `${baseRef}..HEAD`
         case 'review':
           return reviewable ? `origin/${base}..origin/${range.branch}` : null
         case 'release': {
@@ -430,7 +446,11 @@ export class Git {
     }
   }
 
-  fetch(): Promise<void> {
+  async fetch(): Promise<void> {
+    if (!(await this.hasOrigin())) {
+      this.fetchError = null
+      return this.refresh()
+    }
     return this.op('Checking for updates…', async () => {
       try {
         await this.git(['fetch', '--prune', 'origin'])
@@ -463,7 +483,7 @@ export class Git {
         return
       }
       await this.git(['fetch', 'origin', base]).catch(() => undefined)
-      await this.git(['switch', '-c', name, `origin/${base}`, '--no-track'])
+      await this.git(['switch', '-c', name, await this.baseRef(base), '--no-track'])
     })
   }
 
@@ -624,7 +644,7 @@ export class Git {
     const { branch, base, upstream, protected: isProtected } = await this.ready()
     if (isProtected) throw new Error(`${branch} is shared and only follows GitHub`)
     const waiting = await this.op(`Updating from ${base}…`, async () => {
-      await this.git(['fetch', 'origin', base])
+      if (await this.hasOrigin()) await this.git(['fetch', 'origin', base])
       if (upstream) await this.git(['fetch', 'origin', branch]).catch(() => undefined)
       const now = await this.status()
       if (now.behind > 0 && !now.rebased) {
@@ -633,7 +653,7 @@ export class Git {
       if (upstream) {
         await this.git(['config', `branch.${branch}.galleyRebasedOver`, await this.sha(upstream)])
       }
-      return this.rebaseWithEdits(['rebase', `origin/${base}`], base)
+      return this.rebaseWithEdits(['rebase', await this.baseRef(base)], base)
     })
     if (!waiting) await this.sync()
   }
@@ -757,6 +777,17 @@ export class Git {
     const { branch, base, changes } = await this.ready()
     if (!branch || branch === base) throw new Error(`Not on a branch to merge into ${base}`)
     if (changes.length > 0) throw new Error('Commit or discard your changes first')
+    // Without GitHub the base moves forward here instead.
+    if (!(await this.hasOrigin())) {
+      return this.op(`Merging into ${base}…`, async () => {
+        const level = await this.git(['merge-base', '--is-ancestor', base, 'HEAD']).then(
+          () => true,
+          () => false
+        )
+        if (!level) throw new Error(`${base} has moved on. Update this branch first.`)
+        await this.git(['branch', '-f', base, 'HEAD'])
+      })
+    }
     return this.op(`Merging into ${base}…`, async () => {
       await this.git(['fetch', 'origin', base])
       try {
@@ -1033,12 +1064,13 @@ export class Git {
 export async function clone(
   url: string,
   dest: string,
-  onProgress: (line: string) => void
+  onProgress: (line: string) => void,
+  options: string[] = []
 ): Promise<void> {
   const bin = await gitBinary()
   const env = { ...process.env, ...(await gitEnv()) }
   return new Promise((resolve, reject) => {
-    const proc = spawn(bin, ['clone', '--progress', url, dest], { env })
+    const proc = spawn(bin, ['clone', '--progress', ...options, url, dest], { env })
     let output = ''
     const onData = (chunk: Buffer): void => {
       const text = chunk.toString()
