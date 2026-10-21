@@ -28,33 +28,35 @@ Done in Galley 0.5.0 (2026-10-20):
   stock `hugo new site` opens and previews.
 - Phase 2. TOML and JSON frontmatter open as text with the badge.
 
-Done on Galley develop after 0.5.0, unreleased: phase 3 apart from the Bookshop removal.
-`docs/site-contract.md` documents the contract and the README links it. A site without
-component schemas is in plain mode: no list is a block list, so lists of objects edit as
-object cards and the component key is an ordinary field. A site with neither schema
-format now gets the `blocks` and `component` keys, not the Bookshop pair.
+Done on Galley develop after 0.5.0, unreleased:
 
-Also done after 0.5.0: phase 4. `teamconclude/galley-template` (tag `v1.0.0`) has six
-components covering every field type, a block-built home page, an about page, a blog with
-an author list, Markdown renditions and `/llms.txt`, plain CSS and a CI build. **New
-site…** on the Welcome screen and in the File menu clones the tag, drops its history,
-sets the title and commits on `main`; it asks who commits when neither git nor GitHub
-says. **Clone a site…** starts empty with the conclude.io URL as placeholder. Settings
-keep the recent sites, listed on the Welcome screen and under File ▸ Open Recent. A
-checkout without `origin` works locally: no fetch, counts and branches against the local
-base, Merge fast-forwards `main`, and the Changes tab says the site is only on this Mac
-instead of offering Push.
+- Phase 3 apart from the Bookshop removal. `docs/site-contract.md` documents the contract
+  and the README links it. A site without component schemas is in plain mode: no list is
+  a block list, so lists of objects edit as object cards and the component key is an
+  ordinary field. A site with neither schema format gets the `blocks` and `component`
+  keys, not the Bookshop pair.
+- Phase 4. `teamconclude/galley-template` is a public template repository, tagged
+  `v1.0.0`, with six components covering every field type, a block-built home page, an
+  about page, a blog with an author list, Markdown renditions, `/llms.txt`, plain CSS and
+  a CI build. **New site…** on the Welcome screen and in the File menu clones the tag,
+  drops its history, sets the title and commits on `main`; it asks who commits when
+  neither git nor GitHub says. **Open site…** (⌘O) replaces both Open Site Checkout and
+  Clone: one dialog that opens a folder on this Mac or clones any repository URL, the
+  conclude.io URL being only the placeholder. Settings keep the last eight sites, listed
+  on the Welcome screen and under File ▸ Open Recent.
+- Local sites, which the plan had not foreseen: a checkout without `origin` does not
+  fetch, counts and branches against the local base, Merge fast-forwards `main` on the
+  Mac, and the Changes tab says the site is only on this Mac instead of offering Push.
 
 Open:
 
 - Phase 3: the pointer from the web repo's CLAUDE.md to the contract (3.1), and the
   Bookshop removal (3.4), which waits for `lars/galley` to merge into the web repo's
   develop. That can happen as soon as CloudCannon is no longer needed.
-- Phase 4: adding a GitHub repository to a local site from Galley; until then the user
-  adds `origin` by hand. The setup dialog's site step still offers the conclude.io clone
-  (phase 5).
-- Phase 5: only the Claude preference is done. The feedback work added two more places
-  that name our site, the review link page and the About window (see below).
+- Phase 4 follow-up: putting a local site on GitHub from Galley. Until then the user
+  creates the repository and adds `origin` by hand.
+- Phase 5: the Claude preference and the Welcome screen's wording are done; the rest is
+  open (see below).
 
 Next: phase 5.
 
@@ -266,6 +268,11 @@ preview to it; on a plain Hugo site the block list still edits as YAML objects.
 
 ### Phase 4: the template site (done after 0.5.0)
 
+As built, the template differs from the list below in two places: styles are plain CSS
+bundled with Hugo's `css.Build`, so the standard Hugo edition (0.158 or later) builds it
+without Sass, and each component also has a `<name>.md` for its part of the Markdown
+rendition. Which component covers which field type is in the template's README.
+
 A GitHub template repository, `teamconclude/galley-template`, rather than files bundled
 in the app: a new site needs its own git history anyway, the template can improve without
 a Galley release, and Galley stays small. Galley pins the tag it clones.
@@ -289,23 +296,27 @@ Contents:
 
 In Galley:
 
-1. Welcome gets **New site…** next to Open and Clone: a name and a folder. Galley clones
+1. Done. Welcome gets **New site…** next to Open and Clone: a name and a folder. Galley clones
    the template tag, removes its history, writes the name into `hugo.yaml`, and commits "Start from the Galley template" on `main`. Pushing is left
    to the Changes tab once the user has created a remote; creating the GitHub repository
    from Galley (`POST /user/repos`) is a later addition, not part of the first version.
-2. **Clone the site…** accepts any repository URL; the conclude.io URL becomes the
-   placeholder, then disappears once the README stops naming it.
-3. Settings remember a list of sites instead of one `repoPath`; the Welcome screen lists
-   them and the File menu gets Open recent.
+2. Done, differently: **Open site…** combines opening a local checkout and cloning, and
+   the clone half accepts any repository URL with the conclude.io URL as placeholder.
+3. Done. Settings remember a list of sites next to `repoPath`; the Welcome screen lists
+   them and the File menu gets Open Recent.
 
 Verify: New site ends with Galley open on the new folder, the preview running, a block
 added and scrolled to, and a commit on a personal branch that offers "Merge into main".
+Verified 2026-10-21 against the published template; the merge needed the local-site
+handling described under Status.
 
 ### Phase 5: branding and environment
 
-1. Neutral wording everywhere the site is named: Welcome, open dialog, error boxes, the
-   About window, the README's introduction and "Using Galley", the web repo's CLAUDE.md
-   pointer. The conclude.io site becomes one example, and the appId stays as it is.
+1. Neutral wording everywhere the site is named: the folder picker's message, error
+   boxes, the About window, the setup dialog's site step (which still offers to clone
+   conclude.io into `~/Conclude/web`), the README's introduction and "Using Galley", the
+   manual, and the web repo's CLAUDE.md pointer. The conclude.io site becomes one
+   example, and the appId stays as it is. The Welcome screen is done.
 2. Review links: the `conclude.io/galley/open/` page only works for our site. Either
    host the redirect page somewhere site-neutral or let the link go straight to a
    `galley://` URL.
@@ -322,8 +333,8 @@ added and scrolled to, and a commit on a personal branch that offers "Merge into
 | 3.2   | Preview marker on both sides (done, 0.4.1)                         | half a day                     |
 | 1     | Derive folders, keys, pickers, snippets and previews (done, 0.5.0) | 2–3 days                       |
 | 2     | TOML and JSON frontmatter (done, 0.5.0)                            | half a day                     |
-| 3     | Contract doc, plain mode, Bookshop removal later                   | 1–2 days                       |
-| 4     | Template repository and New site flow                              | 3–4 days                       |
+| 3     | Contract doc, plain mode (done); Bookshop removal later            | 1–2 days                       |
+| 4     | Template repository and New site flow (done)                       | 3–4 days                       |
 | 5     | Wording, review links, signing (optional Claude done)              | 1 day plus the Apple paperwork |
 
 Phases 1 to 3 make Galley work on any site that follows the contract, with no configuration file. Phase 4 is what
@@ -338,7 +349,10 @@ lets someone start a project with it. Phase 5 is what lets them install it.
   be cut from the site as well, so the default chain shrinks to two branches once the web
   repo has dropped `staging`.
 - New site is local first: clone the template, commit, open. Creating the repository on
-  GitHub from Galley comes later, if at all.
+  GitHub from Galley comes later, if at all. A site without a remote works fully on the
+  Mac, merges included (2026-10-21).
+- One **Open site…** for a checkout on this Mac or a clone from GitHub, instead of two
+  menu entries (2026-10-21).
 - `NewTab` is the link title for new-tab links and the template ships the render hook.
   Not configurable.
 - No `galley.yaml`: everything derives from the Hugo config and repository conventions.
