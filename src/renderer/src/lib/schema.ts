@@ -18,12 +18,19 @@ export type FieldSpec =
 
 let blockKey: BlockKey = 'component'
 let listKey: ListKey = 'blocks'
+let plain = false
 let imagesUrl = '/images'
 
-export function setKeys(block: BlockKey, list: ListKey): void {
+// Plain mode is a site without component schemas: nothing on its pages is a block, so
+// lists edit as lists of objects and every key, the component key too, is a field.
+export function setKeys(block: BlockKey, list: ListKey, noComponents: boolean): void {
   blockKey = block
   listKey = list
+  plain = noComponents
 }
+
+// The key that makes an object a block when guessing fields; none in plain mode.
+const inferKey = (): string => (plain ? '' : blockKey)
 
 export function setImagesUrl(url: string): void {
   imagesUrl = url
@@ -74,17 +81,17 @@ export function specFor(def: FieldDef): FieldSpec {
 export function fieldsFor(declared: FieldDef[], obj: Record<string, unknown>): FieldDef[] {
   const known = new Set(declared.map((f) => f.key))
   const extra = Object.keys(obj)
-    .filter((k) => !known.has(k) && k !== blockKey)
-    .map((k) => inferField(k, obj[k], blockKey, imagesUrl))
+    .filter((k) => !known.has(k) && k !== inferKey())
+    .map((k) => inferField(k, obj[k], inferKey(), imagesUrl))
   return [...declared, ...extra]
 }
 
 // Top-level page fields have no schema; a few keys get pickers from the data files.
 export function pageField(key: string, value: unknown, lists: DataLists): FieldSpec {
-  if (key === listKey) return { kind: 'blocks', allowed: null }
+  if (key === listKey && !plain) return { kind: 'blocks', allowed: null }
   if (key in lists) return { kind: 'choicelist', options: lists[key] }
   if (key === 'description' || key === 'summary') return { kind: 'string', multiline: true }
-  return specFor(inferField(key, value, blockKey, imagesUrl))
+  return specFor(inferField(key, value, inferKey(), imagesUrl))
 }
 
 // The value a new field starts with: its default, else empty for its type. A nested

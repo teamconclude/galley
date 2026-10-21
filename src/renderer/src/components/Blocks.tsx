@@ -290,30 +290,32 @@ export function BlockList({ path, items, allowed }: BlockListProps): React.JSX.E
         const schema = name === null ? undefined : schemas.get(name)
         return <ObjectFields path={[...path, index]} obj={obj} fields={schema?.fields ?? []} />
       }}
-      addControl={(insert) => (
-        <>
-          <button
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect()
-              setMenu({ x: r.left, y: r.bottom + 4, insert })
-            }}
-          >
-            Add block…
-          </button>
-          {menu && (
-            <ContextMenu
-              x={menu.x}
-              y={menu.y}
-              onClose={() => setMenu(null)}
-              items={choices.map((s) => ({
-                label: labels.get(s.name) ?? s.name,
-                description: s.description || undefined,
-                onClick: () => menu.insert(newBlock(s))
-              }))}
-            />
-          )}
-        </>
-      )}
+      addControl={(insert) =>
+        choices.length > 0 && (
+          <>
+            <button
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect()
+                setMenu({ x: r.left, y: r.bottom + 4, insert })
+              }}
+            >
+              Add block…
+            </button>
+            {menu && (
+              <ContextMenu
+                x={menu.x}
+                y={menu.y}
+                onClose={() => setMenu(null)}
+                items={choices.map((s) => ({
+                  label: labels.get(s.name) ?? s.name,
+                  description: s.description || undefined,
+                  onClick: () => menu.insert(newBlock(s))
+                }))}
+              />
+            )}
+          </>
+        )
+      }
     />
   )
 }

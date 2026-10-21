@@ -122,7 +122,8 @@ export class Repo {
 
   // A checkout has either <name>.yml files under components/ or, while the site still
   // uses Bookshop, <name>.bookshop.yml files under component-library/components/; the
-  // latter are normalised to the same shape.
+  // latter are normalised to the same shape. A site with neither gets the contract's keys
+  // and no components, which the editor takes as plain mode.
   async components(): Promise<ComponentLibrary> {
     if (this.componentCache) return this.componentCache
     const dir = join(this.path, (await this.site()).componentsDir)
@@ -140,14 +141,15 @@ export class Repo {
       return out
     }
     const own = await load('.yml')
+    const bookshop = own.length > 0 ? [] : await load('.bookshop.yml')
     this.componentCache =
-      own.length > 0
-        ? { blockKey: 'component', listKey: 'blocks', components: own.map(fromSchema) }
-        : {
+      bookshop.length > 0
+        ? {
             blockKey: '_bookshop_name',
             listKey: 'content_blocks',
-            components: fromBookshop(await load('.bookshop.yml'))
+            components: fromBookshop(bookshop)
           }
+        : { blockKey: 'component', listKey: 'blocks', components: own.map(fromSchema) }
     return this.componentCache
   }
 

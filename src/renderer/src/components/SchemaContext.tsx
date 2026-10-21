@@ -25,7 +25,7 @@ export function SchemaProvider({ repoPath, site, page, children }: Props): React
     const loadComponents = (): void => {
       void window.api.repo.components().then((lib) => {
         if (!live) return
-        setKeys(lib.blockKey, lib.listKey)
+        setKeys(lib.blockKey, lib.listKey, lib.components.length === 0)
         setComponents(lib.components)
       })
     }
