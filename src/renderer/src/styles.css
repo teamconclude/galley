@@ -2835,3 +2835,35 @@ body.dragging .terminal-host {
   align-self: flex-start;
   margin-bottom: 4px;
 }
+
+/* The page, and the layer that takes a picture dragged over it from the file list. */
+.preview-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+
+.preview-drop {
+  position: absolute;
+  inset: 0;
+}
+
+.preview-drop-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--accent-text);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.preview-drop-hint.refused {
+  background: var(--text-muted);
+}

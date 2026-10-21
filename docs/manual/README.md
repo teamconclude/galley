@@ -164,6 +164,9 @@ There are several ways to add a picture:
 - **Drop** a picture from the Finder onto a picture setting, the Image dialog, the picture
   library, or into the text where it should go.
 - **Paste** a screenshot or a copied picture into the text.
+- **Drag** a picture from the file list onto the preview, to where it should appear. A line
+  shows where it will go, and a note at the bottom says what the drop will do. Dropped on
+  a picture already on the page, it takes that picture's place.
 - **File ▸ Add Images…** copies several pictures at once.
 
 ![The picture library, with the pictures new on this branch first](images/image-picker.png)

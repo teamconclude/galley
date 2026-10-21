@@ -14,6 +14,7 @@ import {
 import FileIcon from './FileIcon'
 import Tip from './Tip'
 import { useSchemas } from '../lib/contexts'
+import { imageFile } from '../lib/site'
 import { pageState, stateDetail, stateLabel } from '../lib/pages'
 import { ago } from '../lib/time'
 
@@ -25,6 +26,8 @@ interface Props {
   onSelect: (path: string) => void
   onContextMenu: (entry: DirEntry, x: number, y: number) => void
   onDropFiles: (dir: string, files: File[]) => void
+  // A picture dragged from the list, e.g. onto the preview; null when the drag ends.
+  onDragImage: (path: string | null) => void
   onNewPage: () => void
   onNewFolder: () => void
   onRefresh: () => void
@@ -121,7 +124,7 @@ interface ChildrenProps extends Props {
 
 function Children(props: ChildrenProps): React.JSX.Element {
   const { path, depth, expanded, onToggle, selected, onSelect, version } = props
-  const { onContextMenu, onDropFiles, dropTarget, setDropTarget, showAll } = props
+  const { onContextMenu, onDropFiles, onDragImage, dropTarget, setDropTarget, showAll } = props
   const { pages, showTitles } = props
   const [entries, setEntries] = useState<DirEntry[]>([])
   // What an editor works in: pages, images and downloads, and the menus and authors.
@@ -186,6 +189,7 @@ function Children(props: ChildrenProps): React.JSX.Element {
         const second = !showTitles || entry.isDir ? null : (titled && page?.title) || facts(entry)
         if (second) classes.push('two-line')
         if (entry.isDir) classes.push('folder')
+        const draggable = !entry.isDir && imageFile.test(entry.name)
         return (
           <div key={entry.path}>
             <div
@@ -193,6 +197,14 @@ function Children(props: ChildrenProps): React.JSX.Element {
               data-path={entry.path}
               title={tip}
               style={{ paddingLeft: rowStart + depth * indent }}
+              draggable={draggable}
+              onDragStart={(e) => {
+                if (!draggable) return
+                e.dataTransfer.setData('application/x-galley-image', entry.path)
+                e.dataTransfer.effectAllowed = 'copy'
+                onDragImage(entry.path)
+              }}
+              onDragEnd={() => draggable && onDragImage(null)}
               onClick={() => (entry.isDir ? onToggle(entry.path) : onSelect(entry.path))}
               onContextMenu={(e) => {
                 e.preventDefault()

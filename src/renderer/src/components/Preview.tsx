@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { HugoStatus, PreviewMode, PreviewTarget } from '../../../shared/types'
+import type { DropSpot, HugoStatus, PreviewMode, PreviewTarget } from '../../../shared/types'
 import type { WebviewElement } from '../env'
-import { previewScript } from '../../../shared/previewScript'
+import { dropMarkScript, dropSpotScript, previewScript } from '../../../shared/previewScript'
 
 interface Props {
   status: HugoStatus
@@ -23,6 +23,17 @@ interface Props {
   targets: (cb: (target: PreviewTarget) => void) => () => void
   // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
   notice?: string | null
+  // While a picture from the file list is dragged; see ImageDrop.
+  imageDrop?: ImageDrop | null
+}
+
+// Judges what dropping the dragged picture at a spot would do, in words for the editor,
+// and makes the drop.
+export interface ImageDrop {
+  judge: (spot: DropSpot) => { ok: boolean; hint: string }
+  drop: (spot: DropSpot) => void
+  // The drag is over, in case it ended without saying so.
+  end: () => void
 }
 
 // A page's markdown rendition lives at its URL plus the suffix; a .txt is text as it is.
@@ -34,7 +45,7 @@ const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? fa
 
 export default function Preview(props: Props): React.JSX.Element {
   const { status, url, reloadKey, mode, onMode, version, detached, markdownSuffix } = props
-  const { onDetach, onAttach, targets, notice } = props
+  const { onDetach, onAttach, targets, notice, imageDrop } = props
   const plainFile = isPlainFile(url)
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -87,6 +98,7 @@ export default function Preview(props: Props): React.JSX.Element {
         targets={targets}
         empty={status.message ?? statusText(status)}
         notice={notice ?? null}
+        imageDrop={imageDrop ?? null}
       />
     </div>
   )
@@ -102,11 +114,12 @@ interface ContentProps {
   targets: (cb: (target: PreviewTarget) => void) => () => void
   empty: string
   notice: string | null
+  imageDrop?: ImageDrop | null
 }
 
 // The page in a webview, or its text rendered; shared by the pane and the detached window.
 export function PreviewContent(props: ContentProps): React.JSX.Element {
-  const { url, mode, version, reloadKey, targets, empty, markdownSuffix, notice } = props
+  const { url, mode, version, reloadKey, targets, empty, markdownSuffix, notice, imageDrop } = props
   const view = useRef<WebviewElement>(null)
   const textMode = isPlainFile(url) || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -149,8 +162,96 @@ export function PreviewContent(props: ContentProps): React.JSX.Element {
   if (shownUrl && textMode) {
     return <TextPreview url={shownUrl} version={version} reloadKey={reloadKey} />
   }
-  if (url) return <webview ref={view} src={url} className="webview" />
+  if (url) {
+    return (
+      <div className="preview-stage">
+        <webview ref={view} src={url} className="webview" />
+        {imageDrop && <DropLayer view={view} imageDrop={imageDrop} />}
+      </div>
+    )
+  }
   return <pre className="pane-empty">{empty}</pre>
+}
+
+// Lies over the page while a picture is dragged, since the webview would take the drag
+// events itself. The page is asked what lies under the pointer, one question at a time,
+// and marks where the picture would go. Mouse events arrive only once no drag is going
+// on, so one ends the layer should the drag have ended unnoticed.
+function DropLayer(props: {
+  view: React.RefObject<WebviewElement | null>
+  imageDrop: ImageDrop
+}): React.JSX.Element {
+  const { view, imageDrop } = props
+  const [hint, setHint] = useState<{ ok: boolean; hint: string } | null>(null)
+  const spot = useRef<DropSpot | null>(null)
+  const busy = useRef(false)
+  const next = useRef<{ x: number; y: number } | null>(null)
+  const judge = useRef(imageDrop.judge)
+  useEffect(() => {
+    judge.current = imageDrop.judge
+  })
+
+  const mark = (shown: DropSpot | null): void => {
+    void view.current?.executeJavaScript(dropMarkScript(shown)).catch(() => {})
+  }
+  const ask = (x: number, y: number): void => {
+    if (busy.current) {
+      next.current = { x, y }
+      return
+    }
+    busy.current = true
+    void view.current
+      ?.executeJavaScript(dropSpotScript(x, y))
+      .then((found) => {
+        const at = found as DropSpot
+        const verdict = judge.current(at)
+        spot.current = verdict.ok ? at : null
+        setHint(verdict)
+        mark(spot.current)
+      })
+      .catch(() => {})
+      .finally(() => {
+        busy.current = false
+        const queued = next.current
+        next.current = null
+        if (queued) ask(queued.x, queued.y)
+      })
+  }
+  // The mark goes when the drag ends anywhere else.
+  useEffect(() => {
+    const page = view.current
+    return () => void page?.executeJavaScript(dropMarkScript(null)).catch(() => {})
+  }, [view])
+
+  return (
+    <div
+      className="preview-drop"
+      onMouseMove={imageDrop.end}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = spot.current ? 'copy' : 'none'
+        const r = e.currentTarget.getBoundingClientRect()
+        ask(Math.round(e.clientX - r.left), Math.round(e.clientY - r.top))
+      }}
+      onDragLeave={() => {
+        spot.current = null
+        setHint(null)
+        mark(null)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        const at = spot.current
+        spot.current = null
+        setHint(null)
+        mark(null)
+        if (at) imageDrop.drop(at)
+      }}
+    >
+      {hint && (
+        <span className={'preview-drop-hint' + (hint.ok ? '' : ' refused')}>{hint.hint}</span>
+      )}
+    </div>
+  )
 }
 
 // The text the server serves at a URL, fetched again a moment after the file changes and

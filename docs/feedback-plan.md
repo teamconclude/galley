@@ -11,7 +11,7 @@ section need a `baseURL` in `config/staging/` and `config/production/` of the we
 repository, which today passes it on the command line only. The web side of phase 2 is
 on its branch `lars/claude-content-editing`; the forwarding page of phase 6 on
 `lars/galley-review-links`. Phase 7 waits for a need. Phases 8 and 9 come from two later
-items (2026-10-21); phase 8 is done on develop, unreleased, and phase 9 is not started.
+items (2026-10-21); both are done on develop, unreleased.
 
 ## What the feedback showed
 
@@ -298,7 +298,7 @@ starts using stayed; the unpublished `-v2.png` was offered under its own name wi
 warning; typing the old name of a published image showed the loud warning; Rename… and
 Move to Trash behaved as above, and the preview showed the new picture.
 
-### Phase 9: dropping images on the preview
+### Phase 9: dropping images on the preview (done)
 
 1. Image rows in the tree can be dragged. While a drag from the tree is on, a
    transparent layer over the preview takes the drag events, since the webview would
@@ -325,6 +325,26 @@ Start with a spike: the layer over the webview, `elementFromPoint` through
 Verify: on a quickstart page, dropping an image below a numbered step inserts it inside
 the step and the numbering continues; dropping onto a screenshot swaps its address; on a
 product page, dropping onto a block's picture sets that block's image field.
+
+As built: the spike held; a drag from the tree reaches the layer over the webview, and a
+round trip to the page for each pointer position, one at a time, keeps up. A hint at the
+bottom of the preview says what a drop would do, or why it cannot: a picture outside the
+static folder, a point outside `main`, text that is in no line of the body, a picture in
+neither the body nor the settings. Near the top or bottom edge the page scrolls. A drop
+above a list item that is not the first goes at the end of the item before it, so the
+list stays one. An `<img>` with a width and height that is swapped takes the new
+picture's proportions. Inserting and swapping in the body go through the editor and can
+be undone; a swap in the settings rewrites them. Not built: drops on the detached
+preview, which would need the drag announced to the other window, and drops from the
+Finder, which need a preload in the webview.
+
+Checked in the app with a real drag (CDP intercepting the tree row's drag and delivering
+it over the preview): on the Jira quickstart, a drop on a screenshot swapped it and its
+height, and a drop below a paragraph put the picture there with "Description" selected
+and the editor scrolled to it; in the email-connect guide, a drop at item 3 of a tight
+numbered list went into item 2 and the page still shows one list of four; on the AI
+integrations product page a drop on a block's picture set its `image`; a drop on the
+header was refused.
 
 ## Order and effort
 

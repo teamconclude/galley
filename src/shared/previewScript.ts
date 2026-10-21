@@ -1,4 +1,4 @@
-import type { PreviewTarget } from './types'
+import type { DropSpot, PreviewTarget } from './types'
 
 // JavaScript for the preview page that scrolls to a target and outlines it for a moment.
 export function previewScript(target: PreviewTarget): string {
@@ -82,4 +82,88 @@ function showBlockScript(index: number): string {
   }
   return false
 })(${index})`
+}
+
+// What lies at a point of the page, as a DropSpot. Near the top or bottom edge the page
+// scrolls a little first, so a drag can reach any part of it. A picture counts with the
+// <picture> or <figure> around it; text counts as the block that holds it, a whole quote
+// or table at once; a point between blocks takes the nearest one above or below.
+export function dropSpotScript(x: number, y: number): string {
+  return `(function (x, y) {
+  if (y < 40) window.scrollBy(0, -20)
+  else if (y > window.innerHeight - 40) window.scrollBy(0, 20)
+  var norm = function (s) { return s.replace(/\\s+/g, ' ').trim() }
+  var box = function (n) { var r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, width: r.width } }
+  var path = function (img) { try { return new URL(img.getAttribute('src') || '', location.href).pathname } catch (e) { return '' } }
+  var root = document.querySelector('main') || document.body
+  var el = document.elementFromPoint(x, y)
+  if (!el || !root.contains(el)) return { kind: 'outside' }
+  var holder = el.closest('picture, figure')
+  var img = el.closest('img') || (holder && holder.querySelector('img'))
+  if (img && root.contains(img)) {
+    var src = path(img)
+    var same = Array.prototype.filter.call(root.querySelectorAll('img'), function (i) { return path(i) === src })
+    return { kind: 'image', src: src, nth: same.indexOf(img), rect: box(img) }
+  }
+  var blocks = 'h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dt,dd,figcaption'
+  var block = el.closest(blocks)
+  if (!block || !root.contains(block)) {
+    var best = null, gap = Infinity
+    root.querySelectorAll(blocks).forEach(function (b) {
+      var r = b.getBoundingClientRect()
+      if (r.height === 0 || x < r.left || x > r.right) return
+      var d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
+      if (d < gap) { gap = d; best = b }
+    })
+    block = gap < 80 ? best : null
+  }
+  if (!block) return { kind: 'outside' }
+  var outer = block.closest('blockquote, table')
+  if (outer && root.contains(outer)) block = outer
+  var r = block.getBoundingClientRect()
+  return {
+    kind: 'text',
+    text: norm(block.textContent || '').slice(0, 200),
+    heading: /^H[1-6]$/.test(block.tagName),
+    after: y > r.top + r.height / 2,
+    rect: box(block)
+  }
+})(${x}, ${y})`
+}
+
+// Shows where a dragged picture would go: a line above or below a block, or an outline
+// around a picture it would swap. Without a spot, the mark goes away.
+export function dropMarkScript(spot: DropSpot | null): string {
+  const mark =
+    spot?.kind === 'text'
+      ? {
+          top: (spot.after ? spot.rect.bottom + 4 : spot.rect.top - 7) + 'px',
+          left: spot.rect.left + 'px',
+          width: spot.rect.width + 'px',
+          height: '3px',
+          border: 'none',
+          background: 'rgba(62, 184, 163, 0.95)'
+        }
+      : spot?.kind === 'image'
+        ? {
+            top: spot.rect.top - 3 + 'px',
+            left: spot.rect.left - 3 + 'px',
+            width: spot.rect.width + 'px',
+            height: spot.rect.bottom - spot.rect.top + 'px',
+            border: '3px solid rgba(62, 184, 163, 0.95)',
+            background: 'rgba(62, 184, 163, 0.15)'
+          }
+        : null
+  return `(function (mark) {
+  var el = document.getElementById('galley-drop-mark')
+  if (!mark) { if (el) el.remove(); return true }
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'galley-drop-mark'
+    el.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border-radius:2px;box-sizing:content-box'
+    document.body.appendChild(el)
+  }
+  for (var k in mark) el.style[k] = mark[k]
+  return true
+})(${JSON.stringify(mark)})`
 }

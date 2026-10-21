@@ -294,6 +294,22 @@ export interface ReplaceResult {
   matches: number
 }
 
+// What lies under the pointer in the preview while a picture is dragged over it: a picture
+// on the page, with its address and how many pictures before it have the same one; a
+// block of text, by its words, and whether the pointer is in its lower half; or nothing
+// of the page's content. Rectangles are in the page's viewport, for drawing the mark.
+export type DropSpot =
+  | { kind: 'image'; src: string; nth: number; rect: DropRect }
+  | { kind: 'text'; text: string; heading: boolean; after: boolean; rect: DropRect }
+  | { kind: 'outside' }
+
+export interface DropRect {
+  top: number
+  bottom: number
+  left: number
+  width: number
+}
+
 // A picture's size in pixels.
 export interface ImageSize {
   width: number

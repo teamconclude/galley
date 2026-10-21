@@ -42,7 +42,7 @@ import PageFinder from './components/PageFinder'
 import ReplaceImageDialog from './components/ReplaceImageDialog'
 import ReviewDialog from './components/ReviewDialog'
 import ShareButton, { type Shared } from './components/ShareButton'
-import Preview from './components/Preview'
+import Preview, { type ImageDrop } from './components/Preview'
 import { SchemaProvider } from './components/SchemaContext'
 import { imagePath, imageUrl, sectionImageFolder, useSiteInfo } from './lib/site'
 import SearchPanel, { type SearchRequest } from './components/SearchPanel'
@@ -62,6 +62,7 @@ import { askClaude } from './lib/claudeTerminal'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
 import { usePages } from './lib/pages'
+import { placeInBody, resizeTag, swapInBody, swapInSettings } from './lib/previewDrop'
 import { pageAddress, reviewLink as makeReviewLink, type ReviewLink } from '../../shared/reviewLink'
 import { currentListKey } from './lib/schema'
 
@@ -169,6 +170,8 @@ export default function App(): React.JSX.Element | null {
   const [reloadKey, setReloadKey] = useState(0)
   // Changes when an image is replaced under its own name, so its view loads it again.
   const [imageVersion, setImageVersion] = useState(0)
+  // A picture being dragged from the file list, which the preview then takes.
+  const [draggedImage, setDraggedImage] = useState<string | null>(null)
   const [layout] = useState(loadLayout)
   const [setup, setSetup] = useState<SetupStatus | null>(null)
   const [showSetup, setShowSetup] = useState<boolean | null>(null)
@@ -504,6 +507,81 @@ export default function App(): React.JSX.Element | null {
     changeText(join(merged, '\n' + body.replace(/^\s*\n/, ''), 'yaml'))
     return true
   }
+
+  // A picture dragged from the file list onto the preview: before or after the block of
+  // text under the pointer, or in place of the picture there, in the body or the settings.
+  // Only pictures in the static folder have an address pages can use.
+  // The address pages use for the dragged picture; only the static folder has one.
+  const draggedUrl =
+    draggedImage?.startsWith(site.staticDir + '/') === true
+      ? draggedImage.slice(site.staticDir.length)
+      : null
+  const settingsText = (): string | null => (file ? split(file.text).frontmatter : null)
+
+  const judgeDrop: ImageDrop['judge'] = (spot) => {
+    const url = draggedUrl
+    if (!url) return { ok: false, hint: 'Only pictures in the static folder can go on a page.' }
+    if (spot.kind === 'outside') return { ok: false, hint: 'Drop it on the page’s content.' }
+    const text = bodyEditor()?.state.doc.toString() ?? null
+    if (spot.kind === 'image') {
+      const fm = settingsText()
+      const found =
+        (text !== null && swapInBody(text, spot.src, spot.nth, url)) ||
+        (fm !== null && swapInSettings(fm, spot.src, spot.nth, url))
+      return found
+        ? { ok: true, hint: 'Drop to show the new picture here instead' }
+        : { ok: false, hint: 'This picture does not come from the page’s text or settings.' }
+    }
+    return text !== null && placeInBody(text, spot, url)
+      ? { ok: true, hint: `Drop to put the picture ${spot.after ? 'below' : 'above'} this` }
+      : { ok: false, hint: 'This part of the page does not come from its text.' }
+  }
+
+  const dropImage: ImageDrop['drop'] = (spot) => {
+    const view = bodyEditor()
+    const url = draggedUrl
+    if (!url || !draggedImage || spot.kind === 'outside') return
+    if (spot.kind === 'text') {
+      const edit = view && placeInBody(view.state.doc.toString(), spot, url)
+      if (!view || !edit) return
+      const { from, to, insert, select } = edit
+      view.dispatch({
+        changes: { from, to, insert },
+        selection: select && { anchor: select.from, head: select.to },
+        scrollIntoView: true
+      })
+      view.focus()
+      return
+    }
+    const edit = view && swapInBody(view.state.doc.toString(), spot.src, spot.nth, url)
+    if (view && edit) {
+      const { from, to, insert } = edit
+      view.dispatch({ changes: { from, to, insert }, scrollIntoView: true })
+      view.focus()
+      // An <img> that gives a size takes the new picture's proportions.
+      const picture = new Image()
+      picture.onload = () => {
+        const size = { width: picture.naturalWidth, height: picture.naturalHeight }
+        const fit = size.width > 0 && resizeTag(view.state.doc.toString(), from, size)
+        if (fit) view.dispatch({ changes: fit })
+      }
+      picture.src = `galley://repo/${draggedImage}`
+      return
+    }
+    if (!file) return
+    const parts = split(file.text)
+    const next =
+      parts.frontmatter !== null && swapInSettings(parts.frontmatter, spot.src, spot.nth, url)
+    if (next) changeText(join(next, parts.body, parts.format))
+  }
+
+  // A picture dragged from the file list onto the preview goes before or after the block
+  // of text under the pointer, or takes the place of the picture there, in the body or
+  // the settings.
+  const imageDrop: ImageDrop | null =
+    draggedImage && file && markdownFile.test(file.path)
+      ? { judge: judgeDrop, drop: dropImage, end: () => setDraggedImage(null) }
+      : null
 
   // Paste as plain text: the clipboard's text exactly, into whatever has focus.
   const pastePlain = async (): Promise<void> => {
@@ -1281,6 +1359,7 @@ export default function App(): React.JSX.Element | null {
                 onSelect={(path) => void open(path)}
                 onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
                 onDropFiles={(dir, files) => void dropFiles(dir, files)}
+                onDragImage={setDraggedImage}
                 onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
                 onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
                 onRefresh={() => setTreeVersion((v) => v + 1)}
@@ -1430,6 +1509,7 @@ export default function App(): React.JSX.Element | null {
                       onAttach={toggleDetached}
                       targets={onShow}
                       notice={previewNotice}
+                      imageDrop={imageDrop}
                     />
                   </section>
                 </>
