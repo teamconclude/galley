@@ -20,16 +20,25 @@ Done, in Galley 0.4.1 and on the web branch `lars/galley` (2026-09-18):
 - The web branch itself: Bookshop, CloudCannon and the vendored module removed, plain
   file names, 37 schemas with hand-written labels, placeholders and help.
 
-Done on Galley develop after 0.4.1, unreleased: phase 1. Galley reads the Hugo config in
-any of its forms and derives the site name, folders, components mount, markdown rendition
-and text previews from it, pickers from every data list, snippets from the shortcodes,
-and the Claude pane is a preference. A stock `hugo new site` opens and previews.
+Done in Galley 0.5.0 (2026-10-20):
 
-Phase 2 is done too: TOML and JSON frontmatter open as text with the badge.
+- Phase 1. Galley reads the Hugo config in any of its forms and derives the site name,
+  folders, components mount, markdown rendition and text previews from it, pickers from
+  every data list, snippets from the shortcodes, and the Claude pane is a preference. A
+  stock `hugo new site` opens and previews.
+- Phase 2. TOML and JSON frontmatter open as text with the badge.
 
-Next, in order: the rest of phase 3, the template site; merging `lars/galley`
-into develop can happen any time after 0.4.1 is installed and CloudCannon is no longer
-needed.
+Open:
+
+- Phase 3: the contract doc (3.1) and plain mode (3.3). `BlockList` still offers Add
+  block and titles every card "Unknown block" on a site without components. The
+  Bookshop removal (3.4) waits for `lars/galley` to merge into the web repo's develop,
+  which can happen as soon as CloudCannon is no longer needed.
+- Phase 4, the template site and New site flow: not started.
+- Phase 5: only the Claude preference is done. The feedback work added two more places
+  that name our site, the review link page and the About window (see below).
+
+Next, in order: the rest of phase 3, then the template site.
 
 ## Goals and non-goals
 
@@ -44,10 +53,16 @@ needed.
 
 ## Where the site is baked in today
 
+This is the survey as of 0.4.1. Phases 1 and 2 have since replaced the folder, data
+list, snippet, preview and config assumptions; what is left is the wording, the clone
+URL, the review link and the Bookshop fallbacks.
+
 Plainly ours:
 
 - `src/shared/site.ts`: clone URL and default checkout folder. `Welcome.tsx`, the open
-  dialog in `src/main/index.ts` and `README.md` talk about the conclude.io website.
+  dialog in `src/main/index.ts`, the About window's tagline in `src/main/about.ts` and
+  `README.md` talk about the conclude.io website.
+- `src/shared/reviewLink.ts`: review links go through `https://conclude.io/galley/open/`.
 - `src/main/git.ts`: the shared chain `develop → staging → production`, the protected
   set, `develop` as the base of personal branches, and "the last hop is a pull request".
   `ChangesPanel.tsx` and `App.tsx` key the Publish wording off the literal `production`.
@@ -182,7 +197,7 @@ the body) below a fixed header; the contract asks for a `<main>` element, nothin
 
 ## Work items
 
-### Phase 1: read the Hugo config and the repository
+### Phase 1: read the Hugo config and the repository (done, 0.5.0)
 
 1. A Hugo config reader in `src/main/hugoConfig.ts`: find the file in its five names and
    two places, parse YAML, TOML (`smol-toml`) and JSON into one object, and read `title`,
@@ -205,7 +220,7 @@ Verify: the playwright scripts pass against the conclude.io scratch clone; a sto
 tree, the settings form, the preview and no Markdown mode; a scratch site with
 `staticDir: assets/public` shows the picker in the right place.
 
-### Phase 2: frontmatter formats
+### Phase 2: frontmatter formats (done, 0.5.0)
 
 1. Recognise `+++` TOML and `{` JSON fences. Form editing stays YAML only; TOML and JSON
    pages show the badge and open in the raw editor, with a note. Converting formats on
@@ -269,24 +284,27 @@ added and scrolled to, and a commit on a personal branch that offers "Merge into
 ### Phase 5: branding and environment
 
 1. Neutral wording everywhere the site is named: Welcome, open dialog, error boxes, the
-   README's introduction and "Using Galley", the web repo's CLAUDE.md pointer. The
-   conclude.io site becomes one example, and the appId stays as it is.
-2. Done in phase 1: the Claude pane and setup step follow a preference.
-3. Signing and notarisation with a Developer ID in the release workflow, replacing
+   About window, the README's introduction and "Using Galley", the web repo's CLAUDE.md
+   pointer. The conclude.io site becomes one example, and the appId stays as it is.
+2. Review links: the `conclude.io/galley/open/` page only works for our site. Either
+   host the redirect page somewhere site-neutral or let the link go straight to a
+   `galley://` URL.
+3. Done in phase 1: the Claude pane and setup step follow a preference.
+4. Signing and notarisation with a Developer ID in the release workflow, replacing
    `scripts/adhoc-sign.cjs`. Without it nobody outside the team can start the app.
-4. `install.sh` and the updater are already generic; the README's install section only
+5. `install.sh` and the updater are already generic; the README's install section only
    needs the "conclude.io" wording changed.
 
 ## Order and effort
 
-| Phase | Work                                                                               | Estimate                       |
-| ----- | ---------------------------------------------------------------------------------- | ------------------------------ |
-| 3.2   | Preview marker on both sides (done, 0.4.1)                                         | half a day                     |
-| 1     | Derive folders, keys, pickers, snippets and previews from the Hugo config and repo | 2–3 days                       |
-| 2     | TOML and JSON frontmatter                                                          | half a day                     |
-| 3     | Contract doc, plain mode, Bookshop removal later                                   | 1–2 days                       |
-| 4     | Template repository and New site flow                                              | 3–4 days                       |
-| 5     | Wording, optional Claude, signing                                                  | 1 day plus the Apple paperwork |
+| Phase | Work                                                               | Estimate                       |
+| ----- | ------------------------------------------------------------------ | ------------------------------ |
+| 3.2   | Preview marker on both sides (done, 0.4.1)                         | half a day                     |
+| 1     | Derive folders, keys, pickers, snippets and previews (done, 0.5.0) | 2–3 days                       |
+| 2     | TOML and JSON frontmatter (done, 0.5.0)                            | half a day                     |
+| 3     | Contract doc, plain mode, Bookshop removal later                   | 1–2 days                       |
+| 4     | Template repository and New site flow                              | 3–4 days                       |
+| 5     | Wording, review links, signing (optional Claude done)              | 1 day plus the Apple paperwork |
 
 Phases 1 to 3 make Galley work on any site that follows the contract, with no configuration file. Phase 4 is what
 lets someone start a project with it. Phase 5 is what lets them install it.
