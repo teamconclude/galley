@@ -34,16 +34,29 @@ component schemas is in plain mode: no list is a block list, so lists of objects
 object cards and the component key is an ordinary field. A site with neither schema
 format now gets the `blocks` and `component` keys, not the Bookshop pair.
 
+Also done after 0.5.0: phase 4. `teamconclude/galley-template` (tag `v1.0.0`) has six
+components covering every field type, a block-built home page, an about page, a blog with
+an author list, Markdown renditions and `/llms.txt`, plain CSS and a CI build. **New
+site…** on the Welcome screen and in the File menu clones the tag, drops its history,
+sets the title and commits on `main`; it asks who commits when neither git nor GitHub
+says. **Clone a site…** starts empty with the conclude.io URL as placeholder. Settings
+keep the recent sites, listed on the Welcome screen and under File ▸ Open Recent. A
+checkout without `origin` works locally: no fetch, counts and branches against the local
+base, Merge fast-forwards `main`, and the Changes tab says the site is only on this Mac
+instead of offering Push.
+
 Open:
 
 - Phase 3: the pointer from the web repo's CLAUDE.md to the contract (3.1), and the
   Bookshop removal (3.4), which waits for `lars/galley` to merge into the web repo's
   develop. That can happen as soon as CloudCannon is no longer needed.
-- Phase 4, the template site and New site flow: not started.
+- Phase 4: adding a GitHub repository to a local site from Galley; until then the user
+  adds `origin` by hand. The setup dialog's site step still offers the conclude.io clone
+  (phase 5).
 - Phase 5: only the Claude preference is done. The feedback work added two more places
   that name our site, the review link page and the About window (see below).
 
-Next: the template site.
+Next: phase 5.
 
 ## Goals and non-goals
 
@@ -251,7 +264,7 @@ Verify: a TOML-frontmatter page opens raw with the badge; a YAML page is unchang
 Verify: on a checkout of the editor-environment branch, clicking a block card scrolls the
 preview to it; on a plain Hugo site the block list still edits as YAML objects.
 
-### Phase 4: the template site
+### Phase 4: the template site (done after 0.5.0)
 
 A GitHub template repository, `teamconclude/galley-template`, rather than files bundled
 in the app: a new site needs its own git history anyway, the template can improve without

@@ -48,7 +48,9 @@ editing `data/llms.yaml` previews `/llms.txt`.
 - **Branches.** Work starts from `develop` when origin has one, else from the branch
   origin's HEAD points at. The shared branches are whichever of `develop`, `staging` and
   `production` exist, in that order; publishing to the last one opens a pull request. A
-  protected base branch takes pull requests too.
+  protected base branch takes pull requests too. A checkout without an `origin` remote,
+  such as a new site, works against its local `main`: merging moves `main` forward on
+  this Mac, and nothing is pushed until a remote is added.
 
 ## Components
 
@@ -70,7 +72,8 @@ Each component has a folder in the components folder, holding:
 
 - `<name>.yml`, the schema, which drives the editor and nothing else;
 - `<name>.html`, the Hugo partial that renders it, reading the block's keys directly;
-- optionally `<name>.scss` for its styles and `<name>.md` for its Markdown rendition.
+- optionally its styles, `<name>.scss` or `<name>.css` as the site builds them, and
+  `<name>.md` for its Markdown rendition.
 
 ### The schema
 
