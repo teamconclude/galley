@@ -111,8 +111,9 @@ export function PreviewContent(props: ContentProps): React.JSX.Element {
   const textMode = isPlainFile(url) || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
 
+  // Pictures too, e.g. one replaced under its own name.
   useEffect(() => {
-    if (reloadKey) view.current?.reload()
+    if (reloadKey) view.current?.reloadIgnoringCache()
   }, [reloadKey])
 
   // A target stays pending until the page has found it, so one asked for while Hugo is

@@ -6,6 +6,7 @@ import type {
   SetupStatus,
   HugoStatus,
   Identity,
+  ImageReplacement,
   ImportedDocument,
   MenuCommand,
   RepoInfo,
@@ -38,6 +39,7 @@ import {
 } from './components/GitDialogs'
 import Frontmatter from './components/Frontmatter'
 import PageFinder from './components/PageFinder'
+import ReplaceImageDialog from './components/ReplaceImageDialog'
 import ReviewDialog from './components/ReviewDialog'
 import ShareButton, { type Shared } from './components/ShareButton'
 import Preview from './components/Preview'
@@ -86,6 +88,7 @@ type DialogState =
   | { kind: 'new-folder'; dir: string }
   | { kind: 'rename'; entry: DirEntry }
   | { kind: 'duplicate'; entry: DirEntry }
+  | { kind: 'replace-image'; entry: DirEntry; plan: ImageReplacement }
 
 const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 const binaryFile = /\.(pdf|zip|gz|woff2?|ttf|otf|eot|mp4|mov|webm|mp3)$/i
@@ -164,6 +167,8 @@ export default function App(): React.JSX.Element | null {
   const [saving, setSaving] = useState(false)
   const [treeVersion, setTreeVersion] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
+  // Changes when an image is replaced under its own name, so its view loads it again.
+  const [imageVersion, setImageVersion] = useState(0)
   const [layout] = useState(loadLayout)
   const [setup, setSetup] = useState<SetupStatus | null>(null)
   const [showSetup, setShowSetup] = useState<boolean | null>(null)
@@ -380,7 +385,12 @@ export default function App(): React.JSX.Element | null {
     const target = inDir(parentOf(entry.path), normalizeName(name))
     if (target === entry.path) return
     try {
-      await window.api.repo.rename(entry.path, target)
+      if (!entry.isDir && imageFile.test(entry.path)) {
+        // The pages that show the image follow it, the open one too.
+        await save()
+        await window.api.repo.renameImage(entry.path, target)
+        if (file && file.path !== entry.path) await reopen(file.path)
+      } else await window.api.repo.rename(entry.path, target)
       if (file?.path === entry.path) setFile({ ...file, path: target })
       else if (file?.path.startsWith(entry.path + '/')) {
         setFile({ ...file, path: target + file.path.slice(entry.path.length) })
@@ -403,7 +413,14 @@ export default function App(): React.JSX.Element | null {
 
   const trashEntry = async (entry: DirEntry): Promise<void> => {
     const what = entry.isDir ? `the folder ${entry.name} and everything in it` : entry.name
-    if (!window.confirm(`Move ${what} to the Trash?`)) return
+    const uses =
+      entry.isDir || !imageFile.test(entry.path)
+        ? []
+        : await window.api.repo.imageUses(entry.path).catch(() => [])
+    const shownOn = uses.length
+      ? `\n\nIt is shown on ${uses.map((u) => pages.get(u.path)?.title || u.path).join(', ')}, which would show a missing picture.`
+      : ''
+    if (!window.confirm(`Move ${what} to the Trash?${shownOn}`)) return
     try {
       await window.api.repo.trash(entry.path)
       if (file && (file.path === entry.path || file.path.startsWith(entry.path + '/'))) {
@@ -502,6 +519,37 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
+  // The picture to replace an image with is asked for first; the dialog then shows what
+  // replacing it would do.
+  const chooseReplacement = async (entry: DirEntry): Promise<void> => {
+    try {
+      const plan = await window.api.repo.chooseReplacement(entry.path)
+      if (plan) setDialog({ kind: 'replace-image', entry, plan })
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  const replaceImage = async (
+    entry: DirEntry,
+    plan: ImageReplacement,
+    name: string
+  ): Promise<void> => {
+    const target = inDir(parentOf(entry.path), name)
+    try {
+      await save()
+      await window.api.repo.replaceImage(entry.path, plan.source, name)
+      if (file?.path === entry.path) {
+        if (target === entry.path) setImageVersion((v) => v + 1)
+        else await open(target)
+      } else if (file && plan.uses.some((use) => use.path === file.path)) await reopen(file.path)
+      reveal(target)
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      fail(e)
+    }
+  }
+
   const menuItems = (entry: DirEntry): MenuItem[] =>
     entry.isDir
       ? [
@@ -514,6 +562,9 @@ export default function App(): React.JSX.Element | null {
           { label: 'Move to Trash', danger: true, onClick: () => void trashEntry(entry) }
         ]
       : [
+          ...(imageFile.test(entry.name)
+            ? [{ label: 'Replace…', onClick: () => void chooseReplacement(entry) }]
+            : []),
           { label: 'Rename…', onClick: () => setDialog({ kind: 'rename', entry }) },
           { label: 'Duplicate…', onClick: () => setDialog({ kind: 'duplicate', entry }) },
           { label: 'Move to Trash', danger: true, onClick: () => void trashEntry(entry) }
@@ -1305,7 +1356,7 @@ export default function App(): React.JSX.Element | null {
                   <div className="pane-empty">Choose a page on the left.</div>
                 ) : imageFile.test(file.path) ? (
                   <div className="image-view">
-                    <img src={`galley://repo/${file.path}`} alt={file.path} />
+                    <img src={`galley://repo/${file.path}?v=${imageVersion}`} alt={file.path} />
                   </div>
                 ) : binaryFile.test(file.path) ? (
                   <div className="pane-empty">This file cannot be edited here.</div>
@@ -1650,6 +1701,18 @@ export default function App(): React.JSX.Element | null {
               setPendingCommit(null)
             }}
             onSubmit={(id) => void saveIdentity(id)}
+          />
+        )}
+        {dialog?.kind === 'replace-image' && (
+          <ReplaceImageDialog
+            path={dialog.entry.path}
+            plan={dialog.plan}
+            pages={pages}
+            onCancel={() => setDialog(null)}
+            onSubmit={(name) => {
+              setDialog(null)
+              void replaceImage(dialog.entry, dialog.plan, name)
+            }}
           />
         )}
         {dialog?.kind === 'duplicate' && (

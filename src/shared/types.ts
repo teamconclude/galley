@@ -294,6 +294,36 @@ export interface ReplaceResult {
   matches: number
 }
 
+// A picture's size in pixels.
+export interface ImageSize {
+  width: number
+  height: number
+}
+
+// A file that shows an image: how often, and how many of those give a width and height.
+export interface ImageUse {
+  path: string
+  count: number
+  sized: number
+}
+
+// What replacing an image would do, for the dialog to show before anything changes.
+export interface ImageReplacement {
+  // The new picture on disk, and as a data URL to show.
+  source: string
+  preview: string
+  size: ImageSize | null
+  oldSize: ImageSize | null
+  uses: ImageUse[]
+  // The image is on a shared branch, so browsers and caches may hold it.
+  published: boolean
+  // The file name offered for the new picture, and the names taken in its folder.
+  name: string
+  taken: string[]
+  // Branches on GitHub whose own changes use the image; the old file stays for them.
+  keptFor: string[]
+}
+
 // Where the preview should scroll to: a top-level content block, or the element whose
 // text starts with a snippet of the body.
 export type PreviewTarget =

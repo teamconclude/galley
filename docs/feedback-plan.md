@@ -10,7 +10,8 @@ Phases 1 to 6 are done on develop, unreleased (2026-10-20). The site names in th
 section need a `baseURL` in `config/staging/` and `config/production/` of the web
 repository, which today passes it on the command line only. The web side of phase 2 is
 on its branch `lars/claude-content-editing`; the forwarding page of phase 6 on
-`lars/galley-review-links`. Phase 7 waits for a need.
+`lars/galley-review-links`. Phase 7 waits for a need. Phases 8 and 9 come from two later
+items (2026-10-21); phase 8 is done on develop, unreleased, and phase 9 is not started.
 
 ## What the feedback showed
 
@@ -67,6 +68,19 @@ Item by item:
     draft, but Galley keeps only path and URL.
 12. Developer docs sidebar differs between conclude.dev and conclude.io: not a bug. The
     extra entries are `draft: true` pages, and staging builds with `-D -F`.
+13. Dragging an image from the tree onto the preview, where it should appear: not
+    possible. Tree rows cannot be dragged, and the preview is a webview in its own
+    process, so the window sees no drag events over it. Nothing maps a place in the page
+    back to the text either: the preview only follows the editor, by block index or by a
+    line's words. Dropping a file from Finder into the body text works.
+14. Replacing an image in an article: real. Image fields have Upload…, but an image in a
+    page body can only be changed by editing its address, and the tree's menu has no
+    Replace…. Rename… and Move to Trash do not look at where an image is used, so either
+    breaks the pages that show it without a word. Replacing a file under the same name
+    would not reach readers: conclude.io serves images with `max-age` of 31 days and
+    `immutable` (`pkg/httpapi/http.go` in the Conclude repository), so browsers and
+    shared caches keep the old picture for up to a month without asking. Body images
+    come both as `![…](…)` and as `<img>` with the width and height CloudCannon wrote.
 
 Outside Galley: delete the five stray images in `content/blog/`, move the source folders
 out of the checkout, set Claude's model back, and use Publish… rather than asking Claude.
@@ -236,6 +250,82 @@ A GitHub Action runs `scripts/deploy-netlify` on every push to a personal branch
 viewing costs 20 credits per GB and 2 per 10,000 requests, so a few hundred page views a
 month fit the free 300 credits, which are a hard limit (prices as of October 2026).
 
+### Phase 8: replacing images (done)
+
+1. Replace… in the tree's menu on an image picks a new file and lists where the image is
+   used, by page title: the image's address anywhere in the site outside build output,
+   and for an image in a page bundle its bare name in that bundle's pages.
+2. A replaced image gets a new name, by default `<name>-v2.<ext of the new file>`, then
+   `-v3`, so no reader sees the old picture under a cached address. The editor may type
+   another. Keeping the old name is allowed, since a picture other sites or emails link
+   to has to keep its address, but the dialog warns loudly that readers may see the old
+   picture for a month. Every use is rewritten to the new address.
+3. An image that is on no shared branch on GitHub has never been published, so its name
+   is offered unchanged and the preview reloads ignoring its cache.
+4. The dialog shows both pictures with their sizes and warns when the sizes differ, more
+   strongly when the proportions do. An `<img>` with a width and height keeps its width
+   and takes the height from the new picture's proportions. Better still, the site
+   writes sizes when it builds; that belongs in the web repository.
+5. The old file is removed, unless a branch on GitHub other than the editor's changes a
+   page that uses it; then it stays and the dialog says so.
+6. Rename… on an image rewrites its uses the same way, and Move to Trash names the pages
+   that show it before asking.
+
+Everything lands in the working tree as ordinary changes (a new file, edited pages, a
+deleted file), committed together like any other edit. Addresses a template builds from
+parts cannot be found; the dialog lists only what it found.
+
+Verify: replacing a published blog image used by two pages writes `-v2`, rewrites both
+pages and an `<img>`'s height, and removes the old file; replacing an image uploaded on
+this branch keeps its name and the preview shows the new picture.
+
+As built: an address counts as a use when nothing that could continue a longer name
+stands on either side, so `/fr/images/x.png` and `x.png.bak` do not; it may carry one of
+the site's hosts (from its Hugo environments), a leading `static/`, or no leading slash,
+as templates write it. Tags that give a size are `<img>` and shortcodes with `width` and
+`height`. Sizes are read from the file's header (PNG, JPEG, GIF, WebP, AVIF, SVG). An
+image counts as published when it is on `develop`, `staging`, `production`, `main` or
+`master` on GitHub, or locally without GitHub. Branches that keep the old file are those
+whose diff from the base adds or removes its address (`git diff -S`). The old file goes
+to the Trash. The preview server now runs with `--noHTTPCache`: without it, Hugo sends
+only Last-Modified, from which the preview kept a replaced picture for days. Renaming a
+folder of images does not rewrite their uses.
+
+Checked on a scratch clone of the web repository: a quickstart screenshot used on three
+pages, replaced by a picture of other proportions, became `-v2.png` with all three
+`<img>` heights recomputed and the old file gone; an image a fake colleague's branch
+starts using stayed; the unpublished `-v2.png` was offered under its own name without a
+warning; typing the old name of a published image showed the loud warning; Rename… and
+Move to Trash behaved as above, and the preview showed the new picture.
+
+### Phase 9: dropping images on the preview
+
+1. Image rows in the tree can be dragged. While a drag from the tree is on, a
+   transparent layer over the preview takes the drag events, since the webview would
+   swallow them, and asks the page with `elementFromPoint` what lies under the pointer.
+2. Over the page body, the page draws a line above or below the nearest block
+   (paragraph, heading, list item, table, quote, picture), in the colour the preview
+   uses to show the cursor's place. Outside `main`, and over text that comes from no
+   line of the body (a shortcode's output, a generated list), nothing is drawn and the
+   pane bar says why.
+3. The drop finds the block's line in the body by its words, the reverse of how the
+   preview follows the cursor, and inserts `![Description](…)` as a paragraph before or
+   after the block, with "Description" selected. In a list item it is indented into the
+   item, so numbered steps keep counting.
+4. A drop onto a picture swaps it on this page: the matching `![…](…)` or `<img>` in the
+   body, or the image field in the settings that holds its address. On block pages that
+   is the only drop there is.
+5. The detached preview takes drops the same way and sends them to the main window.
+   Files dragged from Finder need a preload in the webview, since such a drag can enter
+   the preview without crossing the window first; only if asked for.
+
+Start with a spike: the layer over the webview, `elementFromPoint` through
+`executeJavaScript` on every animation frame, and the line drawn in the page.
+
+Verify: on a quickstart page, dropping an image below a numbered step inserts it inside
+the step and the numbering continues; dropping onto a screenshot swaps its address; on a
+product page, dropping onto a block's picture sets that block's image field.
+
 ## Order and effort
 
 | Phase | Work                                                        | Estimate   |
@@ -247,6 +337,8 @@ month fit the free 300 credits, which are a hard limit (prices as of October 202
 | 5     | Page finder and titles in the tree                          | 1–2 days   |
 | 6     | Deep links                                                  | 2 days     |
 | 7     | Netlify previews                                            | half a day |
+| 8     | Replace images under a new name, uses rewritten             | 1 day      |
+| 9     | Drop images on the preview                                  | 2 days     |
 
 ## Decisions taken
 
@@ -261,3 +353,6 @@ month fit the free 300 credits, which are a hard limit (prices as of October 202
   holds no untracked files beyond build output, which the site's .gitignore covers.
 - Editors are not expected to know git or Hugo: anything that looks misplaced is
   explained in plain words before it is committed.
+- A published image is replaced under a new name by default, since caches keep images
+  for a month, and its uses follow. The same name stays possible, with a loud warning
+  (2026-10-21).

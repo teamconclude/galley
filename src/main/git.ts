@@ -941,6 +941,50 @@ export class Git {
     return [...new Set([...committed, ...staged, ...untracked])].sort()
   }
 
+  // Whether a file is on a shared branch, so browsers and caches may hold it. Without
+  // GitHub, the checkout's own shared branches stand in.
+  async published(path: string): Promise<boolean> {
+    const origin = await this.hasOrigin()
+    const remotes = origin ? await this.lines(['branch', '-r', '--format=%(refname:short)']) : []
+    for (const branch of protectedBranches) {
+      const ref = origin ? `origin/${branch}` : branch
+      if (origin && !remotes.includes(ref)) continue
+      const found = await this.git(['cat-file', '-e', `${ref}:${path}`]).then(
+        () => true,
+        () => false
+      )
+      if (found) return true
+    }
+    return false
+  }
+
+  // Branches on GitHub, other than this one and the shared ones, whose own changes since
+  // the base add or remove the text under the folders, e.g. a colleague's page that
+  // starts using an image.
+  async branchesUsing(text: string, dirs: string[]): Promise<string[]> {
+    if (!(await this.hasOrigin())) return []
+    const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
+    const base = `origin/${await this.base(remotes)}`
+    if (!remotes.includes(base)) return []
+    const head = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
+    const found: string[] = []
+    for (const ref of remotes) {
+      if (!ref.startsWith('origin/')) continue
+      const name = ref.slice('origin/'.length)
+      if (name === 'HEAD' || name === head || protectedBranches.has(name)) continue
+      const files = await this.lines([
+        'diff',
+        '--name-only',
+        `-S${text}`,
+        `${base}...${ref}`,
+        '--',
+        ...dirs.map((d) => d || '.')
+      ])
+      if (files.length > 0) found.push(name)
+    }
+    return found
+  }
+
   // When each file directly in dir last changed: its last commit, for files without
   // changes since. A checkout gives every file the same time on disk, so the disk only
   // speaks for changed and new files, which are left out here.

@@ -336,6 +336,16 @@ export class Repo {
     await fs.rename(this.absolute(from), this.absolute(to))
   }
 
+  // Copies a file in under exactly this path, in one step like write, e.g. a picture that
+  // replaces another.
+  async copyIn(src: string, rel: string, overwrite: boolean): Promise<void> {
+    const abs = this.absolute(rel)
+    if (!overwrite && existsSync(abs)) throw new Error(`${rel} already exists`)
+    const tmp = join(dirname(abs), `.${basename(abs)}.galley~`)
+    await fs.copyFile(src, tmp)
+    await fs.rename(tmp, abs)
+  }
+
   // The newest page in a directory, by frontmatter date, else by modification time.
   async newest(dirRel: string): Promise<string | null> {
     const dir = this.absolute(dirRel)

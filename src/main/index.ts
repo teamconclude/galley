@@ -32,6 +32,7 @@ import type {
 import { isDev } from './env'
 import { claudeArgs, receiveDrops, setContext } from './claude'
 import { importDocument } from './convert'
+import { imageUses, planReplacement, renameImage, replaceImage } from './images'
 import { clone, Git, run as runGit } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
@@ -366,6 +367,24 @@ function registerIpc(): void {
     targets: await current().linkTargets(),
     hosts: await environmentSites(current().path)
   }))
+  ipcMain.handle('repo:imageUses', (_e, rel: string) => imageUses(current(), rel))
+  ipcMain.handle('repo:chooseReplacement', async (_e, rel: string) => {
+    const result = await dialog.showOpenDialog({
+      title: `Replace ${basename(rel)}`,
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'] }
+      ]
+    })
+    const src = result.filePaths[0]
+    return src ? planReplacement(current(), git, rel, src) : null
+  })
+  ipcMain.handle('repo:replaceImage', (_e, rel: string, src: string, name: string) =>
+    replaceImage(current(), git, rel, src, name)
+  )
+  ipcMain.handle('repo:renameImage', (_e, from: string, to: string) =>
+    renameImage(current(), from, to)
+  )
   ipcMain.handle('repo:create', (_e, rel: string, text: string) => current().create(rel, text))
   ipcMain.handle('repo:mkdir', (_e, rel: string) => current().mkdir(rel))
   ipcMain.handle('repo:rename', (_e, from: string, to: string) => current().rename(from, to))

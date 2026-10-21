@@ -138,8 +138,9 @@ export class HugoServer {
     // this process renders. Hugo rejects --destination with --renderToMemory, hence the
     // environment variable.
     // Drafts, future-dated and expired pages all render, so an editor can preview a post
-    // before its publishing date.
-    const proc = spawn(bin, ['server', '-D', '-F', '-E', '--renderToMemory'], {
+    // before its publishing date. Without --noHTTPCache the server sends only
+    // Last-Modified, from which the preview would keep a replaced picture for days.
+    const proc = spawn(bin, ['server', '-D', '-F', '-E', '--renderToMemory', '--noHTTPCache'], {
       cwd: repo,
       env: { ...process.env, HUGO_PUBLISHDIR: join(app.getPath('temp'), 'galley-preview') }
     })

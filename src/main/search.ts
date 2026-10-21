@@ -86,7 +86,7 @@ const display = (line: string): string =>
   line.length > maxLineLength ? line.slice(0, maxLineLength) : line
 
 // Files in depth-first order, so results come out grouped as the file tree shows them.
-async function listFiles(root: string, dirs: string[]): Promise<string[]> {
+export async function listFiles(root: string, dirs: string[]): Promise<string[]> {
   const out: string[] = []
   const walk = async (rel: string): Promise<void> => {
     const entries = await fs.readdir(join(root, rel), { withFileTypes: true }).catch(() => [])
@@ -102,7 +102,7 @@ async function listFiles(root: string, dirs: string[]): Promise<string[]> {
   return out
 }
 
-async function readText(path: string): Promise<string | null> {
+export async function readText(path: string): Promise<string | null> {
   const stat = await fs.stat(path).catch(() => null)
   if (!stat || stat.size > maxFileSize) return null
   const buffer = await fs.readFile(path).catch(() => null)

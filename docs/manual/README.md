@@ -173,6 +173,14 @@ of the site, such as `static/images/blog`, and names them in lowercase without s
 When you add a picture to the text, write a short description of what it shows. Readers
 who cannot see the picture hear it, and search engines read it.
 
+To swap a picture for a new one everywhere it appears, right-click it in the file list and
+choose **Replace…**. Galley shows the old and new picture and the pages that use it, and
+saves the new one under a new name, such as `screenshot-v2.png`. Every page then shows it.
+The new name matters: browsers keep a published picture for weeks, so under the old name
+many readers would go on seeing the old one. Keep the old name only if other sites or
+emails link to the picture. **Rename…** also changes the pages that show the picture, and
+**Move to Trash** first tells you which pages would lose it.
+
 ## New pages
 
 **File ▸ New Page…** (⌘N), or the page button above the list, creates a page in the folder

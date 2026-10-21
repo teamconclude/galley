@@ -3,6 +3,8 @@ import type {
   Commit,
   CommitRange,
   Placement,
+  ImageReplacement,
+  ImageUse,
   ImportedDocument,
   ComponentLibrary,
   DataLists,
@@ -69,6 +71,16 @@ export interface Api {
     create: (rel: string, text: string) => Promise<void>
     mkdir: (rel: string) => Promise<void>
     rename: (from: string, to: string) => Promise<void>
+    // Renames an image and points the pages that show it at the new name; returns how
+    // many files changed.
+    renameImage: (from: string, to: string) => Promise<number>
+    // The files that show an image.
+    imageUses: (rel: string) => Promise<ImageUse[]>
+    // Asks for a picture to replace an image with and says what replacing would do; null
+    // when cancelled.
+    chooseReplacement: (rel: string) => Promise<ImageReplacement | null>
+    // Puts the picture at src in as <name> beside the image and points its uses at it.
+    replaceImage: (rel: string, src: string, name: string) => Promise<void>
     trash: (rel: string) => Promise<void>
     // Pictures picked in an open dialog, as paths on disk.
     chooseImages: () => Promise<string[]>
