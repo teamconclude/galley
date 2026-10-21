@@ -146,7 +146,9 @@ The page forms are generated from the component schemas in the site checkout,
 `components/<name>/<name>.yml` (label, description and a `fields` map of
 type, label, placeholder, help and default per key), or from `<name>.bookshop.yml` while a
 site still uses Bookshop, with labels derived from the keys. Nothing in Galley needs to
-change when a component is added.
+change when a component is added. A site without schemas is edited in plain mode, its
+lists as lists of objects. [The site contract](docs/site-contract.md) describes what a
+site provides for each part of Galley.
 
 ### Releasing
 

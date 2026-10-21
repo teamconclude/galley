@@ -28,17 +28,22 @@ Done in Galley 0.5.0 (2026-10-20):
   stock `hugo new site` opens and previews.
 - Phase 2. TOML and JSON frontmatter open as text with the badge.
 
+Done on Galley develop after 0.5.0, unreleased: phase 3 apart from the Bookshop removal.
+`docs/site-contract.md` documents the contract and the README links it. A site without
+component schemas is in plain mode: no list is a block list, so lists of objects edit as
+object cards and the component key is an ordinary field. A site with neither schema
+format now gets the `blocks` and `component` keys, not the Bookshop pair.
+
 Open:
 
-- Phase 3: the contract doc (3.1) and plain mode (3.3). `BlockList` still offers Add
-  block and titles every card "Unknown block" on a site without components. The
-  Bookshop removal (3.4) waits for `lars/galley` to merge into the web repo's develop,
-  which can happen as soon as CloudCannon is no longer needed.
+- Phase 3: the pointer from the web repo's CLAUDE.md to the contract (3.1), and the
+  Bookshop removal (3.4), which waits for `lars/galley` to merge into the web repo's
+  develop. That can happen as soon as CloudCannon is no longer needed.
 - Phase 4, the template site and New site flow: not started.
 - Phase 5: only the Claude preference is done. The feedback work added two more places
   that name our site, the review link page and the About window (see below).
 
-Next, in order: the rest of phase 3, then the template site.
+Next: the template site.
 
 ## Goals and non-goals
 
@@ -231,12 +236,14 @@ Verify: a TOML-frontmatter page opens raw with the badge; a YAML page is unchang
 ### Phase 3: the component contract
 
 1. Write `docs/site-contract.md` from the section above; link it from the README and from
-   the web repo's CLAUDE.md, replacing the Galley section there with a pointer.
+   the web repo's CLAUDE.md, replacing the Galley section there with a pointer. Done
+   apart from the web repo's pointer.
 2. Done in 0.4.1: `showBlockScript` counts `<!--galley-block-->` comments and falls back
    to the Bookshop comments; `layouts/partials/content-blocks.html` on `lars/galley` emits
    the marker through `safeHTML` (Go templates strip plain comments).
-3. Plain mode: with no component folder, `Blocks.tsx` renders the block list as an
-   objects list, the Add block menu is hidden, and nothing asks for a schema.
+3. Done: plain mode. With no component schemas, `lib/schema.ts` infers no blocks, so a
+   `blocks` list renders as an objects list with Add item, and nothing asks for a schema.
+   `BlockList` also hides Add block when it has no components to offer.
 4. Once `lars/galley` has merged: delete `fromBookshop`, the `_bookshop_name` and
    `content_blocks` keys, the `component-library` fallback, the Bookshop marker fallback
    and the `.bookshop.yml` mention in the README.
