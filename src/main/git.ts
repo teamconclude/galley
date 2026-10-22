@@ -360,18 +360,52 @@ export class Git {
     return [ahead, behind]
   }
 
-  // A shared branch only ever follows GitHub. When it has nothing of its own it is
-  // brought level; edits that collide with the new commits leave it as it is.
-  private async followShared(): Promise<void> {
-    const branch = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
-    if (!protectedBranches.has(branch)) return
+  // Every branch with nothing of its own follows its copy on GitHub: it moves forward
+  // when others pushed, and onto the new commits when they rewrote the branch. Commits
+  // GitHub never had keep a branch where it is, as do edits colliding with the new
+  // commits, a branch checked out elsewhere, or an update that is under way.
+  private async followGitHub(): Promise<void> {
+    if ((await this.stoppedRebase()) || (await this.aside())) return
+    const current = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
     const remotes = await this.lines(['branch', '-r', '--format=%(refname:short)'])
-    const upstream = await this.tracking(branch, remotes)
-    if (!upstream) return
-    const [ahead, behind] = await this.aheadBehind(upstream)
-    if (ahead === 0 && behind > 0) {
-      await this.git(['merge', '--ff-only', upstream]).catch(() => undefined)
+    const checkedOut = await this.checkedOut()
+    for (const branch of await this.lines(['branch', '--format=%(refname:short)'])) {
+      if (branch !== current && checkedOut.has(branch)) continue
+      const upstream = await this.tracking(branch, remotes)
+      if (!upstream) continue
+      const local = await this.sha(`refs/heads/${branch}`)
+      const remote = await this.sha(upstream)
+      if (!remote || local === remote || (await this.isAncestor(remote, local))) continue
+      const forward = await this.isAncestor(local, remote)
+      if (!forward && !(await this.wasOnGitHub(upstream, local))) continue
+      const move =
+        branch === current
+          ? ['reset', '--keep', upstream]
+          : ['update-ref', `refs/heads/${branch}`, remote, local]
+      await this.git(move).catch(() => undefined)
     }
+  }
+
+  private isAncestor(ancestor: string, of: string): Promise<boolean> {
+    return this.git(['merge-base', '--is-ancestor', ancestor, of]).then(
+      () => true,
+      () => false
+    )
+  }
+
+  // Whether GitHub's copy ever stood at this commit, by the fetches and pushes that moved
+  // it here. A rebase made here and not pushed yet never did.
+  private async wasOnGitHub(upstream: string, commit: string): Promise<boolean> {
+    const seen = await this.lines(['reflog', 'show', '--format=%H', `refs/remotes/${upstream}`])
+    return seen.includes(commit)
+  }
+
+  // Branches checked out in any worktree. Moving one checked out in another worktree
+  // would leave its files behind.
+  private async checkedOut(): Promise<Set<string>> {
+    const prefix = 'branch refs/heads/'
+    const lines = await this.lines(['worktree', 'list', '--porcelain'])
+    return new Set(lines.filter((l) => l.startsWith(prefix)).map((l) => l.slice(prefix.length)))
   }
 
   // The commits behind one of the counts the status reports, newest first.
@@ -459,7 +493,7 @@ export class Git {
       } catch (e) {
         this.fetchError = message(e)
       }
-      await this.followShared()
+      await this.followGitHub()
     })
   }
 
@@ -490,7 +524,7 @@ export class Git {
   switchBranch(name: string): Promise<void> {
     return this.op('Switching branch…', async () => {
       await this.git(['switch', name])
-      await this.followShared()
+      await this.followGitHub()
     })
   }
 
@@ -547,7 +581,7 @@ export class Git {
     return this.op(`Deleting ${name}…`, async () => {
       if (name === branch) {
         await this.git(['switch', base])
-        await this.followShared()
+        await this.followGitHub()
       }
       if (await this.hasLocal(name)) await this.git(['branch', '-D', name])
       if (onGitHub) await this.git(['push', 'origin', '--delete', name])
@@ -807,6 +841,7 @@ export class Git {
       } else {
         await this.git(['push', 'origin', 'HEAD']).catch(() => undefined)
       }
+      await this.followGitHub()
     })
   }
 
@@ -838,6 +873,7 @@ export class Git {
       } finally {
         await this.git(['worktree', 'remove', '--force', dir]).catch(() => undefined)
       }
+      await this.followGitHub()
     })
   }
 
@@ -868,6 +904,7 @@ export class Git {
       const result = await publish(slug, from, to)
       await this.git(['fetch', 'origin', to]).catch(() => undefined)
       this.lastFetch = Date.now()
+      await this.followGitHub()
       return result
     })
   }

@@ -285,9 +285,12 @@ there.
 
 ### Keeping up with the team
 
-Galley checks GitHub every few minutes.
+Galley checks GitHub every few minutes. Your branches that have nothing GitHub lacks
+follow it by themselves, also when a colleague rewrote one, and `develop` moves along
+as soon as you merge into it. Edits you have not committed stay as they are.
 
-- **Pull** appears when someone else added to your branch. Your own commits go on top of
+- **Pull** appears when someone else added to your branch while you have commits GitHub
+  does not have yet, or edits that clash with theirs. Your own commits go on top of
   theirs.
 - **Update** appears when `develop` has moved on since you started your branch. It brings
   your branch up to date with the team's work. If a colleague added to your branch, pull
