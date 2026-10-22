@@ -3,6 +3,7 @@ import { existsSync, promises as fs } from 'fs'
 import { basename, extname, join } from 'path'
 import type { ClaudeMode, Preferences, SiteInfo } from '../shared/types'
 import { docxToMarkdown, htmlFileToMarkdown } from './convert'
+import { isDev } from './env'
 
 // What the Claude pane is started with: the editor's role, permissions that suit it, the
 // files dropped on the pane, the page that is open, and Galley's own skills. Everything
@@ -16,6 +17,14 @@ const inboxDays = 14
 // Galley's plugin ships in resources/, which the packaged app keeps outside the asar.
 const pluginDir = (): string =>
   join(app.getAppPath().replace(/app\.asar$/, 'app.asar.unpacked'), 'resources', 'claude-plugin')
+
+// Galley's manual and the site contract, which Claude reads to answer questions about Galley.
+// The renderer bundles the manual's text, so the packaged app carries these two files in its
+// resources as well (see electron-builder.yml).
+const docsDir = (): string =>
+  isDev ? join(app.getAppPath(), 'docs') : join(process.resourcesPath, 'docs')
+const manualFile = (): string => join(docsDir(), 'manual', 'README.md')
+const contractFile = (): string => join(docsDir(), 'site-contract.md')
 
 export const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 
@@ -35,19 +44,24 @@ refer to them as ${site.imagesUrl}/<section>/<file>. File names are lowercase wi
 Hugo or a server.
 - Files the editor drops on this pane arrive in ${inbox()}. Word and web documents arrive \
 converted to Markdown, with the same text and links; work from that file.
+- Galley's manual is ${manualFile()}. When the editor asks how to do something in Galley \
+or why Galley behaves as it does, read the manual and answer from it, naming the buttons and \
+menu items it names; do not guess at features it does not describe. What a site needs for \
+Galley's features to work is in ${contractFile()}.
 - Answer briefly and in plain words, without technical terms where possible.`
 }
 
 // What Claude may do without asking and what it may never do, in either form of the pane.
 function rules(hosts: string[]): Record<string, unknown> {
-  const inboxRule = `//${inbox().replace(/^\//, '')}/**`
+  const rule = (dir: string): string => `//${dir.replace(/^\//, '')}/**`
   return {
     // The pane is white whatever theme the user's own Claude Code uses; a dark one draws
     // some text in white there.
     theme: 'light',
     permissions: {
       allow: [
-        `Read(${inboxRule})`,
+        `Read(${rule(inbox())})`,
+        `Read(${rule(docsDir())})`,
         'Bash(hugo list *)',
         'Bash(git status *)',
         'Bash(git diff *)',
@@ -113,9 +127,10 @@ async function tidyInbox(): Promise<void> {
 // addresses, which Claude may fetch to compare with the live pages.
 export interface ClaudeLaunch {
   settings: string
+  // Folders outside the checkout Claude may read: the inbox and Galley's documentation.
+  dirs: string[]
   // The settings' rules without the terminal's hook, for the chat.
   rules: Record<string, unknown>
-  inbox: string
   rolePrompt: string
   plugin: string | null
   model: string | null
@@ -132,7 +147,7 @@ export async function claudeLaunch(
   return {
     settings: settingsFile(),
     rules: rules(hosts),
-    inbox: inbox(),
+    dirs: [inbox(), docsDir()],
     rolePrompt: rolePrompt(site),
     plugin: existsSync(pluginDir()) ? pluginDir() : null,
     model: prefs.claudeModel === 'default' ? null : prefs.claudeModel,
@@ -148,7 +163,7 @@ export function claudeArgs(launch: ClaudeLaunch): string[] {
     '--permission-mode',
     'acceptEdits',
     '--add-dir',
-    launch.inbox,
+    ...launch.dirs,
     '--append-system-prompt',
     launch.rolePrompt
   ]

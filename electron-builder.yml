@@ -5,7 +5,8 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
-  # The manual is bundled into the renderer; its source stays out of the app.
+  # The manual is bundled into the renderer; its source stays out of the app. Claude reads
+  # it, and the site contract, from the copies in extraResources below.
   - '!docs/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,README.md}'
@@ -13,6 +14,11 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # The chat runs the editor's own Claude Code, so the Agent SDK's bundled copy stays out.
   - '!node_modules/@anthropic-ai/claude-agent-sdk-*{,/**}'
+extraResources:
+  - from: docs/manual/README.md
+    to: docs/manual/README.md
+  - from: docs/site-contract.md
+    to: docs/site-contract.md
 asarUnpack:
   - resources/**
 afterPack: scripts/pty-helper.cjs

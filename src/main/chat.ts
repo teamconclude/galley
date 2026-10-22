@@ -235,7 +235,7 @@ export class ClaudeChat {
           env: proc.env,
           settings: l.rules as Options['settings'],
           permissionMode: l.mode,
-          additionalDirectories: [l.inbox],
+          additionalDirectories: l.dirs,
           systemPrompt: { type: 'preset', preset: 'claude_code', append: l.rolePrompt },
           plugins: l.plugin ? [{ type: 'local', path: l.plugin }] : [],
           model: l.model ?? undefined,
