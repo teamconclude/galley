@@ -1,7 +1,6 @@
 import * as pty from 'node-pty'
-import { dirname } from 'path'
 import { shellQuote } from './claude'
-import { findClaude, findGit, gitToolEnv } from './tools'
+import { claudeProcess } from './tools'
 
 export class ClaudeTerminal {
   private proc: pty.IPty | null = null
@@ -16,24 +15,12 @@ export class ClaudeTerminal {
 
   async start(cwd: string, args: string[] = []): Promise<void> {
     this.kill()
-    const env: Record<string, string> = {}
-    // Markers from a Claude session that launched the app would make the CLI think it is nested.
-    for (const [k, v] of Object.entries(process.env)) {
-      if (v !== undefined && !k.startsWith('CLAUDE')) env[k] = v
-    }
+    const { bin, env, path } = await claudeProcess()
     env.TERM = 'xterm-256color'
     env.COLORTERM = 'truecolor'
     // The pane is white on white; Claude Code reads this to pick its light theme.
     env.COLORFGBG = '0;15'
-    env.LANG ||= 'en_US.UTF-8'
-    // Git without Galley's GitHub token: Claude reads history but never pushes.
-    Object.assign(env, await gitToolEnv())
-    const git = await findGit()
-    const claude = await findClaude()
-    // Claude's own git calls get the portable git when that is what this Mac has.
-    const extraPath = [claude && dirname(claude), git && dirname(git.bin)].filter(Boolean)
-    const bin = claude ? shellQuote(claude) : 'claude'
-    const command = `export PATH="${extraPath.join(':')}:$PATH"; exec ${[bin, ...args.map(shellQuote)].join(' ')}`
+    const command = `export PATH="${path.join(':')}:$PATH"; exec ${[bin ? shellQuote(bin) : 'claude', ...args.map(shellQuote)].join(' ')}`
     // The login shell supplies the user's PATH, which a GUI app does not inherit.
     const proc = pty.spawn('/bin/zsh', ['-lc', command], {
       name: 'xterm-256color',

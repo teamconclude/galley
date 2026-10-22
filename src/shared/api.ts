@@ -1,5 +1,10 @@
 import type {
   BranchInfo,
+  ChatAnswer,
+  ChatItem,
+  ChatRequest,
+  ChatStatus,
+  ClaudeMode,
   Commit,
   CommitRange,
   Placement,
@@ -170,7 +175,8 @@ export interface Api {
     onMode: (cb: (mode: PreviewMode) => void) => Unsubscribe
   }
   terminal: {
-    start: (cols: number, rows: number) => void
+    // Starts Claude Code, or with login its sign-in, which the chat needs first.
+    start: (cols: number, rows: number, login?: boolean) => void
     write: (data: string) => void
     resize: (cols: number, rows: number) => void
     kill: () => void
@@ -180,6 +186,24 @@ export interface Api {
     context: (path: string | null) => void
     onData: (cb: (data: string) => void) => Unsubscribe
     onExit: (cb: (code: number) => void) => Unsubscribe
+  }
+  // Claude as a chat. Starting begins a new conversation, after checking the sign-in.
+  chat: {
+    start: () => void
+    // Files are paths from terminal.drop or pick; page is the open file, sent as context.
+    send: (text: string, files: string[], page: string | null) => void
+    // Asks for files to hand Claude; returns their copies, as terminal.drop does.
+    pick: () => Promise<string[]>
+    setMode: (mode: ClaudeMode) => void
+    // A model name such as 'opus', or null for Claude Code's own choice.
+    setModel: (model: string | null) => void
+    answer: (id: string, answer: ChatAnswer) => void
+    interrupt: () => void
+    stop: () => void
+    onStatus: (cb: (status: ChatStatus) => void) => Unsubscribe
+    onItem: (cb: (item: ChatItem) => void) => Unsubscribe
+    onRequest: (cb: (request: ChatRequest) => void) => Unsubscribe
+    onSettled: (cb: (id: string) => void) => Unsubscribe
   }
   files: {
     pathFor: (file: File) => string

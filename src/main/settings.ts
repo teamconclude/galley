@@ -34,6 +34,8 @@ export const prefs = (): Preferences => ({
   deleteMergedBranch: true,
   claude: true,
   claudeModel: 'opus',
+  claudeView: 'chat',
+  claudeMode: 'auto',
   ...loadSettings().prefs
 })
 

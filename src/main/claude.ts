@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { existsSync, promises as fs } from 'fs'
 import { basename, extname, join } from 'path'
-import type { Preferences, SiteInfo } from '../shared/types'
+import type { ClaudeMode, Preferences, SiteInfo } from '../shared/types'
 import { docxToMarkdown, htmlFileToMarkdown } from './convert'
 
 // What the Claude pane is started with: the editor's role, permissions that suit it, the
@@ -38,9 +38,10 @@ converted to Markdown, with the same text and links; work from that file.
 - Answer briefly and in plain words, without technical terms where possible.`
 }
 
-async function writeSettings(hosts: string[]): Promise<void> {
+// What Claude may do without asking and what it may never do, in either form of the pane.
+function rules(hosts: string[]): Record<string, unknown> {
   const inboxRule = `//${inbox().replace(/^\//, '')}/**`
-  const settings = {
+  return {
     // The pane is white whatever theme the user's own Claude Code uses; a dark one draws
     // some text in white there.
     theme: 'light',
@@ -75,7 +76,15 @@ async function writeSettings(hosts: string[]): Promise<void> {
         'Bash(gh *)',
         'Bash(curl *)'
       ]
-    },
+    }
+  }
+}
+
+// The terminal hears which page is open from a hook on every prompt; the chat sends it with
+// each message instead, where the editor sees it and can leave it out.
+async function writeSettings(hosts: string[]): Promise<void> {
+  const settings = {
+    ...rules(hosts),
     hooks: {
       UserPromptSubmit: [
         {
@@ -99,27 +108,52 @@ async function tidyInbox(): Promise<void> {
   }
 }
 
-// The command-line arguments for one start of the pane. Hosts are the site's own addresses,
-// which Claude may fetch to compare with the live pages.
-export async function claudeArgs(
+// What one start of the pane is given, for either of its two forms: the terminal passes it
+// to the CLI as flags, the chat to the Agent SDK as options. Hosts are the site's own
+// addresses, which Claude may fetch to compare with the live pages.
+export interface ClaudeLaunch {
+  settings: string
+  // The settings' rules without the terminal's hook, for the chat.
+  rules: Record<string, unknown>
+  inbox: string
+  rolePrompt: string
+  plugin: string | null
+  model: string | null
+  mode: ClaudeMode
+}
+
+export async function claudeLaunch(
   site: SiteInfo,
   prefs: Preferences,
   hosts: string[]
-): Promise<string[]> {
+): Promise<ClaudeLaunch> {
   await fs.mkdir(inbox(), { recursive: true })
   await Promise.all([writeSettings(hosts), tidyInbox()])
+  return {
+    settings: settingsFile(),
+    rules: rules(hosts),
+    inbox: inbox(),
+    rolePrompt: rolePrompt(site),
+    plugin: existsSync(pluginDir()) ? pluginDir() : null,
+    model: prefs.claudeModel === 'default' ? null : prefs.claudeModel,
+    mode: prefs.claudeMode
+  }
+}
+
+// The command-line arguments for the terminal.
+export function claudeArgs(launch: ClaudeLaunch): string[] {
   const args = [
     '--settings',
-    settingsFile(),
+    launch.settings,
     '--permission-mode',
     'acceptEdits',
     '--add-dir',
-    inbox(),
+    launch.inbox,
     '--append-system-prompt',
-    rolePrompt(site)
+    launch.rolePrompt
   ]
-  if (existsSync(pluginDir())) args.push('--plugin-dir', pluginDir())
-  if (prefs.claudeModel !== 'default') args.push('--model', prefs.claudeModel)
+  if (launch.plugin) args.push('--plugin-dir', launch.plugin)
+  if (launch.model) args.push('--model', launch.model)
   return args
 }
 
@@ -156,9 +190,10 @@ export async function receiveDrops(paths: string[]): Promise<string[]> {
 // What the prompt hook tells Claude about the editor's screen.
 export async function setContext(path: string | null, url: string | null): Promise<void> {
   await fs.mkdir(folder(), { recursive: true })
-  const text = path
-    ? `The editor has ${path} open in Galley${url ? `; on the site it is ${url}` : ''}. ` +
-      '"This page" means that file.\n'
-    : ''
-  await fs.writeFile(contextFile(), text)
+  await fs.writeFile(contextFile(), path ? pageContext(path, url) + '\n' : '')
 }
+
+// What Claude is told about the page the editor has open.
+export const pageContext = (path: string, url: string | null): string =>
+  `The editor has ${path} open in Galley${url ? `; on the site it is ${url}` : ''}. ` +
+  '"This page" means that file.'

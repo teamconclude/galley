@@ -427,6 +427,65 @@ export interface Preferences {
   claude: boolean
   // The model the pane starts Claude with; 'default' leaves it to Claude Code's settings.
   claudeModel: ClaudeModel
+  // How the pane shows Claude: Galley's chat, or Claude Code's own terminal screen.
+  claudeView: ClaudeView
+  // How much the chat asks before Claude acts.
+  claudeMode: ClaudeMode
 }
 
 export type ClaudeModel = 'opus' | 'sonnet' | 'default'
+
+export type ClaudeView = 'chat' | 'terminal'
+
+// Claude Code's permission modes the chat offers: decide automatically, ask before commands
+// but not edits, or ask before both.
+export type ClaudeMode = 'auto' | 'acceptEdits' | 'default'
+
+// One entry of the Claude chat. An entry that comes again with the same id replaces the
+// earlier one, which is how text grows as Claude writes and a step learns its outcome.
+export type ChatItem =
+  // page: the file that was open, which went along as context.
+  | { kind: 'user'; id: string; text: string; files: string[]; page?: string }
+  | { kind: 'text'; id: string; text: string }
+  | {
+      kind: 'step'
+      id: string
+      tool: string
+      summary: string
+      detail?: string
+      state: ChatStepState
+    }
+  | { kind: 'notice'; id: string; text: string; error?: boolean }
+
+export type ChatStepState = 'running' | 'done' | 'failed'
+
+export interface ChatQuestion {
+  question: string
+  header: string
+  multiSelect: boolean
+  options: { label: string; description: string }[]
+}
+
+// What Claude waits on the editor for: leave to do something, or answers to its questions.
+export type ChatRequest =
+  // canAlways: the editor may allow such requests for the rest of the conversation.
+  | { kind: 'permission'; id: string; title: string; detail?: string; canAlways: boolean }
+  | { kind: 'question'; id: string; questions: ChatQuestion[] }
+
+// The answers are keyed by question; null when the editor dismisses the questions.
+export type ChatAnswer =
+  | { kind: 'permission'; allow: boolean; always?: boolean }
+  | { kind: 'question'; answers: Record<string, string> | null }
+
+export interface ChatStatus {
+  // missing: Claude Code is not installed; signed-out: it needs the editor to sign in.
+  state: 'starting' | 'missing' | 'signed-out' | 'ready' | 'busy' | 'stopped'
+  // Whose Claude account the chat runs under, e.g. "ann@example.com (Example)".
+  account?: string
+  // The model answering, e.g. claude-opus-5-5, and the mode the session is in.
+  model?: string
+  mode?: ClaudeMode
+  // False when the account has no auto mode, so the chat asks before commands instead.
+  auto?: boolean
+  error?: string
+}

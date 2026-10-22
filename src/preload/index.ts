@@ -110,7 +110,7 @@ const api: Api = {
     onMode: (cb) => on('preview:mode', cb)
   },
   terminal: {
-    start: (cols, rows) => ipcRenderer.send('terminal:start', cols, rows),
+    start: (cols, rows, login) => ipcRenderer.send('terminal:start', cols, rows, login),
     write: (data) => ipcRenderer.send('terminal:write', data),
     resize: (cols, rows) => ipcRenderer.send('terminal:resize', cols, rows),
     kill: () => ipcRenderer.send('terminal:kill'),
@@ -118,6 +118,20 @@ const api: Api = {
     context: (path) => ipcRenderer.send('terminal:context', path),
     onData: (cb) => on('terminal:data', cb),
     onExit: (cb) => on('terminal:exit', cb)
+  },
+  chat: {
+    start: () => ipcRenderer.send('chat:start'),
+    send: (text, files, page) => ipcRenderer.send('chat:send', text, files, page),
+    pick: () => ipcRenderer.invoke('chat:pick'),
+    setMode: (mode) => ipcRenderer.send('chat:mode', mode),
+    setModel: (model) => ipcRenderer.send('chat:model', model),
+    answer: (id, answer) => ipcRenderer.send('chat:answer', id, answer),
+    interrupt: () => ipcRenderer.send('chat:interrupt'),
+    stop: () => ipcRenderer.send('chat:stop'),
+    onStatus: (cb) => on('chat:status', cb),
+    onItem: (cb) => on('chat:item', cb),
+    onRequest: (cb) => on('chat:request', cb),
+    onSettled: (cb) => on('chat:settled', cb)
   },
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)

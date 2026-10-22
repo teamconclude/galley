@@ -11,6 +11,8 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,README.md}'
   - '!{.env,.env.*,.npmrc}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # The chat runs the editor's own Claude Code, so the Agent SDK's bundled copy stays out.
+  - '!node_modules/@anthropic-ai/claude-agent-sdk-*{,/**}'
 asarUnpack:
   - resources/**
 afterPack: scripts/pty-helper.cjs

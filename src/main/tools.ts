@@ -3,7 +3,7 @@ import { execFile, spawn } from 'child_process'
 import { createHash } from 'crypto'
 import { existsSync, promises as fs } from 'fs'
 import { homedir } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { token as githubToken } from './github'
 import { log } from './log'
 import { resolveCommand } from './shell'
@@ -145,6 +145,30 @@ const claudeHome = join(homedir(), '.local', 'bin', 'claude')
 export async function findClaude(): Promise<string | null> {
   if (pretendMissing('claude')) return null
   return (await resolveCommand('claude')) ?? (existsSync(claudeHome) ? claudeHome : null)
+}
+
+export interface ClaudeProcess {
+  // The claude binary; null when Claude Code is not installed.
+  bin: string | null
+  env: Record<string, string>
+  // Folders to put ahead of the login shell's PATH: claude's own, and the portable git's
+  // when that is what this Mac has, so Claude's git calls use it.
+  path: string[]
+}
+
+// How the pane starts Claude, in the terminal and in the chat alike.
+export async function claudeProcess(): Promise<ClaudeProcess> {
+  const env: Record<string, string> = {}
+  // Markers from a Claude session that launched the app would make the CLI think it is nested.
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined && !k.startsWith('CLAUDE')) env[k] = v
+  }
+  env.LANG ||= 'en_US.UTF-8'
+  // Git without Galley's GitHub token: Claude reads history but never pushes.
+  Object.assign(env, await gitToolEnv())
+  const [git, bin] = await Promise.all([findGit(), findClaude()])
+  const path = [bin && dirname(bin), git && dirname(git.bin)].filter((p): p is string => !!p)
+  return { bin, env, path }
 }
 
 // The official installer puts a native binary under ~/.local/bin without admin rights.

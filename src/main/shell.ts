@@ -8,3 +8,16 @@ export function resolveCommand(name: string): Promise<string | null> {
     })
   })
 }
+
+let pathCache: string | null = null
+
+// The login shell's PATH, for programs Galley starts without a shell.
+export function loginPath(): Promise<string> {
+  if (pathCache !== null) return Promise.resolve(pathCache)
+  return new Promise((resolve) => {
+    execFile('/bin/zsh', ['-lc', 'printf %s "$PATH"'], (err, stdout) => {
+      pathCache = err || !stdout ? (process.env['PATH'] ?? '/usr/bin:/bin') : stdout
+      resolve(pathCache)
+    })
+  })
+}

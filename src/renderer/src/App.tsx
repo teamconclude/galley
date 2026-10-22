@@ -58,7 +58,7 @@ import { UpdateButton } from './components/UpdateButton'
 import Welcome, { type SiteDialog } from './components/Welcome'
 import { join, split } from './lib/frontmatter'
 import { branchPrefix } from '../../shared/branchPrefix'
-import { askClaude } from './lib/claudeTerminal'
+import { askClaude } from './lib/claude'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
 import { usePages } from './lib/pages'
@@ -216,6 +216,10 @@ export default function App(): React.JSX.Element | null {
   const [prefs, setPrefs] = useState<Preferences | null>(null)
   const claudeOn = prefs?.claude !== false
   const [showSettings, setShowSettings] = useState(false)
+  const updatePrefs = (p: Preferences): void => {
+    setPrefs(p)
+    void window.api.prefs.set(p)
+  }
   useEffect(() => {
     void window.api.prefs.get().then(setPrefs)
   }, [])
@@ -1525,7 +1529,14 @@ export default function App(): React.JSX.Element | null {
               style={{ height: claudeHeight }}
               hidden={!showClaude || !claudeOn}
             >
-              {claudeOn && <ClaudePane repoPath={repo.path} />}
+              {claudeOn && prefs && (
+                <ClaudePane
+                  repoPath={repo.path}
+                  prefs={prefs}
+                  onPrefs={updatePrefs}
+                  openFile={filePath}
+                />
+              )}
             </section>
           </div>
         </div>
@@ -1766,10 +1777,7 @@ export default function App(): React.JSX.Element | null {
         {showSettings && prefs && (
           <SettingsDialog
             prefs={prefs}
-            onChange={(p) => {
-              setPrefs(p)
-              void window.api.prefs.set(p)
-            }}
+            onChange={updatePrefs}
             onClose={() => setShowSettings(false)}
           />
         )}

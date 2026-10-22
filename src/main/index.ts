@@ -17,6 +17,8 @@ import { pathToFileURL } from 'url'
 import { electronApp } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import type {
+  ChatAnswer,
+  ClaudeMode,
   CommitRange,
   Identity,
   Layout,
@@ -30,7 +32,8 @@ import type {
   SetupStepId
 } from '../shared/types'
 import { isDev } from './env'
-import { claudeArgs, receiveDrops, setContext } from './claude'
+import { claudeArgs, claudeLaunch, receiveDrops, setContext, type ClaudeLaunch } from './claude'
+import { ClaudeChat } from './chat'
 import { importDocument } from './convert'
 import { imageUses, planReplacement, renameImage, replaceImage } from './images'
 import { clone, Git, run as runGit } from './git'
@@ -72,6 +75,16 @@ const terminal = new ClaudeTerminal(
   (data) => send('terminal:data', data),
   (code) => send('terminal:exit', code)
 )
+const chat = new ClaudeChat({
+  status: (status) => send('chat:status', status),
+  item: (item) => send('chat:item', item),
+  request: (request) => send('chat:request', request),
+  settled: (id) => send('chat:settled', id)
+})
+
+// What the Claude pane starts with in the site that is open.
+const launch = async (opened: Repo): Promise<ClaudeLaunch> =>
+  claudeLaunch(await opened.site(), prefs(), await environmentSites(opened.path))
 
 const maxRecent = 8
 
@@ -110,6 +123,7 @@ function openRepo(path: string): void {
   repo?.close()
   git?.stop()
   terminal.kill()
+  chat.stop()
   repo = new Repo(path, (paths) => {
     send('repo:changed', paths)
     git?.scheduleRefresh()
@@ -500,11 +514,12 @@ function registerIpc(): void {
   ipcMain.on('preview:show', (_e, target: PreviewTarget) => {
     previewWin?.webContents.send('preview:target', target)
   })
-  ipcMain.on('terminal:start', async (_e, cols: number, rows: number) => {
+  // The terminal runs Claude Code itself, or its sign-in for the chat.
+  ipcMain.on('terminal:start', async (_e, cols: number, rows: number, login?: boolean) => {
     if (!repo) return
     terminal.resize(cols, rows)
     const opened = repo
-    const args = await claudeArgs(await opened.site(), prefs(), await environmentSites(opened.path))
+    const args = login ? ['auth', 'login'] : claudeArgs(await launch(opened))
     if (repo === opened) void terminal.start(opened.path, args)
   })
   ipcMain.handle('terminal:drop', (_e, paths: string[]) => receiveDrops(paths))
@@ -515,6 +530,24 @@ function registerIpc(): void {
   ipcMain.on('terminal:write', (_e, data: string) => terminal.write(data))
   ipcMain.on('terminal:resize', (_e, cols: number, rows: number) => terminal.resize(cols, rows))
   ipcMain.on('terminal:kill', () => terminal.kill())
+  ipcMain.on('chat:start', () => {
+    const opened = repo
+    if (opened) void chat.start(opened.path, () => launch(opened))
+  })
+  ipcMain.on('chat:send', async (_e, text: string, files: string[], page: string | null) => {
+    const url = page && repo ? await repo.pageUrl(page).catch(() => null) : null
+    chat.send(text, files, page ? { path: page, url } : null)
+  })
+  ipcMain.on('chat:mode', (_e, mode: ClaudeMode) => chat.setMode(mode))
+  ipcMain.on('chat:model', (_e, model: string | null) => chat.setModel(model))
+  // Files chosen to hand Claude, copied the way dropped ones are.
+  ipcMain.handle('chat:pick', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] })
+    return result.canceled ? [] : receiveDrops(result.filePaths)
+  })
+  ipcMain.on('chat:answer', (_e, id: string, answer: ChatAnswer) => chat.answer(id, answer))
+  ipcMain.on('chat:interrupt', () => chat.interrupt())
+  ipcMain.on('chat:stop', () => chat.stop())
   ipcMain.on('layout:get', (e) => {
     e.returnValue = loadSettings().layout ?? {}
   })
@@ -640,5 +673,6 @@ app.on('before-quit', () => {
   hugo.stop()
   git?.stop()
   terminal.kill()
+  chat.stop()
   repo?.close()
 })
