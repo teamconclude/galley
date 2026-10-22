@@ -3,6 +3,8 @@
 Galley is the editor for the [conclude.io](https://conclude.io) website. You find and edit
 pages, add pictures and new pages, see the result as you type, and send your work on its
 way to the live site, all in one window. This manual walks through each of those.
+**Help ▸ Galley Manual** (⌘?) shows it inside Galley, and Claude can answer questions about
+Galley from it.
 
 ![Galley with a blog post open: pages on the left, the page's settings and text in the middle, the preview on the right](images/overview.png)
 
@@ -67,8 +69,17 @@ needs nothing from you. Two steps do:
 - **The site.** Click to download the site into `~/Conclude/web`, or choose a copy you
   already have.
 
-The Claude step installs Claude Code; it asks you to sign in the first time you open the
-Claude pane. **Galley ▸ Setup…** shows the list again at any time.
+The Claude step installs Claude Code. The first time you open the Claude pane, it asks you
+to sign in with your Claude account. **Galley ▸ Setup…** shows the list again at any time.
+
+### Other sites
+
+Galley edits other Hugo sites too. **File ▸ Open Site…** (⌘O) opens a site that is already
+on your Mac, or copies one from GitHub: choose **From GitHub** and give the repository's
+address. **File ▸ New Site…** starts a new site from the Galley template, with a home page
+built from blocks, an about page and a blog. A new site stays on your Mac until a GitHub
+repository is added for it; until then the Changes tab says so, and merging happens on your
+Mac only. **File ▸ Open Recent** lists the sites you opened lately.
 
 ## The window
 
@@ -208,6 +219,14 @@ becomes the title, the text comes over with its headings, lists, tables and link
 its pictures go into the site. Notes above the headline, such as a proposed address, stay
 out of the page; the dialog shows them, and picks up a proposed address.
 
+### Copying, renaming and removing pages
+
+**File ▸ Duplicate Page…** copies the open page under a new name, as a start for a similar
+one. **Rename Page…** changes its file name. The file name is usually the page's address,
+so do not rename a page that is live, or links to it break. **Move Page to Trash…** removes
+it; until you commit, the arrow next to it in the Changes tab brings it back. Right-click a
+file in the list for the same commands, and for **New folder…**.
+
 ## The preview
 
 The preview shows the page as the site will show it, and follows along as you type and
@@ -215,7 +234,9 @@ move through the text. **Markdown** shows the plain-text version of the page tha
 offers to AI tools. **Separate window** moves the preview into its own window, for example
 for a second screen. **Open in Browser** opens it in your web browser.
 
-If the preview says the preview server stopped, click **Restart Hugo**.
+Hugo, the program behind the preview, starts again by itself if it stops. If it keeps
+stopping, the preview shows Hugo's message, which usually names the page at fault; fix
+that page and click **Restart Hugo**.
 
 ## Saving your work
 
@@ -333,20 +354,45 @@ If clicking the link does nothing, copy it and use **File ▸ Open Review Link�
 
 ## Claude
 
-The **Claude** button opens Claude, an AI assistant, at the bottom of the window. Ask it in
-plain words:
+The **Claude** button (⌘J) opens Claude, an AI assistant, at the bottom of the window. Type
+what you want in plain words and press Return; ⇧Return starts a new line.
 
 - "Draft a blog post about connecting Jira and Microsoft Teams, in the style of our other
   posts."
 - "Shorten the introduction of this page."
 - "Which pages mention our free trial?"
+- "How do I send my work to a colleague for review?" Claude knows this manual and answers
+  questions about Galley from it.
 
-Claude knows which page you have open, so "this page" works. It edits pages without asking
-each time, and you see every change in the Changes tab, where you commit or discard it as
-usual. Claude does not commit or publish.
+Claude answers in the pane, and each thing it does, such as reading or changing a page,
+shows as a line of its own; click a change to see it. Every change also appears in the
+Changes tab, where you commit or discard it as usual. Claude never commits, pushes or
+publishes.
 
-Drop files onto the Claude pane to give them to Claude, such as a Word draft or a
-screenshot. Word documents and web pages arrive as text with their links intact.
+**The open page.** The row below the text field shows the page you have open, and Claude
+is told about it with each message, so "this page" works. Its × leaves it out; it is back
+when you open another page, or click it.
+
+**Files.** Drop files onto the pane, or click **+**, to hand them to Claude, such as a Word
+draft or a screenshot. Word documents and web pages arrive as text with their links intact.
+
+**When Claude asks.** Sometimes Claude needs your go-ahead, for example to run a command,
+or asks a question with a few answers to choose from. It shows a card in the conversation:
+click **Allow** or **Don't allow**, or an answer. The button at the right of the row below
+the text field sets how often Claude asks:
+
+- **Auto**, the usual setting: Claude goes ahead with what is safe and asks when unsure.
+- **Ask before commands**: Claude changes files freely and asks before running anything.
+- **Ask before changes**: Claude shows each change to a file and asks before making it,
+  and asks before every command.
+
+**Stopping and starting over.** The square button, or Esc, stops Claude. **New
+conversation** at the top of the pane starts afresh. The model button in the row, such as
+**Opus 5.5**, switches between Opus, the most careful, and Sonnet, which is quicker.
+
+**Your Claude account.** Claude runs under your own Claude account, shown at the top of the
+pane. The first time, the pane offers **Sign in…**: sign in on the page that opens in your
+browser.
 
 ## Settings
 
@@ -355,13 +401,16 @@ screenshot. Word documents and web pages arrive as text with their links intact.
 - **Remove a merged branch from GitHub** (on): after you merge into develop, your branch
   disappears from GitHub to keep the list tidy. You keep working on it here, and your next
   commit brings it back.
-- **Claude Code pane**: turns Claude off entirely.
+- **Claude Code pane**: turns Claude off entirely; setup then does not install it.
+- **Claude pane shows**: a chat with Claude, or Claude Code's own terminal, the way
+  developers use it.
 - **Claude model**: Opus, the most careful, or Sonnet, which is quicker.
 
 ## Keyboard shortcuts
 
 | Shortcut | Does                           |
 | -------- | ------------------------------ |
+| ⌘O       | Open a site                    |
 | ⌘P       | Find a page                    |
 | ⌘N       | New page                       |
 | ⌘⇧N      | New page from a document       |
@@ -376,14 +425,17 @@ screenshot. Word documents and web pages arrive as text with their links intact.
 | ⌥⌘P      | Preview in a separate window   |
 | ⌥⌘R      | Reload the preview             |
 | ⌘J       | Show or hide Claude            |
+| Esc      | Stop Claude                    |
 | ⌘+, ⌘-   | Larger or smaller text         |
+| ⌘0       | Text at its usual size         |
 | ⌘,       | Settings                       |
+| ⌘?       | This manual                    |
 
 ## When something goes wrong
 
-**The preview is empty or says the server stopped.** Click **Restart Hugo** in the
-preview. If it stops again, a page probably has an error in its settings; the message
-names the file.
+**The preview is empty or says the server stopped.** Galley restarts Hugo by itself, so
+when the preview stays stopped, a page probably has an error in its settings; the message
+usually names the file. Fix it and click **Restart Hugo**.
 
 **"Could not reach GitHub."** Check your internet connection. Galley tries again by itself
 every few minutes; the ⋯ menu in the Changes tab has **Check for updates now**.
@@ -392,6 +444,12 @@ every few minutes; the ⋯ menu in the Changes tab has **Check for updates now**
 
 **My change is not on conclude.dev.** Check the Changes tab: the change must be committed
 and merged into develop. The site takes a few minutes to rebuild.
+
+**Claude asks for permission all the time.** Check the button at the right of the row
+below Claude's text field; **Auto** asks least.
+
+**Claude asks me to sign in.** Click **Sign in…** and sign in with your Claude account in
+the browser.
 
 **A link has a red wavy underline.** No page or file lives at that address. Check for a
 typo, or use Find Page to look up the right address.

@@ -88,15 +88,19 @@ folder, and notes above the headline, such as a proposed address, stay out of th
 **Preview.** The right side shows the page as it will look, updated after every change.
 **Separate window** moves it out of the main window, for example to a second screen.
 
-**Claude.** The Claude button opens Claude Code in the checkout. Ask it to draft a blog
-post, rewrite a section, or find where something is on the site. Galley starts it for an
-editor: it knows which page is open, edits pages without asking for each one, leaves
-commits and publishing to the Changes tab, and runs on the model chosen in Settings
-(Opus unless changed). Files dropped on the pane are copied where Claude can read them,
+**Claude.** The Claude button opens a chat with Claude Code, working in the checkout. Ask
+it to draft a blog post, rewrite a section, find where something is on the site, or how to
+do something in Galley, which it answers from the manual. Galley starts it for an editor:
+each message carries the open page, unless the editor leaves it out; it starts in auto
+mode, with a switch to asking before commands or before every change; requests for
+permission and Claude's questions appear as cards; commits and publishing stay with the
+Changes tab; and it runs on the model chosen in Settings (Opus unless changed). Files
+dropped on the pane, or chosen with its + button, are copied where Claude can read them,
 and Word or web documents arrive converted to Markdown by rule, so their text and links
-come through exactly. Galley's own skills, `galley:import-document` and
-`galley:add-images`, live in `resources/claude-plugin/`; anything about one particular
-site belongs in that site's CLAUDE.md and `.claude/skills/`.
+come through exactly. Settings can show Claude Code's own terminal instead of the chat.
+Galley's own skills, `galley:import-document` and `galley:add-images`, live in
+`resources/claude-plugin/`; anything about one particular site belongs in that site's
+CLAUDE.md and `.claude/skills/`.
 
 **Publishing.** The **Changes** tab lists what you changed and shows a diff for each file,
 or the picture for an image. Work happens on a branch: the branch menu creates one, named
@@ -127,7 +131,11 @@ offers the way back. **File ▸ Open Review Link…** takes a pasted link.
 
 Galley is an Electron app written in TypeScript with React, built with electron-vite. The
 main process talks to git and Hugo and serves the checkout to the renderer, where CodeMirror
-provides the editors and xterm.js the Claude pane.
+provides the editors. The Claude chat drives the editor's own installed Claude Code through
+the Agent SDK (`src/main/chat.ts`), so it runs under the account they signed in to Claude
+Code with; the SDK's bundled copy of Claude Code is left out of the app. xterm.js shows
+Claude Code's terminal, when chosen in Settings, and its sign-in. The manual and the site
+contract ship in the app's resources, where Claude reads them.
 
 ```sh
 npm install
@@ -172,6 +180,11 @@ and notarisation without further changes.
 
 `GALLEY_UPDATE_FEED=<url>` points the updater at another folder holding `latest-mac.yml` and
 the zip, to test updates against a local build.
+
+`GALLEY_USER_DATA=<folder>` gives a development build its own settings, downloads and logs,
+for testing without touching your own. Test with development builds: a packaged build from
+`npm run build:unpack` moves itself into /Applications when started, replacing the Galley
+installed there.
 
 ### Testing on a fresh Mac
 
