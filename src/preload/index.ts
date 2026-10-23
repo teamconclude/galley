@@ -137,7 +137,10 @@ const api: Api = {
     onStatus: (cb) => on('chat:status', cb),
     onItem: (cb) => on('chat:item', cb),
     onRequest: (cb) => on('chat:request', cb),
-    onSettled: (cb) => on('chat:settled', cb)
+    onSettled: (cb) => on('chat:settled', cb),
+    onCommit: (cb) => on('chat:commit', cb),
+    committed: (id, answer) => ipcRenderer.send('chat:committed', id, answer),
+    commitMessage: (files) => ipcRenderer.invoke('chat:commitMessage', files)
   },
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)

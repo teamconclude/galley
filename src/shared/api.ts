@@ -213,6 +213,12 @@ export interface Api {
     onItem: (cb: (item: ChatItem) => void) => Unsubscribe
     onRequest: (cb: (request: ChatRequest) => void) => Unsubscribe
     onSettled: (cb: (id: string) => void) => Unsubscribe
+    // Claude asks to commit; the window commits as its Commit button does and says how it
+    // went, for Claude to read.
+    onCommit: (cb: (id: string, message: string, files: string[] | null) => void) => Unsubscribe
+    committed: (id: string, answer: string) => void
+    // A message for committing these files, written by Claude in a session of its own.
+    commitMessage: (files: string[]) => Promise<string>
   }
   files: {
     pathFor: (file: File) => string

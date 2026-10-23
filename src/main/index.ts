@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import {
   app,
   BrowserWindow,
@@ -34,7 +35,7 @@ import type {
 } from '../shared/types'
 import { isDev } from './env'
 import { claudeArgs, claudeLaunch, receiveDrops, setContext, type ClaudeLaunch } from './claude'
-import { ClaudeChat } from './chat'
+import { ClaudeChat, writeCommitMessage } from './chat'
 import { importDocument } from './convert'
 import { imageUses, planReplacement, renameImage, replaceImage } from './images'
 import { clone, Git, run as runGit } from './git'
@@ -77,11 +78,21 @@ const terminal = new ClaudeTerminal(
   (data) => send('terminal:data', data),
   (code) => send('terminal:exit', code)
 )
+// Commits Claude asked for, waiting on the main window to make them.
+const commits = new Map<string, (answer: string) => void>()
+
 const chat = new ClaudeChat({
   status: (status) => send('chat:status', status),
   item: (item) => send('chat:item', item),
   request: (request) => send('chat:request', request),
-  settled: (id) => send('chat:settled', id)
+  settled: (id) => send('chat:settled', id),
+  commit: (message, files) =>
+    new Promise((resolve) => {
+      if (!win) return resolve('Galley has no window open, so nothing was committed.')
+      const id = randomUUID()
+      commits.set(id, resolve)
+      send('chat:commit', id, message, files)
+    })
 })
 
 // What the Claude pane starts with in the site that is open.
@@ -583,6 +594,13 @@ function registerIpc(): void {
   ipcMain.on('chat:answer', (_e, id: string, answer: ChatAnswer) => chat.answer(id, answer))
   ipcMain.on('chat:interrupt', () => chat.interrupt())
   ipcMain.on('chat:stop', () => chat.stop())
+  ipcMain.on('chat:committed', (_e, id: string, answer: string) => {
+    commits.get(id)?.(answer)
+    commits.delete(id)
+  })
+  ipcMain.handle('chat:commitMessage', async (_e, files: string[]) =>
+    writeCommitMessage(current().path, files, await launch(current()))
+  )
   ipcMain.on('layout:get', (e) => {
     e.returnValue = loadSettings().layout ?? {}
   })

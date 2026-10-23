@@ -6,6 +6,7 @@ import {
   FolderOpen,
   Plus,
   RotateCcw,
+  Sparkles,
   Trash2,
   TriangleAlert
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import type {
   RebaseState,
   ReleaseStep
 } from '../../../shared/types'
+import type { CommitDraft } from '../lib/commitDraft'
 import { ago } from '../lib/time'
 import CommitList from './CommitList'
 import FileIcon from './FileIcon'
@@ -30,9 +32,12 @@ interface Props {
   onShowDiff: (change: Change) => void
   onDiscard: (change: Change) => void
   onDiscardAll: (changes: Change[]) => void
-  // The message being written, kept by the caller while the panel is out of sight.
-  message: string
-  onMessage: (message: string) => void
+  // The commit being prepared, kept by the caller while the panel is out of sight.
+  draft: CommitDraft
+  onDraft: React.Dispatch<React.SetStateAction<CommitDraft>>
+  // Has Claude write the message for the files ticked; absent while Claude is off.
+  onWriteMessage?: (paths: string[]) => void
+  writingMessage: boolean
   onCommit: (message: string, paths: string[]) => Promise<boolean>
   onPush: () => void
   onPull: () => void
@@ -77,22 +82,13 @@ function pullRequestUrl(status: GitStatus): string | null {
 
 export default function ChangesPanel(props: Props): React.JSX.Element {
   const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
-  const { message, onMessage: setMessage } = props
+  const { draft, onDraft, onWriteMessage, writingMessage } = props
+  const { message, excluded } = draft
+  const setMessage = (text: string): void => onDraft((d) => ({ ...d, message: text }))
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch, onDeleteBranch } = props
   const { onMerge, onMove, onOutside, onRelease, onPublish } = props
   const { onContinue, onCancelRebase, onAskClaude } = props
-  const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [menuOpen, setMenuOpen] = useState(false)
-
-  // A new file that looks out of place starts left out of the commit, once; ticking it
-  // afterwards is the editor's choice.
-  const [warned, setWarned] = useState<Set<string>>(() => new Set())
-  const misplaced = (status?.changes ?? []).filter((c) => c.warning && !warned.has(c.path))
-  if (misplaced.length > 0) {
-    const paths = misplaced.map((c) => c.path)
-    setWarned(new Set([...warned, ...paths]))
-    setExcluded((prev) => new Set([...prev, ...paths]))
-  }
 
   if (!status) return <div className="pane-empty">Reading the repository…</div>
 
@@ -113,12 +109,12 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
     status.behind === 0
 
   const setIncluded = (paths: string[], include: boolean): void =>
-    setExcluded((prev) => {
-      const next = new Set(prev)
+    onDraft((d) => {
+      const next = new Set(d.excluded)
       for (const p of paths)
         if (include) next.delete(p)
         else next.add(p)
-      return next
+      return { ...d, excluded: next }
     })
 
   // Lists reload when GitHub was checked or a count moved.
@@ -327,8 +323,24 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
           <span className="changes-select">
             {changes.length > 1 && (
               <>
-                <button onClick={() => setExcluded(new Set())}>All</button>
-                <button onClick={() => setExcluded(new Set(changes.map((c) => c.path)))}>
+                <button
+                  onClick={() =>
+                    setIncluded(
+                      changes.map((c) => c.path),
+                      true
+                    )
+                  }
+                >
+                  All
+                </button>
+                <button
+                  onClick={() =>
+                    setIncluded(
+                      changes.map((c) => c.path),
+                      false
+                    )
+                  }
+                >
                   None
                 </button>
               </>
@@ -415,7 +427,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
         <div className="commit-box">
           <textarea
             rows={3}
-            placeholder="What did you change?"
+            placeholder={writingMessage ? 'Claude is writing the message…' : 'What did you change?'}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
@@ -423,8 +435,19 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
               e.preventDefault()
               if (canCommit) void commit()
             }}
-            disabled={busy}
+            disabled={busy || writingMessage}
           />
+          {onWriteMessage && !status.protected && (
+            <button
+              className="write-message"
+              disabled={busy || writingMessage || included.length === 0}
+              onClick={() => onWriteMessage(included.map((c) => c.path))}
+              title="Claude looks at the ticked changes and writes the message; it replaces what is in the box"
+            >
+              <Sparkles size={13} />
+              {writingMessage ? 'Writing…' : 'Write with Claude'}
+            </button>
+          )}
           {status.protected ? (
             <button className="primary" onClick={onNewBranch}>
               Create a branch to commit

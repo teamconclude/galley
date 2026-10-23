@@ -1,6 +1,7 @@
 import { execFile } from 'child_process'
 import { randomUUID } from 'crypto'
 import { basename } from 'path'
+import { z } from 'zod'
 import type {
   CanUseTool,
   Options,
@@ -28,7 +29,25 @@ export interface ChatEvents {
   request: (request: ChatRequest) => void
   // A request that no longer needs an answer, answered or not.
   settled: (id: string) => void
+  // Claude asks Galley to commit, as the Commit button would; the answer is for Claude.
+  commit: (message: string, files: string[] | null) => Promise<string>
 }
+
+// How a commit message reads, for the message Galley asks for and for commits Claude
+// makes from the chat.
+const commitStyle = `A commit message is for colleagues who edit the same site: a first line \
+of at most 60 characters that says what changed on the site, in plain words and the \
+imperative ("Add the pricing FAQ", "Fix the broken link on the about page"), and, when the \
+change is more than one thing or the reason is not obvious, a blank line and a few short \
+lines on what and why. No file paths unless they help, no technical terms, no emoji.`
+
+// Galley commits for Claude, so that the branch on GitHub follows as it does after the
+// Commit button, and the editor's checks apply.
+const commitPrompt = `
+- In this chat you can also commit for the editor: when they ask you to, use the commit \
+tool of the galley server, never git. Without files it commits the changes ticked in the Changes panel; name files only \
+when the editor wants just some of them. Look at the changes first (git status, git diff, \
+and read new files) to write the message. ${commitStyle}`
 
 // The SDK is an ES module; the main process loads it when the chat first starts.
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -96,6 +115,13 @@ function fileOf(input: Record<string, unknown>, cwd: string): string {
   return path.startsWith(cwd + '/') ? path.slice(cwd.length + 1) : basename(path)
 }
 
+const commitTool = 'mcp__galley__commit'
+const firstLine = (input: Record<string, unknown>): string => str(input['message']).split('\n')[0]
+const committed = (input: Record<string, unknown>): string => {
+  const files = Array.isArray(input['files']) ? input['files'].length : 0
+  return files === 0 ? 'the ticked changes' : files === 1 ? '1 file' : `${files} files`
+}
+
 // What Claude asks leave for, to follow "Claude wants to".
 function asking(tool: string, input: Record<string, unknown>, cwd: string): string {
   switch (tool) {
@@ -110,6 +136,8 @@ function asking(tool: string, input: Record<string, unknown>, cwd: string): stri
       const what = str(input['description'])
       return what ? what[0].toLowerCase() + what.slice(1) : 'run a command'
     }
+    case commitTool:
+      return `commit ${committed(input)} with the message “${firstLine(input)}”`
     case 'WebFetch':
       return `open ${str(input['url'])}`
     case 'WebSearch':
@@ -159,6 +187,11 @@ function describe(
       return { summary: `Searched the web for “${str(input['query'])}”` }
     case 'Skill':
       return { summary: `Followed the ${str(input['skill']).replace(/^.*:/, '')} instructions` }
+    case commitTool:
+      return {
+        summary: `Asked Galley to commit ${committed(input)}`,
+        detail: str(input['message'])
+      }
     case 'TodoWrite': {
       const todos = Array.isArray(input['todos'])
         ? (input['todos'] as Record<string, unknown>[])
@@ -223,9 +256,31 @@ export class ClaudeChat {
       const signedIn = await account(proc)
       if (!current()) return
       if (!signedIn.loggedIn) return this.setStatus({ state: 'signed-out' })
-      const [{ query }, l] = await Promise.all([loadSdk(), launch()])
+      const [{ query, createSdkMcpServer, tool }, l] = await Promise.all([loadSdk(), launch()])
       if (!current()) return
       const outbox = new Outbox()
+      const galley = createSdkMcpServer({
+        name: 'galley',
+        tools: [
+          tool(
+            'commit',
+            'Commits changes in Galley, which then brings the branch on GitHub up to date. ' +
+              'Without files, the changes ticked in the Changes panel are committed.',
+            {
+              message: z.string().describe('The commit message'),
+              files: z
+                .array(z.string())
+                .optional()
+                .describe('Paths relative to the checkout, when only some changes go in')
+            },
+            async ({ message, files }) => ({
+              content: [{ type: 'text', text: await this.events.commit(message, files ?? null) }]
+            }),
+            // Offered from the start, rather than found through a tool search first.
+            { alwaysLoad: true }
+          )
+        ]
+      })
       const q = query({
         prompt: outbox,
         options: {
@@ -236,7 +291,12 @@ export class ClaudeChat {
           settings: l.rules as Options['settings'],
           permissionMode: l.mode,
           additionalDirectories: l.dirs,
-          systemPrompt: { type: 'preset', preset: 'claude_code', append: l.rolePrompt },
+          systemPrompt: {
+            type: 'preset',
+            preset: 'claude_code',
+            append: l.rolePrompt + commitPrompt
+          },
+          mcpServers: { galley },
           plugins: l.plugin ? [{ type: 'local', path: l.plugin }] : [],
           model: l.model ?? undefined,
           includePartialMessages: true,
@@ -493,4 +553,60 @@ export class ClaudeChat {
         canAlways: !!suggestions?.length
       })
     })
+}
+
+// A commit message for the files about to be committed, from a session of its own that
+// nobody sees: Claude looks at the changes in the checkout, without leave to change
+// anything, and answers with the message alone.
+export async function writeCommitMessage(
+  cwd: string,
+  files: string[],
+  launch: ClaudeLaunch
+): Promise<string> {
+  const proc = await claudeProcess()
+  if (!proc.bin) throw new Error('Claude Code is not installed')
+  proc.env.PATH = [...proc.path, await loginPath()].join(':')
+  const { query } = await loadSdk()
+  const prompt =
+    'Write the commit message for these changes in the checkout:\n\n' +
+    files.map((f) => `- ${f}`).join('\n') +
+    '\n\nLook at them first: git diff for changed files (git diff HEAD -- <file>), and ' +
+    'read new ones. Answer with the message only, nothing before or after it.'
+  const q = query({
+    prompt,
+    options: {
+      cwd,
+      pathToClaudeCodeExecutable: proc.bin,
+      env: proc.env,
+      settings: launch.rules as Options['settings'],
+      model: launch.model ?? undefined,
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: commitStyle },
+      tools: ['Read', 'Glob', 'Grep', 'Bash'],
+      allowedTools: [
+        'Read',
+        'Glob',
+        'Grep',
+        'Bash(git diff *)',
+        'Bash(git status *)',
+        'Bash(git log *)',
+        'Bash(git show *)'
+      ],
+      // Anything not allowed above is refused without asking anyone.
+      permissionMode: 'dontAsk',
+      persistSession: false,
+      maxTurns: 20,
+      stderr: (data) => log('claude (commit message):', data.trim())
+    }
+  })
+  for await (const m of q) {
+    if (m.type !== 'result') continue
+    if (m.subtype !== 'success') throw new Error('Claude could not write a message')
+    // The changes are the editor's; Claude only wrote the message, so it signs nothing.
+    return m.result
+      .trim()
+      .replace(/^```\w*\n?|\n?```$/g, '')
+      .replace(/(\n\s*Co-Authored-By:.*)+$/i, '')
+      .trim()
+  }
+  throw new Error('Claude could not write a message')
 }

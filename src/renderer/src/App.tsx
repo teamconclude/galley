@@ -22,6 +22,7 @@ import type {
 } from '../../shared/types'
 import { EditorView } from '@codemirror/view'
 import ChangesPanel from './components/ChangesPanel'
+import { emptyDraft, newDraft, type CommitDraft } from './lib/commitDraft'
 import ClaudePane from './components/ClaudePane'
 import ConflictEditor from './components/ConflictEditor'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
@@ -219,7 +220,10 @@ export default function App(): React.JSX.Element | null {
   const [sidebarGroups, setSidebarGroups] = useState<PanelGroup[]>(layout.sidebarGroups)
   const showSidebarPanel = (tab: SidebarTab): void =>
     setSidebarGroups((groups) => showPanel(groups, tab))
-  const [commitMessage, setCommitMessage] = useState('')
+  const [draft, setDraft] = useState<CommitDraft>(emptyDraft)
+  const [writingMessage, setWritingMessage] = useState(false)
+  const settledDraft = newDraft(draft, gitStatus)
+  if (settledDraft !== draft) setDraft(settledDraft)
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null)
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [select, setSelect] = useState<Target | null>(null)
@@ -871,6 +875,58 @@ export default function App(): React.JSX.Element | null {
     }
   }
 
+  // Claude looks at the changes in a session of its own and writes the message, which the
+  // editor reads and commits as any other.
+  const writeMessage = async (paths: string[]): Promise<void> => {
+    await save()
+    setWritingMessage(true)
+    try {
+      const message = await window.api.chat.commitMessage(paths)
+      setDraft((d) => ({ ...d, message }))
+    } catch (e) {
+      fail(e)
+    } finally {
+      setWritingMessage(false)
+    }
+  }
+
+  // A commit Claude asked for in the chat, made as the Commit button makes one, with the
+  // ticked changes unless Claude names files. The answer is Claude's to read.
+  const commitForClaude = async (message: string, files: string[] | null): Promise<string> => {
+    const status = gitStatus
+    if (!status) return 'Galley has not read the repository yet; try again in a moment.'
+    if (status.rebase) {
+      return 'Bringing in changes stopped on a conflict. The editor settles it in the Changes panel first.'
+    }
+    if (status.protected) {
+      return `${status.branch} is a shared branch, so nothing was committed. The editor makes a branch of their own in the Changes panel first, which takes the changes along.`
+    }
+    const unknown = (files ?? []).filter((f) => !status.changes.some((c) => c.path === f))
+    if (unknown.length > 0) return `These have no changes to commit: ${unknown.join(', ')}.`
+    const paths = (
+      files
+        ? status.changes.filter((c) => files.includes(c.path))
+        : status.changes.filter((c) => !draft.excluded.has(c.path))
+    ).map((c) => c.path)
+    if (paths.length === 0) return 'There is nothing ticked to commit in the Changes panel.'
+    await save()
+    if (!identity && !(await window.api.git.identity())) {
+      setGitDialog('identity')
+      return 'Commits carry a name and email, which Galley has now asked the editor for. Nothing was committed yet; try again once they are filled in.'
+    }
+    try {
+      await window.api.git.commit(message, paths)
+    } catch (e) {
+      return `The commit failed: ${e instanceof Error ? e.message : String(e)}`
+    }
+    setDraft((d) => ({ ...d, message: '' }))
+    setDiff(null)
+    const count = paths.length === 1 ? '1 file' : `${paths.length} files`
+    return status.branch && !status.protected
+      ? `Committed ${count}. Galley brings the branch on GitHub up to date by itself.`
+      : `Committed ${count}.`
+  }
+
   const saveIdentity = async (id: Identity): Promise<void> => {
     setGitDialog(null)
     try {
@@ -1346,6 +1402,12 @@ export default function App(): React.JSX.Element | null {
   })
   useEffect(() => window.api.onMenu((command) => menuHandler.current(command)), [])
 
+  const commitAsked = useEffectEvent(
+    (id: string, message: string, files: string[] | null) =>
+      void commitForClaude(message, files).then((answer) => window.api.chat.committed(id, answer))
+  )
+  useEffect(() => window.api.chat.onCommit(commitAsked), [])
+
   // The preview in its own window reports as the one in this window does; a mouse's own
   // back and forward buttons step too.
   const navigated = useEffectEvent(previewNavigated)
@@ -1476,8 +1538,10 @@ export default function App(): React.JSX.Element | null {
                       onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
                       onDiscard={(c) => void discardChange(c)}
                       onDiscardAll={(cs) => void discardAll(cs)}
-                      message={commitMessage}
-                      onMessage={setCommitMessage}
+                      draft={draft}
+                      onDraft={setDraft}
+                      onWriteMessage={claudeOn ? (paths) => void writeMessage(paths) : undefined}
+                      writingMessage={writingMessage}
                       onCommit={commit}
                       onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
                       onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}

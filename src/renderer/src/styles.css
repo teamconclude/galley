@@ -2845,6 +2845,17 @@ button.chat-chip.off:hover {
   background: var(--bg);
 }
 
+.commit-box button.write-message {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.commit-box button.write-message svg {
+  color: var(--accent-text);
+}
+
 .commit-box button.primary:disabled {
   opacity: 0.5;
 }
