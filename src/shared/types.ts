@@ -355,8 +355,13 @@ export interface ImageReplacement {
 export type PreviewTarget =
   { kind: 'block'; index: number } | { kind: 'text'; snippet: string; heading: boolean }
 
-// Where the reader scrolled the preview to: its top, or the first text below the header.
-export type PreviewScroll = { top: true } | { text: string; heading: boolean }
+// Where the reader scrolled the preview to: whether at its top, the first pieces of text
+// below the header, top to bottom, and the top-level block there, if the page has blocks.
+export interface PreviewScroll {
+  top: boolean
+  texts: { text: string; heading: boolean }[]
+  block: number | null
+}
 
 export interface SearchResults {
   files: SearchFile[]

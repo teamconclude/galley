@@ -87,7 +87,8 @@ Mac only. **File ▸ Open Recent** lists the sites you opened lately.
   **Changes** shows your work and the next step for it, and **Search** searches the whole
   site. At first Files and Search share the top as two tabs and Changes sits below, so you
   see your pages and your changes at once.
-- **Middle: the open page.** Its settings at the top, its text below.
+- **Middle: the open page.** Its settings at the top, its text below. Galley starts on
+  the home page.
 - **Right: the preview**, the page as it will look on the site.
 - **Bottom: Claude**, when you open it.
 - **Top right:** the share button, which copies a link to your work for a colleague, and
@@ -251,7 +252,9 @@ in a category; those show in the preview, and the editor keeps the page you had.
 other websites open in your web browser.
 
 **Scrolling.** Scroll the preview and the text in the editor scrolls along to the same
-heading or paragraph. Your cursor stays where it was.
+heading or paragraph. Your cursor stays where it was. On a page built from content blocks,
+such as the home page, the block at the top of the preview is outlined in the list of
+blocks.
 
 **Back and forward.** The arrows at the left of the preview's bar, **View ▸ Back** (⌘[) and
 **View ▸ Forward** (⌘]), and the back and forward buttons of a mouse go through the pages

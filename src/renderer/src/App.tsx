@@ -52,7 +52,7 @@ import SearchPanel, { type SearchRequest } from './components/SearchPanel'
 import { BodyFollower } from './components/PreviewFollow'
 import Splitter from './components/Splitter'
 import { openFind } from './lib/findPanel'
-import { followPreview, forgetTarget, onShow } from './lib/previewScroll'
+import { followPreview, forgetTarget, onShow, setBlockInView } from './lib/previewScroll'
 import {
   restoreForm,
   restoreText,
@@ -375,6 +375,7 @@ export default function App(): React.JSX.Element | null {
 
   // Scrolling the preview scrolls the page's text to the same place.
   const previewScrolled = (scroll: PreviewScroll): void => {
+    setBlockInView(blocksPage ? scroll.block : null)
     if (bodyView) followPreview(bodyView, scroll)
   }
 
@@ -1171,6 +1172,7 @@ export default function App(): React.JSX.Element | null {
   const textPreview = filePath ? site.textPreviews[filePath] : undefined
   useEffect(() => {
     forgetTarget()
+    setBlockInView(null)
     if (!filePath) return
     if (textPreview) return
     let live = true
@@ -1181,6 +1183,18 @@ export default function App(): React.JSX.Element | null {
       live = false
     }
   }, [filePath, textPreview])
+
+  // A site opens on the page the preview starts with, its home page, in the editor too.
+  const startedIn = useRef<string | null>(null)
+  useEffect(() => {
+    if (!repoPath || filePath || startedIn.current === repoPath) return
+    startedIn.current = repoPath
+    void (async () => {
+      const path = (await window.api.repo.pageAt(pagePath)) ?? (await window.api.repo.pageAt('/'))
+      if (path && !fileRef.current) await open(path)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoPath, filePath])
 
   // Claude hears which page is open, so "this page" means what the editor sees.
   useEffect(() => window.api.terminal.context(filePath), [filePath])

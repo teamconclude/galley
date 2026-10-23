@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FieldDef } from '../../../shared/types'
 import {
   blankObject,
@@ -14,7 +14,7 @@ import {
 } from '../lib/schema'
 import { deleteAt, insertAt, moveItem, setValue, type Path } from '../lib/yamlEdit'
 import { useEdit } from '../lib/contexts'
-import { showBlock } from '../lib/previewScroll'
+import { showBlock, useBlockInView } from '../lib/previewScroll'
 import {
   BooleanControl,
   ChoiceControl,
@@ -189,6 +189,15 @@ function CardList(props: CardListProps): React.JSX.Element {
     const top = topLevel(index)
     if (top !== null && !Number.isNaN(top)) showBlock(top)
   }
+  // The page's own blocks mark the one the reader scrolled the preview to, and keep it in
+  // view here.
+  const inView = useBlockInView()
+  const shown = path.length === 1 && path[0] === currentListKey() ? inView : null
+  const cards = useRef<(HTMLDivElement | null)[]>([])
+  useEffect(() => {
+    if (shown !== null)
+      cards.current[shown]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [shown])
   return (
     <div className="block-list">
       {items.map((item, index) => {
@@ -198,7 +207,10 @@ function CardList(props: CardListProps): React.JSX.Element {
         return (
           <div
             key={index}
-            className={'block-card' + (isOpen ? ' open' : '')}
+            ref={(el) => {
+              cards.current[index] = el
+            }}
+            className={'block-card' + (isOpen ? ' open' : '') + (index === shown ? ' in-view' : '')}
             onMouseDownCapture={() => follow(index)}
           >
             <div

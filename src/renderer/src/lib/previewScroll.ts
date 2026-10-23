@@ -1,4 +1,6 @@
+import { useSyncExternalStore } from 'react'
 import { EditorView } from '@codemirror/view'
+import { textKey } from '../../../shared/previewScript'
 import type { PreviewScroll, PreviewTarget } from '../../../shared/types'
 
 // Tells the preview, in the window or detached, where to scroll to.
@@ -42,28 +44,56 @@ export function plainText(line: string): string {
     .trim()
 }
 
-// The editor's text scrolls to the line the reader scrolled the preview to, found by its
-// words as the preview finds the cursor's line; the cursor stays where it is, so the
-// preview does not follow back.
+// The editor's text scrolls to where the reader scrolled the preview to: the line of the
+// first piece of text in view that the text has, found by its words as the preview finds
+// the cursor's line. The cursor stays where it is, so the preview does not follow back.
 export function followPreview(view: EditorView, scroll: PreviewScroll): void {
-  if ('top' in scroll) {
+  if (scroll.top) {
     view.dispatch({ effects: EditorView.scrollIntoView(0, { y: 'start' }) })
     return
   }
   const doc = view.state.doc
-  const half = scroll.text.slice(0, Math.max(20, Math.floor(scroll.text.length / 2)))
-  let loose: number | null = null
+  const lines: { from: number; key: string; heading: boolean }[] = []
   for (let i = 1; i <= doc.lines; i++) {
     const line = doc.line(i)
-    if (scroll.heading && !/^#{1,6}\s/.test(line.text)) continue
-    const text = plainText(line.text)
-    if (!text) continue
-    if (text.startsWith(scroll.text)) {
-      loose = line.from
+    const key = textKey(plainText(line.text))
+    if (key) lines.push({ from: line.from, key, heading: /^#{1,6}\s/.test(line.text) })
+  }
+  let at: number | null = null
+  for (const { text, heading } of scroll.texts) {
+    const wanted = textKey(text)
+    const found = lines.find((l) => (!heading || l.heading) && l.key.startsWith(wanted))
+    if (found) {
+      at = found.from
       break
     }
-    if (loose === null && text.includes(half)) loose = line.from
   }
-  if (loose === null) return
-  view.dispatch({ effects: EditorView.scrollIntoView(loose, { y: 'start', yMargin: 24 }) })
+  // A paragraph the page shows differently, e.g. split by a shortcode, may still hold
+  // the start of the first piece.
+  if (at === null && scroll.texts.length > 0) {
+    const wanted = textKey(scroll.texts[0].text)
+    const half = wanted.slice(0, Math.max(20, Math.floor(wanted.length / 2)))
+    at = lines.find((l) => l.key.includes(half))?.from ?? null
+  }
+  if (at === null) return
+  view.dispatch({ effects: EditorView.scrollIntoView(at, { y: 'start', yMargin: 24 }) })
 }
+
+// The top-level block the reader scrolled the preview to, which the page's blocks mark.
+let blockInView: number | null = null
+const blockListeners = new Set<() => void>()
+
+export function setBlockInView(index: number | null): void {
+  if (index === blockInView) return
+  blockInView = index
+  for (const l of blockListeners) l()
+}
+
+export const useBlockInView = (): number | null =>
+  useSyncExternalStore(
+    (cb) => {
+      blockListeners.add(cb)
+      return () => blockListeners.delete(cb)
+    },
+    () => blockInView
+  )
