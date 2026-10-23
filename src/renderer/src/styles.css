@@ -2260,6 +2260,55 @@ button.chat-chip.off:hover {
   border-bottom-color: var(--accent);
 }
 
+/* Panel groups stack in the sidebar; the last one takes the room the others leave. */
+.panels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Squeezed below its natural height, the Changes panel scrolls as a whole. */
+.panel > .changes {
+  overflow-y: auto;
+}
+
+.sidebar-tabs.over {
+  background: var(--accent-soft);
+}
+
+.panel-drop {
+  flex: none;
+  margin: 4px 8px;
+  padding: 6px;
+  border: 1px dashed var(--gray4);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.panel-drop.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
 .sidebar-tabs .badge {
   display: inline-block;
   min-width: 18px;

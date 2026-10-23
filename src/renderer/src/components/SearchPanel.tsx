@@ -20,7 +20,6 @@ interface Preview {
 }
 
 interface Props {
-  hidden: boolean
   request: SearchRequest | null
   selected: { path: string; line: number; column: number } | null
   onOpen: (path: string, match: SearchMatch) => void
@@ -40,7 +39,7 @@ const summary = (r: SearchResults): string =>
       (r.truncated ? ', showing the first ones' : '')
 
 export default function SearchPanel(props: Props): React.JSX.Element {
-  const { hidden, request, selected, onOpen, onReplaceAll } = props
+  const { request, selected, onOpen, onReplaceAll } = props
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState(defaults)
   const [replace, setReplace] = useState(false)
@@ -127,7 +126,7 @@ export default function SearchPanel(props: Props): React.JSX.Element {
   )
 
   return (
-    <div className="search" hidden={hidden}>
+    <div className="search">
       <div className="search-form">
         <div className="search-fields">
           <button

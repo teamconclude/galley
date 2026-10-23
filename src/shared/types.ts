@@ -244,7 +244,7 @@ export interface Layout {
   previewWidth: number
   claudeHeight: number
   frontmatterHeight: number
-  sidebarTab: SidebarTab
+  sidebarGroups: PanelGroup[]
   showAllFiles: boolean
   // Content folders list pages by title and date rather than by file name.
   showTitles: boolean
@@ -268,6 +268,14 @@ export interface PreviewState {
 }
 
 export type SidebarTab = 'files' | 'changes' | 'search'
+
+// The sidebar's panels, top to bottom. A group shows its panels as tabs, one at a time.
+export interface PanelGroup {
+  tabs: SidebarTab[]
+  active: SidebarTab
+  // In pixels; the last group takes whatever room is left.
+  height: number
+}
 
 export interface SearchOptions {
   ignoreCase: boolean

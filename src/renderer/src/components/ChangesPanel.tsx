@@ -30,6 +30,9 @@ interface Props {
   onShowDiff: (change: Change) => void
   onDiscard: (change: Change) => void
   onDiscardAll: (changes: Change[]) => void
+  // The message being written, kept by the caller while the panel is out of sight.
+  message: string
+  onMessage: (message: string) => void
   onCommit: (message: string, paths: string[]) => Promise<boolean>
   onPush: () => void
   onPull: () => void
@@ -74,10 +77,10 @@ function pullRequestUrl(status: GitStatus): string | null {
 
 export default function ChangesPanel(props: Props): React.JSX.Element {
   const { status, me, selected, onShowDiff, onDiscard, onDiscardAll, onCommit } = props
+  const { message, onMessage: setMessage } = props
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch, onDeleteBranch } = props
   const { onMerge, onMove, onOutside, onRelease, onPublish } = props
   const { onContinue, onCancelRebase, onAskClaude } = props
-  const [message, setMessage] = useState('')
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [menuOpen, setMenuOpen] = useState(false)
 

@@ -1,4 +1,5 @@
 import type { Layout } from '../../../shared/types'
+import { defaultGroups, settleGroups } from './panels'
 
 const defaults: Layout = {
   showPreview: true,
@@ -8,13 +9,16 @@ const defaults: Layout = {
   previewWidth: 600,
   claudeHeight: 300,
   frontmatterHeight: 280,
-  sidebarTab: 'files',
+  sidebarGroups: defaultGroups,
   showAllFiles: false,
   showTitles: true,
   previewMode: 'html'
 }
 
 // The saved layout arrives with the preload, so the first render already has it.
-export const loadLayout = (): Layout => ({ ...defaults, ...window.api.layout.initial })
+export function loadLayout(): Layout {
+  const saved: Partial<Layout> = window.api.layout.initial
+  return { ...defaults, ...saved, sidebarGroups: settleGroups(saved.sidebarGroups) }
+}
 
 export const saveLayout = (layout: Layout): void => window.api.layout.save(layout)

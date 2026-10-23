@@ -16,6 +16,7 @@ import type {
   Preferences,
   SearchMatch,
   SearchOptions,
+  PanelGroup,
   SidebarTab
 } from '../../shared/types'
 import { EditorView } from '@codemirror/view'
@@ -51,6 +52,8 @@ import Splitter from './components/Splitter'
 import { openFind } from './lib/findPanel'
 import { forgetTarget, onShow } from './lib/previewScroll'
 import { loadLayout, saveLayout } from './lib/layout'
+import { showPanel } from './lib/panels'
+import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
 import SettingsDialog from './components/SettingsDialog'
@@ -199,7 +202,10 @@ export default function App(): React.JSX.Element | null {
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null)
   const [identity, setIdentity] = useState<Identity | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(layout.sidebarTab)
+  const [sidebarGroups, setSidebarGroups] = useState<PanelGroup[]>(layout.sidebarGroups)
+  const showSidebarPanel = (tab: SidebarTab): void =>
+    setSidebarGroups((groups) => showPanel(groups, tab))
+  const [commitMessage, setCommitMessage] = useState('')
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null)
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [select, setSelect] = useState<Target | null>(null)
@@ -655,7 +661,7 @@ export default function App(): React.JSX.Element | null {
   // Find works in the editor with focus, else in the page body or the settings as YAML;
   // without any editor, it searches the site.
   const findInSite = useCallback((replace: boolean): void => {
-    setSidebarTab('search')
+    showSidebarPanel('search')
     setSearchRequest({ tick: Date.now(), text: selectedText(), replace })
   }, [])
 
@@ -944,7 +950,7 @@ export default function App(): React.JSX.Element | null {
     }
     setReviewLink(null)
     setDiff(null)
-    setSidebarTab('files')
+    showSidebarPanel('files')
     // The page may exist only on the branch just opened, so its address is looked up anew.
     const path =
       linkedPage(link) ?? (link.url ? await window.api.repo.pageAt(pageAddress(link.url)) : null)
@@ -1075,7 +1081,7 @@ export default function App(): React.JSX.Element | null {
       previewWidth,
       claudeHeight,
       frontmatterHeight,
-      sidebarTab,
+      sidebarGroups,
       showAllFiles,
       showTitles,
       previewMode
@@ -1088,7 +1094,7 @@ export default function App(): React.JSX.Element | null {
     previewWidth,
     claudeHeight,
     frontmatterHeight,
-    sidebarTab,
+    sidebarGroups,
     showAllFiles,
     showTitles,
     previewMode
@@ -1320,88 +1326,84 @@ export default function App(): React.JSX.Element | null {
         )}
         <div className="body">
           <aside className="sidebar" style={{ width: sidebarWidth }}>
-            <div className="sidebar-tabs">
-              <button
-                className={sidebarTab === 'files' ? 'on' : ''}
-                onClick={() => setSidebarTab('files')}
-              >
-                Files
-              </button>
-              <button
-                className={sidebarTab === 'changes' ? 'on' : ''}
-                onClick={() => setSidebarTab('changes')}
-              >
-                Changes
-                {gitStatus && gitStatus.changes.length > 0 && (
-                  <span className="badge">{gitStatus.changes.length}</span>
-                )}
-              </button>
-              <button
-                className={sidebarTab === 'search' ? 'on' : ''}
-                onClick={() => setSidebarTab('search')}
-              >
-                Search
-              </button>
-            </div>
-            <SearchPanel
-              hidden={sidebarTab !== 'search'}
-              request={searchRequest}
-              selected={searchHit}
-              onOpen={(path, match) => void openMatch(path, match)}
-              onReplaceAll={replaceAll}
-            />
-            {sidebarTab === 'search' ? null : sidebarTab === 'files' ? (
-              <FileTree
-                name={repo.name}
-                selected={file?.path ?? null}
-                expanded={expanded}
-                onToggle={toggleDir}
-                onSelect={(path) => void open(path)}
-                onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
-                onDropFiles={(dir, files) => void dropFiles(dir, files)}
-                onDragImage={setDraggedImage}
-                onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
-                onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
-                onRefresh={() => setTreeVersion((v) => v + 1)}
-                onCollapseAll={() => setExpanded(new Set())}
-                showAll={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles(!showAllFiles)}
-                pages={pages}
-                showTitles={showTitles}
-                onToggleTitles={() => setShowTitles(!showTitles)}
-                onFindPage={() => setFinding(true)}
-                version={treeVersion}
-              />
-            ) : (
-              <ChangesPanel
-                status={gitStatus}
-                me={identity}
-                selected={diff?.change.path ?? null}
-                onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
-                onDiscard={(c) => void discardChange(c)}
-                onDiscardAll={(cs) => void discardAll(cs)}
-                onCommit={commit}
-                onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
-                onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
-                onUpdate={() => void save().then(() => gitAction(() => window.api.git.update()))}
-                onContinue={() => void continueRebase()}
-                onCancelRebase={() => void cancelRebase()}
-                onAskClaude={claudeOn ? resolveWithClaude : undefined}
-                onFetch={() => void gitAction(() => window.api.git.fetch())}
-                onNewBranch={() => setGitDialog('new-branch')}
-                onMerge={() => setGitDialog('merge')}
-                onMove={() => setGitDialog('move')}
-                onOutside={(entry, action) =>
-                  action === 'reveal'
-                    ? void window.api.repo.reveal(entry.path)
-                    : setOutsideDialog({ entry, action })
+            <Sidebar
+              groups={sidebarGroups}
+              onGroups={setSidebarGroups}
+              panels={{
+                files: {
+                  content: (
+                    <FileTree
+                      name={repo.name}
+                      selected={file?.path ?? null}
+                      expanded={expanded}
+                      onToggle={toggleDir}
+                      onSelect={(path) => void open(path)}
+                      onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
+                      onDropFiles={(dir, files) => void dropFiles(dir, files)}
+                      onDragImage={setDraggedImage}
+                      onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
+                      onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
+                      onRefresh={() => setTreeVersion((v) => v + 1)}
+                      onCollapseAll={() => setExpanded(new Set())}
+                      showAll={showAllFiles}
+                      onToggleShowAll={() => setShowAllFiles(!showAllFiles)}
+                      pages={pages}
+                      showTitles={showTitles}
+                      onToggleTitles={() => setShowTitles(!showTitles)}
+                      onFindPage={() => setFinding(true)}
+                      version={treeVersion}
+                    />
+                  )
+                },
+                changes: {
+                  badge: gitStatus?.changes.length,
+                  content: (
+                    <ChangesPanel
+                      status={gitStatus}
+                      me={identity}
+                      selected={diff?.change.path ?? null}
+                      onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
+                      onDiscard={(c) => void discardChange(c)}
+                      onDiscardAll={(cs) => void discardAll(cs)}
+                      message={commitMessage}
+                      onMessage={setCommitMessage}
+                      onCommit={commit}
+                      onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
+                      onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
+                      onUpdate={() =>
+                        void save().then(() => gitAction(() => window.api.git.update()))
+                      }
+                      onContinue={() => void continueRebase()}
+                      onCancelRebase={() => void cancelRebase()}
+                      onAskClaude={claudeOn ? resolveWithClaude : undefined}
+                      onFetch={() => void gitAction(() => window.api.git.fetch())}
+                      onNewBranch={() => setGitDialog('new-branch')}
+                      onMerge={() => setGitDialog('merge')}
+                      onMove={() => setGitDialog('move')}
+                      onOutside={(entry, action) =>
+                        action === 'reveal'
+                          ? void window.api.repo.reveal(entry.path)
+                          : setOutsideDialog({ entry, action })
+                      }
+                      onRelease={setReleaseDialog}
+                      onPublish={setReleaseDialog}
+                      onSwitchBranch={() => void openSwitchBranch()}
+                      onDeleteBranch={() => void openDeleteBranch()}
+                    />
+                  )
+                },
+                search: {
+                  content: (
+                    <SearchPanel
+                      request={searchRequest}
+                      selected={searchHit}
+                      onOpen={(path, match) => void openMatch(path, match)}
+                      onReplaceAll={replaceAll}
+                    />
+                  )
                 }
-                onRelease={setReleaseDialog}
-                onPublish={setReleaseDialog}
-                onSwitchBranch={() => void openSwitchBranch()}
-                onDeleteBranch={() => void openDeleteBranch()}
-              />
-            )}
+              }}
+            />
           </aside>
           <Splitter
             direction="horizontal"
