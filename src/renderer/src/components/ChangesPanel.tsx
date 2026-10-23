@@ -138,6 +138,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
     </CountRow>
   )
 
+  const canCommit = !busy && !status.protected && message.trim() !== '' && included.length > 0
   const commit = async (): Promise<void> => {
     const doubtful = included.filter((c) => c.warning)
     if (doubtful.length > 0) {
@@ -414,6 +415,11 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
             placeholder="What did you change?"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || !e.metaKey) return
+              e.preventDefault()
+              if (canCommit) void commit()
+            }}
             disabled={busy}
           />
           {status.protected ? (
@@ -421,11 +427,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
               Create a branch to commit
             </button>
           ) : (
-            <button
-              className="primary"
-              disabled={busy || message.trim() === '' || included.length === 0}
-              onClick={() => void commit()}
-            >
+            <button className="primary" disabled={!canCommit} onClick={() => void commit()}>
               Commit {plural(included.length, 'file')}
             </button>
           )}
