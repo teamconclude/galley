@@ -42,7 +42,7 @@ export default function PageFinder({ pages, onOpen, onClose }: Props): React.JSX
         <input
           autoFocus
           type="search"
-          placeholder="Find a page by title, address or file name…"
+          placeholder="Find a page by title, address, link or file name…"
           value={query}
           spellCheck={false}
           onChange={(e) => {

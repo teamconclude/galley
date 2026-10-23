@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { pageAddress, parseReviewLink } from '../../../shared/reviewLink'
 import type { PageInfo } from '../../../shared/types'
 
 // The site's pages by path, loaded when the site opens and again after changes to its
@@ -79,9 +80,13 @@ export interface PageMatch {
 // Pages whose title, address, aliases or file name hold every word of the query; matches
 // in the title first, then the address, aliases and file name, newest first within each.
 // An empty query lists the newest pages.
-export function findPages(pages: Iterable<PageInfo>, query: string, limit = 50): PageMatch[] {
-  const words = fold(query).split(/\s+/).filter(Boolean)
+export function findPages(pages: Iterable<PageInfo>, text: string, limit = 50): PageMatch[] {
   const all = [...pages]
+  // A pasted link is looked up by its address, and the page at it comes first.
+  const link = linkAddress(text)
+  const exact = link ? pageAt(all, link) : null
+  const query = link ?? text
+  const words = fold(query).split(/\s+/).filter(Boolean)
   if (words.length === 0) {
     return all
       .sort(newest)
@@ -98,6 +103,10 @@ export function findPages(pages: Iterable<PageInfo>, query: string, limit = 50):
     const has = (w: string): boolean =>
       title.includes(w) || url.includes(w) || file.includes(w) || aliases.some((a) => a.includes(w))
     if (!words.every(has)) continue
+    if (page === exact?.page) {
+      ranked.push({ match: exact, rank: -1 })
+      continue
+    }
     let rank = 5
     let alias: string | null = null
     if (title.startsWith(whole)) rank = 0
@@ -117,4 +126,34 @@ export function findPages(pages: Iterable<PageInfo>, query: string, limit = 50):
     .sort((a, b) => a.rank - b.rank || newest(a.match.page, b.match.page))
     .slice(0, limit)
     .map((r) => r.match)
+}
+
+// The page at an address, or the one forwarding from it as an alias.
+export function pageAt(pages: Iterable<PageInfo>, address: string): PageMatch | null {
+  let forwarding: PageMatch | null = null
+  for (const page of pages) {
+    if (page.url === address) return { page, alias: null }
+    if (!forwarding && page.aliases.includes(address)) forwarding = { page, alias: address }
+  }
+  return forwarding
+}
+
+// The address a link to the site points at, whichever copy of the site it names: the
+// live one, the preview or a review link. https://conclude.io/blog/x?ref=1#top gives
+// /blog/x/. Null for text that is not a link.
+export function linkAddress(text: string): string | null {
+  const trimmed = text.trim()
+  const review = parseReviewLink(trimmed)
+  if (review) return review.url && pageAddress(review.url)
+  // A link copied from the address bar may come without its scheme.
+  const withScheme = /^[\w-]+(\.[\w-]+)+(:\d+)?(\/|$)/.test(trimmed)
+    ? `https://${trimmed}`
+    : trimmed
+  if (!/^[a-z]+:\/\/\S+$/i.test(withScheme)) return null
+  try {
+    const path = decodeURI(new URL(withScheme).pathname).replace(/\/index\.html$/, '/')
+    return pageAddress(path)
+  } catch {
+    return null
+  }
 }

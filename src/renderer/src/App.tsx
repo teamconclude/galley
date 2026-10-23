@@ -61,7 +61,7 @@ import { branchPrefix } from '../../shared/branchPrefix'
 import { askClaude } from './lib/claude'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
-import { usePages } from './lib/pages'
+import { pageAt, usePages } from './lib/pages'
 import { placeInBody, resizeTag, swapInBody, swapInSettings } from './lib/previewDrop'
 import { pageAddress, reviewLink as makeReviewLink, type ReviewLink } from '../../shared/reviewLink'
 import { currentListKey } from './lib/schema'
@@ -925,11 +925,7 @@ export default function App(): React.JSX.Element | null {
   const linkedPage = (link: ReviewLink): string | null => {
     if (link.page) return link.page.startsWith(site.contentDir + '/') ? link.page : null
     if (!link.url) return null
-    const url = pageAddress(link.url)
-    const all = [...pages.values()]
-    return (
-      (all.find((p) => p.url === url) ?? all.find((p) => p.aliases.includes(url)))?.path ?? null
-    )
+    return pageAt(pages.values(), pageAddress(link.url))?.page.path ?? null
   }
 
   // Commits the editor's own changes where they are, switches to the reviewed branch and
