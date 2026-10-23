@@ -431,7 +431,10 @@ export interface Preferences {
   claudeView: ClaudeView
   // How much the chat asks before Claude acts.
   claudeMode: ClaudeMode
+  appearance: Appearance
 }
+
+export type Appearance = 'system' | 'light' | 'dark'
 
 export type ClaudeModel = 'opus' | 'sonnet' | 'default'
 

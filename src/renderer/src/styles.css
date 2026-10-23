@@ -23,6 +23,8 @@
   --blue1: #f3f6ff;
 
   --bg: #ffffff;
+  /* Menus, dialogs and the finder, which float over the window. */
+  --bg-raised: var(--bg);
   --bg-muted: var(--gray1);
   --border: var(--gray2);
   /* Unlike the site, the editor's small type is black, easing to gray7 on hover. */
@@ -34,8 +36,78 @@
   --accent-text: var(--green5);
   --accent-soft: var(--green2);
   --danger: var(--red3);
+  /* Tints over whatever lies below: a hovered button, a hovered row, a faint rule. */
+  --tint: rgb(0 0 0 / 7%);
+  --tint-faint: rgb(0 0 0 / 3%);
+  --rule-faint: rgb(0 0 0 / 10%);
+  /* The squares behind a picture, so its transparent parts show as such. */
+  --checker: #f0f0f2;
   --font: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --mono: Menlo, Monaco, 'SF Mono', monospace;
+  color-scheme: light;
+}
+
+/* The dark palette of the app's theme.tsx. Its ramps count by contrast against the
+   background, so each step takes the place of the same step in the light one. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gray7: #f8f8f8;
+    --gray6: #d3d3d3;
+    --gray5: #a0a0a0;
+    --gray4: #777777;
+    --gray3: #505050;
+    --gray2: #3e3e3e;
+    --gray1: #2a2a2a;
+    --green5: #c6ece6;
+    --green4: #3bbfad;
+    --green3: #2f996d;
+    --green2: #237352;
+    --green1: #184c36;
+    --red5: #ffd9dd;
+    --red3: #bc2f32;
+    --red2: #751d1f;
+    --red1: #3f1011;
+    --yellow5: #ffd666;
+    --yellow3: #ffd666;
+    --yellow1: #403c30;
+    --blue3: #8aa4ff;
+    --blue1: #1a1f2b;
+
+    --bg: #1a1a1a;
+    --bg-raised: #242424;
+    --text: var(--gray7);
+    --text-hover: #ffffff;
+    --tint: rgb(255 255 255 / 8%);
+    --tint-faint: rgb(255 255 255 / 4%);
+    --rule-faint: rgb(255 255 255 / 12%);
+    --checker: #2a2a2a;
+    color-scheme: dark;
+  }
+
+  /* Shadows hardly show on a dark window; an edge marks where a floating surface ends. */
+  .finder,
+  .modal,
+  .dialog {
+    box-shadow:
+      0 0 0 1px var(--gray2),
+      0 20px 60px rgb(0 0 0 / 60%);
+  }
+
+  /* CodeMirror's own theme is a light one. */
+  .cm-editor .cm-cursor,
+  .cm-editor .cm-dropCursor {
+    border-left-color: var(--text) !important;
+  }
+  .cm-editor .cm-selectionBackground {
+    background: #3a3a3a !important;
+  }
+  .cm-editor.cm-focused .cm-selectionBackground {
+    background: #2d4a46 !important;
+  }
+  .cm-editor .cm-activeLine,
+  .cm-editor .cm-activeLineGutter {
+    background: var(--tint-faint) !important;
+  }
 }
 
 * {
@@ -273,7 +345,7 @@ button.primary:disabled:hover {
 
 .tree-actions button:hover,
 .tree-actions button.on {
-  background: rgba(0, 0, 0, 0.07);
+  background: var(--tint);
   color: var(--text-hover);
 }
 
@@ -291,7 +363,7 @@ button.primary:disabled:hover {
 }
 
 .tree-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--tint-faint);
   color: var(--text-hover);
 }
 
@@ -303,7 +375,7 @@ button.primary:disabled:hover {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 1px solid var(--rule-faint);
 }
 
 .tree-arrow {
@@ -393,7 +465,7 @@ button.primary:disabled:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--bg-raised);
   border-radius: 10px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
@@ -795,7 +867,7 @@ body.dragging .terminal-host {
   align-items: stretch;
   gap: 2px;
   padding: 4px 6px 4px 2px;
-  background: var(--bg);
+  background: var(--bg-raised);
   border: 1px solid var(--gray3);
   border-top: none;
   border-radius: 0 0 6px 6px;
@@ -901,6 +973,7 @@ body.dragging .terminal-host {
 
 .editor .cm-searchMatch.cm-searchMatch-selected {
   background: var(--yellow3);
+  color: #000000;
 }
 
 .editor.prose .cm-code-line {
@@ -917,8 +990,14 @@ body.dragging .terminal-host {
   overflow: auto;
   padding: 24px;
   background:
-    linear-gradient(45deg, #f0f0f2 25%, transparent 25%, transparent 75%, #f0f0f2 75%),
-    linear-gradient(45deg, #f0f0f2 25%, transparent 25%, transparent 75%, #f0f0f2 75%);
+    linear-gradient(
+      45deg,
+      var(--checker) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--checker) 75%
+    ),
+    linear-gradient(45deg, var(--checker) 25%, transparent 25%, transparent 75%, var(--checker) 75%);
   background-size: 20px 20px;
   background-position:
     0 0,
@@ -1705,7 +1784,7 @@ button.chat-chip.off:hover {
 .modal {
   width: min(900px, 90vw);
   height: min(700px, 85vh);
-  background: var(--bg);
+  background: var(--bg-raised);
   border-radius: 10px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -1770,8 +1849,14 @@ button.chat-chip.off:hover {
   height: 90px;
   object-fit: contain;
   background:
-    linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%),
-    linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%);
+    linear-gradient(
+      45deg,
+      var(--checker) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--checker) 75%
+    ),
+    linear-gradient(45deg, var(--checker) 25%, transparent 25%, transparent 75%, var(--checker) 75%);
   background-size: 12px 12px;
   background-position:
     0 0,
@@ -1847,8 +1932,14 @@ button.chat-chip.off:hover {
   border: 1px solid var(--border);
   border-radius: 6px;
   background:
-    linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%),
-    linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%);
+    linear-gradient(
+      45deg,
+      var(--checker) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--checker) 75%
+    ),
+    linear-gradient(45deg, var(--checker) 25%, transparent 25%, transparent 75%, var(--checker) 75%);
   background-size: 12px 12px;
   background-position:
     0 0,
@@ -1927,7 +2018,7 @@ button.chat-chip.off:hover {
   z-index: 20;
   min-width: 180px;
   padding: 4px;
-  background: var(--bg);
+  background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
@@ -1992,7 +2083,7 @@ button.chat-chip.off:hover {
 
 .dialog {
   width: min(460px, 90vw);
-  background: var(--bg);
+  background: var(--bg-raised);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   padding: 18px 20px;
@@ -2359,7 +2450,7 @@ button.chat-chip.off:hover {
   flex-direction: column;
   min-width: 190px;
   padding: 4px;
-  background: var(--bg);
+  background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
@@ -2669,8 +2760,14 @@ button.chat-chip.off:hover {
   max-height: 60vh;
   object-fit: contain;
   background:
-    linear-gradient(45deg, #f0f0f2 25%, transparent 25%, transparent 75%, #f0f0f2 75%),
-    linear-gradient(45deg, #f0f0f2 25%, transparent 25%, transparent 75%, #f0f0f2 75%);
+    linear-gradient(
+      45deg,
+      var(--checker) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--checker) 75%
+    ),
+    linear-gradient(45deg, var(--checker) 25%, transparent 25%, transparent 75%, var(--checker) 75%);
   background-size: 20px 20px;
   background-position:
     0 0,
@@ -2773,7 +2870,7 @@ button.chat-chip.off:hover {
    through: the same shades as --bg-muted, --blue1 and --green1, but translucent. */
 .cm-line.cm-conflict-marker {
   color: var(--text-muted);
-  background: rgb(0 0 0 / 3%);
+  background: var(--tint-faint);
 }
 
 .cm-line.cm-conflict-theirs {
@@ -3243,7 +3340,7 @@ button.chat-chip.off:hover {
   padding: 6px 12px;
   border-radius: 8px;
   background: var(--accent-text);
-  color: #fff;
+  color: var(--bg);
   font-size: 12px;
   pointer-events: none;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);

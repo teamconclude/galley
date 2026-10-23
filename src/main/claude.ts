@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, nativeTheme } from 'electron'
 import { existsSync, promises as fs } from 'fs'
 import { basename, extname, join } from 'path'
 import type { ClaudeMode, Preferences, SiteInfo } from '../shared/types'
@@ -55,9 +55,9 @@ Galley's features to work is in ${contractFile()}.
 function rules(hosts: string[]): Record<string, unknown> {
   const rule = (dir: string): string => `//${dir.replace(/^\//, '')}/**`
   return {
-    // The pane is white whatever theme the user's own Claude Code uses; a dark one draws
-    // some text in white there.
-    theme: 'light',
+    // The pane takes Galley's colours whatever theme the user's own Claude Code uses; a
+    // dark one draws some text in white, which a light pane would hide.
+    theme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
     permissions: {
       allow: [
         `Read(${rule(inbox())})`,

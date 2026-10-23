@@ -1,8 +1,9 @@
-import { app, BrowserWindow, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
 import license from '../../LICENSE?raw'
 import { isDev } from './env'
+import { windowBackground } from './appearance'
 
 let about: BrowserWindow | null = null
 
@@ -52,12 +53,12 @@ function page(): string {
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --text: #f5f5f7;
-      --muted: #a1a1a6;
-      --line: #3a3a3c;
-      --soft: #2a2a2c;
-      --bg: #1e1e1e;
-      --accent: #5fd0b6;
+      --text: #f8f8f8;
+      --muted: #a0a0a0;
+      --line: #3e3e3e;
+      --soft: #2a2a2a;
+      --bg: #1a1a1a;
+      --accent: #3bbfad;
     }
   }
   html, body { height: 100%; margin: 0; }
@@ -138,7 +139,7 @@ export function showAbout(over: BrowserWindow | null): void {
     titleBarStyle: 'hidden',
     title: 'About Galley',
     show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
+    backgroundColor: windowBackground(),
     webPreferences: { sandbox: true }
   })
   if (over) {

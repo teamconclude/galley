@@ -28,6 +28,34 @@ const lightTheme = {
   brightWhite: '#a5a5a5'
 }
 
+// VS Code's dark terminal palette, on the window's own dark background.
+const darkTheme = {
+  background: '#1a1a1a',
+  foreground: '#cccccc',
+  cursor: '#cccccc',
+  cursorAccent: '#1a1a1a',
+  selectionBackground: 'rgba(255, 255, 255, 0.2)',
+  black: '#000000',
+  red: '#cd3131',
+  green: '#0dbc79',
+  yellow: '#e5e510',
+  blue: '#2472c8',
+  magenta: '#bc3fbc',
+  cyan: '#11a8cd',
+  white: '#e5e5e5',
+  brightBlack: '#666666',
+  brightRed: '#f14c4c',
+  brightGreen: '#23d18b',
+  brightYellow: '#f5f543',
+  brightBlue: '#3b8eea',
+  brightMagenta: '#d670d6',
+  brightCyan: '#29b8db',
+  brightWhite: '#e5e5e5'
+}
+
+const dark = window.matchMedia('(prefers-color-scheme: dark)')
+const theme = (): typeof lightTheme => (dark.matches ? darkTheme : lightTheme)
+
 interface ViewProps {
   // Claude Code's sign-in instead of Claude Code itself.
   login?: boolean
@@ -49,8 +77,12 @@ export function TerminalView({ login, onExit, onTerminal }: ViewProps): React.JS
       fontSize: 13,
       cursorBlink: true,
       macOptionIsMeta: true,
-      theme: lightTheme
+      theme: theme()
     })
+    const recolour = (): void => {
+      term.options.theme = theme()
+    }
+    dark.addEventListener('change', recolour)
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(el)
@@ -69,6 +101,7 @@ export function TerminalView({ login, onExit, onTerminal }: ViewProps): React.JS
     observer.observe(el)
     term.focus()
     return () => {
+      dark.removeEventListener('change', recolour)
       observer.disconnect()
       input.dispose()
       offData()

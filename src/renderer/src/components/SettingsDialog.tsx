@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { ClaudeModel, ClaudeView, Preferences } from '../../../shared/types'
+import type { Appearance, ClaudeModel, ClaudeView, Preferences } from '../../../shared/types'
 
 interface Props {
   prefs: Preferences
@@ -19,6 +19,18 @@ export default function SettingsDialog({ prefs, onChange, onClose }: Props): Rea
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="dialog" onMouseDown={(e) => e.stopPropagation()}>
         <h2>Settings</h2>
+        <label className="dialog-field">
+          <span>Appearance</span>
+          <select
+            value={prefs.appearance}
+            onChange={(e) => onChange({ ...prefs, appearance: e.target.value as Appearance })}
+          >
+            <option value="system">As set in macOS</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <small>The preview keeps the site’s light look.</small>
+        </label>
         <label className="dialog-check">
           <input
             type="checkbox"

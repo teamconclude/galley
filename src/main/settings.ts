@@ -36,6 +36,7 @@ export const prefs = (): Preferences => ({
   claudeModel: 'opus',
   claudeView: 'chat',
   claudeMode: 'auto',
+  appearance: 'system',
   ...loadSettings().prefs
 })
 

@@ -47,6 +47,7 @@ import { createSite } from './newSite'
 import { Repo } from './repo'
 import { replace, search } from './search'
 import { loadSettings, prefs, saveSettings } from './settings'
+import { keepPreviewsLight, setAppearance, windowBackground } from './appearance'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
 import { Updater } from './updater'
@@ -198,6 +199,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    backgroundColor: windowBackground(),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
@@ -242,6 +244,7 @@ function showManual(): void {
     minHeight: 400,
     title: 'Galley Manual',
     show: false,
+    backgroundColor: windowBackground(),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
   if (win) {
@@ -281,6 +284,7 @@ function detachPreview(state: PreviewState): void {
     height: 850,
     ...savedBounds('preview'),
     title: 'Preview',
+    backgroundColor: windowBackground(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -562,7 +566,10 @@ function registerIpc(): void {
     return link
   })
   ipcMain.handle('link:parse', (_e, text: string) => parseReviewLink(text))
-  ipcMain.handle('prefs:set', (_e, p: Preferences) => saveSettings({ ...loadSettings(), prefs: p }))
+  ipcMain.handle('prefs:set', (_e, p: Preferences) => {
+    saveSettings({ ...loadSettings(), prefs: p })
+    setAppearance(p.appearance)
+  })
   ipcMain.handle('setup:status', () => setup.status)
   ipcMain.handle('setup:retry', (_e, step: SetupStepId) => setup.retry(step))
   ipcMain.handle('setup:signIn', () => setup.signIn())
@@ -649,6 +656,8 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('io.conclude.galley')
   // The packaged app carries its own icon; in development the Dock shows Electron's.
   if (isDev) app.dock?.setIcon(icon)
+  setAppearance(prefs().appearance)
+  keepPreviewsLight()
   refreshMenu()
   registerIpc()
   registerRepoProtocol()
