@@ -83,9 +83,10 @@ Mac only. **File ▸ Open Recent** lists the sites you opened lately.
 
 ## The window
 
-- **Left: the sidebar**, with three tabs. **Files** lists the site's pages and files,
+- **Left: the sidebar**, with three panels. **Files** lists the site's pages and files,
   **Changes** shows your work and the next step for it, and **Search** searches the whole
-  site.
+  site. At first Files and Search share the top as two tabs and Changes sits below, so you
+  see your pages and your changes at once.
 - **Middle: the open page.** Its settings at the top, its text below.
 - **Right: the preview**, the page as it will look on the site.
 - **Bottom: Claude**, when you open it.
@@ -94,6 +95,15 @@ Mac only. **File ▸ Open Recent** lists the sites you opened lately.
 
 Drag the borders between the parts to make one larger. **View ▸ Larger text** (⌘+) makes
 everything larger.
+
+**Arranging the panels.** Drag a panel's tab onto another panel's tabs to put them
+together, and only one shows at a time; drag it onto **Drop to show apart**, between the
+panels, to give it a place of its own. Right-click a tab for the same, and for **Move up**
+and **Move down**. Putting all three together gives one panel at a time, with tabs.
+
+**Light or dark.** Galley follows macOS's light or dark appearance, in the colours of the
+Conclude app; **Settings** can keep it light or dark instead. The preview always shows the
+site in its light colours.
 
 ## Finding a page
 
@@ -116,7 +126,8 @@ one line per file.
 
 **File ▸ Find Page…** (⌘P), or the magnifying glass above the list, finds a page by what you
 know of it: words from its title, its address on the site, an old address that forwards
-to it, or its file name. Use the arrow keys and Return, or click. With nothing typed, it
+to it, or its file name. You can also paste a link to the page, from the live site, the
+preview or a review link. Use the arrow keys and Return, or click. With nothing typed, it
 lists the newest pages.
 
 ![Find Page listing the pages that match "slack zendesk"](images/find-page.png)
@@ -234,6 +245,20 @@ move through the text. **Markdown** shows the plain-text version of the page tha
 offers to AI tools. **Separate window** moves the preview into its own window, for example
 for a second screen. **Open in Browser** opens it in your web browser.
 
+**Following links.** Click a link in the preview and the page it leads to opens in the
+editor too. Some pages of the site have no file of their own, such as the list of posts
+in a category; those show in the preview, and the editor keeps the page you had. Links to
+other websites open in your web browser.
+
+**Scrolling.** Scroll the preview and the text in the editor scrolls along to the same
+heading or paragraph. Your cursor stays where it was.
+
+**Back and forward.** The arrows at the left of the preview's bar, **View ▸ Back** (⌘[) and
+**View ▸ Forward** (⌘]), and the back and forward buttons of a mouse go through the pages
+you looked at, as in a web browser: pages opened from the list, Find Page, Search or a link
+in the preview. Going back puts the cursor and the scroll position back where you left
+them.
+
 Hugo, the program behind the preview, starts again by itself if it stops. If it keeps
 stopping, the preview shows Hugo's message, which usually names the page at fault; fix
 that page and click **Restart Hugo**.
@@ -265,7 +290,8 @@ too unless colleagues' work is on it. If you are on the branch, Galley moves you
 2. Tick the files that belong together. Unticked files stay as they are, for a later
    commit.
 3. Write a short note on what you did, such as "Update pricing for the Pro plan", and
-   click **Commit**.
+   click **Commit**, or press ⌘Return. **Write with Claude** has Claude look at the ticked
+   files and write the note for you; read it, change it if you like, then commit.
 
 Galley sends the commit to your branch on GitHub straight away. To undo changes you do not
 want, use the arrow next to a file, or **Discard all**. New files go to the Trash, so you
@@ -369,8 +395,10 @@ what you want in plain words and press Return; ⇧Return starts a new line.
 
 Claude answers in the pane, and each thing it does, such as reading or changing a page,
 shows as a line of its own; click a change to see it. Every change also appears in the
-Changes tab, where you commit or discard it as usual. Claude never commits, pushes or
-publishes.
+Changes tab, where you commit or discard it as usual. You can also ask Claude to commit,
+such as "Commit my changes": Galley then commits the ticked files with a note Claude
+writes, and sends them to your branch on GitHub, just as the Commit button does. Claude
+does not commit on `develop` or another shared branch, and never publishes.
 
 **The open page.** The row below the text field shows the page you have open, and Claude
 is told about it with each message, so "this page" works. Its × leaves it out; it is back
@@ -401,6 +429,7 @@ browser.
 
 **Galley ▸ Settings…** (⌘,):
 
+- **Appearance**: as set in macOS, or always light, or always dark.
 - **Remove a merged branch from GitHub** (on): after you merge into develop, your branch
   disappears from GitHub to keep the list tidy. You keep working on it here, and your next
   commit brings it back.
@@ -427,6 +456,8 @@ browser.
 | ⌘⇧P      | Show or hide the preview       |
 | ⌥⌘P      | Preview in a separate window   |
 | ⌥⌘R      | Reload the preview             |
+| ⌘[, ⌘]   | Back, forward                  |
+| ⌘Return  | Commit, in the commit note     |
 | ⌘J       | Show or hide Claude            |
 | Esc      | Stop Claude                    |
 | ⌘+, ⌘-   | Larger or smaller text         |
