@@ -1,4 +1,4 @@
-import { app, nativeTheme, type WebContents } from 'electron'
+import { nativeTheme, type WebContents } from 'electron'
 import type { Appearance } from '../shared/types'
 import { log } from './log'
 
@@ -13,13 +13,7 @@ export const windowBackground = (): string =>
   nativeTheme.shouldUseDarkColors ? '#1a1a1a' : '#ffffff'
 
 // The preview's webview is told the system is light, whatever Galley and macOS use.
-export function keepPreviewsLight(): void {
-  app.on('web-contents-created', (_e, contents) => {
-    if (contents.getType() === 'webview') lightPage(contents)
-  })
-}
-
-function lightPage(contents: WebContents): void {
+export function keepLight(contents: WebContents): void {
   try {
     contents.debugger.attach('1.3')
   } catch (e) {

@@ -7,33 +7,34 @@ import type {
   ClaudeMode,
   Commit,
   CommitRange,
-  Placement,
-  ImageReplacement,
-  ImageUse,
-  ImportedDocument,
   ComponentLibrary,
   DataLists,
   DirEntry,
-  SiteInfo,
-  Snippet,
   GitStatus,
   HugoStatus,
   Identity,
+  ImageReplacement,
+  ImageUse,
+  ImportedDocument,
   Layout,
   MenuCommand,
   MenuState,
   PageInfo,
+  Placement,
   Preferences,
   PreviewMode,
+  PreviewScroll,
   PreviewState,
   PreviewTarget,
   PublishResult,
-  RepoInfo,
   ReplaceResult,
+  RepoInfo,
   SearchOptions,
   SearchResults,
   SetupStatus,
   SetupStepId,
+  SiteInfo,
+  Snippet,
   UpdateStatus
 } from './types'
 import type { ReviewLink } from './reviewLink'
@@ -173,6 +174,14 @@ export interface Api {
     setMode: (mode: PreviewMode) => void
     // The main window hears of a mode chosen in the detached window.
     onMode: (cb: (mode: PreviewMode) => void) => Unsubscribe
+    // The detached window's page moved, was scrolled, or Back or Forward was clicked
+    // there; the main window hears of each.
+    navigated: (url: string) => void
+    scrolled: (scroll: PreviewScroll) => void
+    step: (by: -1 | 1) => void
+    onNavigated: (cb: (url: string) => void) => Unsubscribe
+    onScrolled: (cb: (scroll: PreviewScroll) => void) => Unsubscribe
+    onStep: (cb: (by: -1 | 1) => void) => Unsubscribe
   }
   terminal: {
     // Starts Claude Code, or with login its sign-in, which the chat needs first.

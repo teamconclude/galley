@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type {
   Change,
   DirEntry,
@@ -17,6 +17,7 @@ import type {
   SearchMatch,
   SearchOptions,
   PanelGroup,
+  PreviewScroll,
   SidebarTab
 } from '../../shared/types'
 import { EditorView } from '@codemirror/view'
@@ -50,7 +51,15 @@ import SearchPanel, { type SearchRequest } from './components/SearchPanel'
 import { BodyFollower } from './components/PreviewFollow'
 import Splitter from './components/Splitter'
 import { openFind } from './lib/findPanel'
-import { forgetTarget, onShow } from './lib/previewScroll'
+import { followPreview, forgetTarget, onShow } from './lib/previewScroll'
+import {
+  restoreForm,
+  restoreText,
+  spotOf,
+  useHistory,
+  type EditorSpot,
+  type Place
+} from './lib/history'
 import { loadLayout, saveLayout } from './lib/layout'
 import { showPanel } from './lib/panels'
 import Sidebar from './components/Sidebar'
@@ -183,6 +192,11 @@ export default function App(): React.JSX.Element | null {
   const [showPreview, setShowPreview] = useState(layout.showPreview)
   const [detached, setDetached] = useState(layout.detached)
   const [pagePath, setPagePath] = useState('/')
+  const history = useHistory()
+  // The text editor of the open file, whatever its kind, and the spot to put it back to
+  // once it has opened, coming Back or Forward to it.
+  const textView = useRef<EditorView | null>(null)
+  const pendingSpot = useRef<{ path: string; spot: EditorSpot } | null>(null)
   const [showClaude, setShowClaude] = useState(layout.showClaude)
   const [sidebarWidth, setSidebarWidth] = useState(layout.sidebarWidth)
   const [previewWidth, setPreviewWidth] = useState(layout.previewWidth)
@@ -299,9 +313,12 @@ export default function App(): React.JSX.Element | null {
     saveTimer.current = window.setTimeout(() => void save(), 800)
   }
 
-  const open = async (path: string): Promise<string | null> => {
+  // Every file opened is a step of Back and Forward, except one opened by taking a step.
+  const open = async (path: string, stepping = false): Promise<string | null> => {
+    const spot = spotOf(textView.current)
     await save()
     setDiff(null)
+    if (!stepping) history.visit({ path, address: pages.get(path)?.url ?? null }, spot)
     if (imageFile.test(path) || binaryFile.test(path)) {
       setFile({ path, text: '', saved: '' })
       return null
@@ -309,6 +326,62 @@ export default function App(): React.JSX.Element | null {
     const text = await window.api.repo.read(path)
     setFile({ path, text, saved: text })
     return text
+  }
+
+  // Back or Forward: the file comes back with its cursor and scroll position, and the
+  // preview with the page it showed, which may have been one without a file of its own.
+  const step = async (by: -1 | 1): Promise<void> => {
+    const place = history.step(by, spotOf(textView.current))
+    if (!place) return
+    await go(place)
+  }
+  const go = async (place: Place): Promise<void> => {
+    if (place.path && place.path !== fileRef.current?.path) {
+      pendingSpot.current = place.spot ? { path: place.path, spot: place.spot } : null
+      await open(place.path, true)
+    } else if (place.path && place.spot && textView.current) {
+      restoreText(textView.current, place.spot)
+    }
+    if (place.spot) restoreForm(place.spot)
+    const address = place.address ?? (place.path ? await window.api.repo.pageUrl(place.path) : null)
+    if (address) setPagePath(address)
+  }
+
+  // A link followed in the preview opens its page in the editor; a page without a file of
+  // its own, e.g. a list of posts, stays in the preview alone.
+  const previewNavigated = (url: string): void => {
+    if (hugo.state !== 'running' || !hugo.url) return
+    let address: string
+    try {
+      const at = new URL(url)
+      if (at.origin !== new URL(hugo.url).origin) return
+      address = decodeURI(at.pathname)
+    } catch {
+      return
+    }
+    if (pageAddress(address) === pageAddress(shownPath)) return
+    const match = pageAt(pages.values(), pageAddress(address))
+    setPagePath(address)
+    if (match) {
+      if (match.page.path !== fileRef.current?.path) void open(match.page.path)
+    } else {
+      history.visit({ path: null, address }, spotOf(textView.current))
+    }
+  }
+
+  // Scrolling the preview scrolls the page's text to the same place.
+  const previewScrolled = (scroll: PreviewScroll): void => {
+    if (bodyView) followPreview(bodyView, scroll)
+  }
+
+  // The editor mounts before this component's effects see its file, so it names its own.
+  const takeTextView = (view: EditorView | null, path: string): void => {
+    textView.current = view
+    const pending = pendingSpot.current
+    if (view && pending && pending.path === path) {
+      pendingSpot.current = null
+      restoreText(view, pending.spot)
+    }
   }
 
   // A hit is selected in the page body, or in the page settings shown as YAML.
@@ -1115,9 +1188,20 @@ export default function App(): React.JSX.Element | null {
       version: contentVersion,
       status: hugo,
       markdownSuffix: site.markdownSuffix,
-      notice: previewNotice
+      notice: previewNotice,
+      canBack: history.canBack,
+      canForward: history.canForward
     }),
-    [previewUrl, previewMode, contentVersion, hugo, site.markdownSuffix, previewNotice]
+    [
+      previewUrl,
+      previewMode,
+      contentVersion,
+      hugo,
+      site.markdownSuffix,
+      previewNotice,
+      history.canBack,
+      history.canForward
+    ]
   )
 
   // A preview in its own window follows what the bar in this window says; one that was
@@ -1219,6 +1303,12 @@ export default function App(): React.JSX.Element | null {
       case 'find-page':
         setFinding(true)
         break
+      case 'back':
+        void step(-1)
+        break
+      case 'forward':
+        void step(1)
+        break
       case 'open-review-link':
         setPastingLink(true)
         break
@@ -1255,6 +1345,27 @@ export default function App(): React.JSX.Element | null {
     menuHandler.current = onMenu
   })
   useEffect(() => window.api.onMenu((command) => menuHandler.current(command)), [])
+
+  // The preview in its own window reports as the one in this window does; a mouse's own
+  // back and forward buttons step too.
+  const navigated = useEffectEvent(previewNavigated)
+  const scrolled = useEffectEvent(previewScrolled)
+  const stepBy = useEffectEvent((by: -1 | 1) => void step(by))
+  useEffect(() => {
+    const offs = [
+      window.api.preview.onNavigated(navigated),
+      window.api.preview.onScrolled(scrolled),
+      window.api.preview.onStep(stepBy)
+    ]
+    const onMouse = (e: MouseEvent): void => {
+      if (e.button === 3 || e.button === 4) stepBy(e.button === 3 ? -1 : 1)
+    }
+    window.addEventListener('mouseup', onMouse)
+    return () => {
+      offs.forEach((off) => off())
+      window.removeEventListener('mouseup', onMouse)
+    }
+  }, [])
   useEffect(
     () => window.api.setMenuState({ site: !!repo, page: !!file, preview: !!previewUrl }),
     [repo, file, previewUrl]
@@ -1484,7 +1595,10 @@ export default function App(): React.JSX.Element | null {
                           paste={isMarkdown ? { pasteImage, pasteDocument } : undefined}
                           prose={isMarkdown}
                           select={selectIn('body')}
-                          onView={isMarkdown ? setBodyView : undefined}
+                          onView={(view) => {
+                            takeTextView(view, file.path)
+                            if (isMarkdown) setBodyView(view)
+                          }}
                         />
                       </>
                     )}
@@ -1512,6 +1626,13 @@ export default function App(): React.JSX.Element | null {
                       targets={onShow}
                       notice={previewNotice}
                       imageDrop={imageDrop}
+                      history={{
+                        canBack: history.canBack,
+                        canForward: history.canForward,
+                        onStep: (by) => void step(by)
+                      }}
+                      onNavigate={previewNavigated}
+                      onScrolled={previewScrolled}
                     />
                   </section>
                 </>

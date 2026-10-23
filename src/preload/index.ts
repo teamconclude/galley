@@ -107,7 +107,13 @@ const api: Api = {
     onState: (cb) => on('preview:state', cb),
     onTarget: (cb) => on('preview:target', cb),
     setMode: (mode) => ipcRenderer.send('preview:setMode', mode),
-    onMode: (cb) => on('preview:mode', cb)
+    onMode: (cb) => on('preview:mode', cb),
+    navigated: (url) => ipcRenderer.send('preview:navigated', url),
+    scrolled: (scroll) => ipcRenderer.send('preview:scrolled', scroll),
+    step: (by) => ipcRenderer.send('preview:step', by),
+    onNavigated: (cb) => on('preview:navigated', cb),
+    onScrolled: (cb) => on('preview:scrolled', cb),
+    onStep: (cb) => on('preview:step', cb)
   },
   terminal: {
     start: (cols, rows, login) => ipcRenderer.send('terminal:start', cols, rows, login),

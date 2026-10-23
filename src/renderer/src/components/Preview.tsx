@@ -1,9 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { DropSpot, HugoStatus, PreviewMode, PreviewTarget } from '../../../shared/types'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import type {
+  DropSpot,
+  HugoStatus,
+  PreviewMode,
+  PreviewScroll,
+  PreviewTarget
+} from '../../../shared/types'
 import type { WebviewElement } from '../env'
-import { dropMarkScript, dropSpotScript, previewScript } from '../../../shared/previewScript'
+import {
+  dropMarkScript,
+  dropSpotScript,
+  followScript,
+  parseScrollMessage,
+  previewScript
+} from '../../../shared/previewScript'
 
 interface Props {
   status: HugoStatus
@@ -25,6 +38,17 @@ interface Props {
   notice?: string | null
   // While a picture from the file list is dragged; see ImageDrop.
   imageDrop?: ImageDrop | null
+  // Back and Forward through the pages visited, in the editor and the preview alike.
+  history: PreviewHistory
+  // The page moved to another address by itself, e.g. through a link followed in it.
+  onNavigate?: (url: string) => void
+  onScrolled?: (scroll: PreviewScroll) => void
+}
+
+export interface PreviewHistory {
+  canBack: boolean
+  canForward: boolean
+  onStep: (by: -1 | 1) => void
 }
 
 // Judges what dropping the dragged picture at a spot would do, in words for the editor,
@@ -45,7 +69,7 @@ const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? fa
 
 export default function Preview(props: Props): React.JSX.Element {
   const { status, url, reloadKey, mode, onMode, version, detached, markdownSuffix } = props
-  const { onDetach, onAttach, targets, notice, imageDrop } = props
+  const { onDetach, onAttach, targets, notice, imageDrop, history, onNavigate, onScrolled } = props
   const plainFile = isPlainFile(url)
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -54,6 +78,24 @@ export default function Preview(props: Props): React.JSX.Element {
   return (
     <div className="preview">
       <div className="pane-bar">
+        <span className="segmented history">
+          <button
+            disabled={!history.canBack}
+            onClick={() => history.onStep(-1)}
+            title="Back (⌘[)"
+            aria-label="Back"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <button
+            disabled={!history.canForward}
+            onClick={() => history.onStep(1)}
+            title="Forward (⌘])"
+            aria-label="Forward"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </span>
         <span className={`dot ${status.state}`} />
         <span className="pane-title">{shownUrl ?? statusText(status)}</span>
         {url && !plainFile && markdownSuffix !== null && (
@@ -99,6 +141,8 @@ export default function Preview(props: Props): React.JSX.Element {
         empty={status.message ?? statusText(status)}
         notice={notice ?? null}
         imageDrop={imageDrop ?? null}
+        onNavigate={onNavigate}
+        onScrolled={onScrolled}
       />
     </div>
   )
@@ -115,11 +159,14 @@ interface ContentProps {
   empty: string
   notice: string | null
   imageDrop?: ImageDrop | null
+  onNavigate?: (url: string) => void
+  onScrolled?: (scroll: PreviewScroll) => void
 }
 
 // The page in a webview, or its text rendered; shared by the pane and the detached window.
 export function PreviewContent(props: ContentProps): React.JSX.Element {
   const { url, mode, version, reloadKey, targets, empty, markdownSuffix, notice, imageDrop } = props
+  const { onNavigate, onScrolled } = props
   const view = useRef<WebviewElement>(null)
   const textMode = isPlainFile(url) || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -165,12 +212,75 @@ export function PreviewContent(props: ContentProps): React.JSX.Element {
   if (url) {
     return (
       <div className="preview-stage">
-        <webview ref={view} src={url} className="webview" />
+        <PageView view={view} url={url} onNavigate={onNavigate} onScrolled={onScrolled} />
         {imageDrop && <DropLayer view={view} imageDrop={imageDrop} />}
       </div>
     )
   }
   return <pre className="pane-empty">{empty}</pre>
+}
+
+// The two addresses show the same page, whatever part of it they scroll to.
+function samePage(a: string | null, b: string | null): boolean {
+  return !!a && !!b && a.replace(/#.*$/, '') === b.replace(/#.*$/, '')
+}
+
+// The webview, told where to go only when it is not there already: a link followed in
+// the page brings the editor along, which then asks for the page the webview shows.
+function PageView(props: {
+  view: React.RefObject<WebviewElement | null>
+  url: string
+  onNavigate?: (url: string) => void
+  onScrolled?: (scroll: PreviewScroll) => void
+}): React.JSX.Element {
+  const { view, url } = props
+  const [first] = useState(url)
+  const here = useRef(url)
+  const ready = useRef(false)
+  const navigated = useEffectEvent((to: string) => props.onNavigate?.(to))
+  const scrolled = useEffectEvent((scroll: PreviewScroll) => props.onScrolled?.(scroll))
+
+  useEffect(() => {
+    const el = view.current
+    if (!el) return
+    const onReady = (): void => {
+      ready.current = true
+      void el.executeJavaScript(followScript).catch(() => {})
+    }
+    const onNavigate = (e: Event): void => {
+      const to = (e as Event & { url: string }).url
+      here.current = to
+      navigated(to)
+    }
+    const onInPage = (e: Event): void => {
+      const { url: to, isMainFrame } = e as Event & { url: string; isMainFrame: boolean }
+      if (isMainFrame) here.current = to
+    }
+    const onConsole = (e: Event): void => {
+      const scroll = parseScrollMessage((e as Event & { message: string }).message)
+      if (scroll) scrolled(scroll)
+    }
+    el.addEventListener('dom-ready', onReady)
+    el.addEventListener('did-navigate', onNavigate)
+    el.addEventListener('did-navigate-in-page', onInPage)
+    el.addEventListener('console-message', onConsole)
+    return () => {
+      el.removeEventListener('dom-ready', onReady)
+      el.removeEventListener('did-navigate', onNavigate)
+      el.removeEventListener('did-navigate-in-page', onInPage)
+      el.removeEventListener('console-message', onConsole)
+    }
+  }, [view])
+
+  useEffect(() => {
+    const el = view.current
+    if (!el || samePage(url, here.current)) return
+    here.current = url
+    if (ready.current) void el.loadURL(url).catch(() => {})
+    else el.setAttribute('src', url)
+  }, [view, url])
+
+  return <webview ref={view} src={first} className="webview" />
 }
 
 // Lies over the page while a picture is dragged, since the webview would take the drag

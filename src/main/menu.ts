@@ -147,6 +147,10 @@ function buildMenu(actions: Actions): Menu {
           click: () => actions.command('reload-preview')
         },
         { type: 'separator' },
+        // As in a browser, through the pages visited in the editor and the preview alike.
+        { label: 'Back', accelerator: 'CmdOrCtrl+[', click: () => actions.command('back') },
+        { label: 'Forward', accelerator: 'CmdOrCtrl+]', click: () => actions.command('forward') },
+        { type: 'separator' },
         // macOS matches these by character, with or without shift; the shifted variants
         // that slip through are caught by the key handler on the window.
         { label: 'Larger text', accelerator: 'CmdOrCtrl+Plus', click: () => actions.zoom(1) },

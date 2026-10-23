@@ -26,6 +26,13 @@ export default function DetachedPreview(): React.JSX.Element {
         onAttach={() => window.api.preview.attach()}
         targets={window.api.preview.onTarget}
         notice={state?.notice ?? null}
+        history={{
+          canBack: state?.canBack ?? false,
+          canForward: state?.canForward ?? false,
+          onStep: window.api.preview.step
+        }}
+        onNavigate={window.api.preview.navigated}
+        onScrolled={window.api.preview.scrolled}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import type { DropSpot, PreviewTarget } from './types'
+import type { DropSpot, PreviewScroll, PreviewTarget } from './types'
 
 // JavaScript for the preview page that scrolls to a target and outlines it for a moment.
 export function previewScript(target: PreviewTarget): string {
@@ -20,6 +20,7 @@ const reveal = `function reveal(n) {
   if (r.top < visibleTop || r.height > visibleBottom - visibleTop) delta = r.top - visibleTop
   else if (r.bottom > visibleBottom) delta = r.bottom - visibleBottom
   if (delta !== 0) window.scrollTo({ top: Math.max(0, window.scrollY + delta), behavior: 'smooth' })
+  window.__galleyQuiet = Date.now() + 1200
   n.style.transition = 'outline-color 0.8s'
   n.style.outline = '2px solid rgba(62, 184, 163, 0.9)'
   n.style.outlineOffset = '-2px'
@@ -167,3 +168,51 @@ export function dropMarkScript(spot: DropSpot | null): string {
   return true
 })(${JSON.stringify(mark)})`
 }
+
+// What the page logs to tell Galley where the reader scrolled to; see followScript.
+export const scrollMessage = 'galley:scroll '
+
+export function parseScrollMessage(message: string): PreviewScroll | null {
+  if (!message.startsWith(scrollMessage)) return null
+  try {
+    return JSON.parse(message.slice(scrollMessage.length)) as PreviewScroll
+  } catch {
+    return null
+  }
+}
+
+// Reports, as a console message, the first text element below the fixed header once the
+// reader has scrolled the page and let it rest. Scrolling the page did not start counts
+// only when the reader just used the wheel, keys or pointer there: a reload restoring its
+// position, or Galley showing what the cursor stands on, moves nothing in the editor.
+export const followScript = `(function () {
+  if (window.__galleyFollows) return
+  window.__galleyFollows = true
+  var touched = 0, timer = null
+  var touch = function () { touched = Date.now() }
+  ;['wheel', 'keydown', 'mousedown', 'touchstart'].forEach(function (t) {
+    addEventListener(t, touch, { passive: true, capture: true })
+  })
+  var norm = function (s) { return s.replace(/\\s+/g, ' ').trim() }
+  var report = function () {
+    if (Date.now() < (window.__galleyQuiet || 0)) return
+    if (window.scrollY <= 0) return console.log(${JSON.stringify(scrollMessage)} + JSON.stringify({ top: true }))
+    var header = document.querySelector('header, .navbar, nav')
+    var offset = header && getComputedStyle(header).position !== 'static' ? header.offsetHeight : 0
+    var root = document.querySelector('main') || document.body
+    var els = root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,td,figcaption,dt,dd')
+    for (var i = 0; i < els.length; i++) {
+      var r = els[i].getBoundingClientRect()
+      if (r.height === 0 || r.bottom <= offset + 8) continue
+      var text = norm(els[i].textContent || '').slice(0, 80)
+      if (!text) continue
+      var heading = /^H[1-6]$/.test(els[i].tagName)
+      return console.log(${JSON.stringify(scrollMessage)} + JSON.stringify({ text: text, heading: heading }))
+    }
+  }
+  addEventListener('scroll', function () {
+    if (Date.now() - touched > 1000) return
+    clearTimeout(timer)
+    timer = setTimeout(report, 150)
+  }, { passive: true })
+})()`

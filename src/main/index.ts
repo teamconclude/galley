@@ -26,6 +26,7 @@ import type {
   MenuState,
   Preferences,
   PreviewMode,
+  PreviewScroll,
   PreviewState,
   PreviewTarget,
   SearchOptions,
@@ -47,7 +48,7 @@ import { createSite } from './newSite'
 import { Repo } from './repo'
 import { replace, search } from './search'
 import { loadSettings, prefs, saveSettings } from './settings'
-import { keepPreviewsLight, setAppearance, windowBackground } from './appearance'
+import { keepLight, setAppearance, windowBackground } from './appearance'
 import { Setup } from './setup'
 import { ClaudeTerminal } from './terminal'
 import { Updater } from './updater'
@@ -316,6 +317,33 @@ function detachPreview(state: PreviewState): void {
   }
 }
 
+// The preview stays on the site: a link to anywhere else opens in the browser, and one
+// that asks for a new window opens in the preview itself.
+function watchPreviews(): void {
+  app.on('web-contents-created', (_e, contents) => {
+    if (contents.getType() !== 'webview') return
+    keepLight(contents)
+    const outside = (url: string): boolean => {
+      const site = hugo.status.state === 'running' ? hugo.status.url : null
+      try {
+        return !site || new URL(url).origin !== new URL(site).origin
+      } catch {
+        return true
+      }
+    }
+    contents.on('will-navigate', (e) => {
+      if (!outside(e.url)) return
+      e.preventDefault()
+      void shell.openExternal(e.url)
+    })
+    contents.setWindowOpenHandler(({ url }) => {
+      if (outside(url)) void shell.openExternal(url)
+      else void contents.loadURL(url)
+      return { action: 'deny' }
+    })
+  })
+}
+
 function registerIpc(): void {
   const current = (): Repo => {
     if (!repo) throw new Error('No repository open')
@@ -508,6 +536,9 @@ function registerIpc(): void {
   })
   ipcMain.handle('preview:state', () => previewState)
   ipcMain.on('preview:setMode', (_e, mode: PreviewMode) => send('preview:mode', mode))
+  ipcMain.on('preview:navigated', (_e, url: string) => send('preview:navigated', url))
+  ipcMain.on('preview:scrolled', (_e, scroll: PreviewScroll) => send('preview:scrolled', scroll))
+  ipcMain.on('preview:step', (_e, by: -1 | 1) => send('preview:step', by))
   ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
   ipcMain.on('preview:attach', () => previewWin?.close())
   ipcMain.handle('preview:fetch', async (_e, url: string) => {
@@ -657,7 +688,7 @@ app.whenReady().then(() => {
   // The packaged app carries its own icon; in development the Dock shows Electron's.
   if (isDev) app.dock?.setIcon(icon)
   setAppearance(prefs().appearance)
-  keepPreviewsLight()
+  watchPreviews()
   refreshMenu()
   registerIpc()
   registerRepoProtocol()

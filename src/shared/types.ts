@@ -265,6 +265,8 @@ export interface PreviewState {
   markdownSuffix: string | null
   // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
   notice: string | null
+  canBack: boolean
+  canForward: boolean
 }
 
 export type SidebarTab = 'files' | 'changes' | 'search'
@@ -353,6 +355,9 @@ export interface ImageReplacement {
 export type PreviewTarget =
   { kind: 'block'; index: number } | { kind: 'text'; snippet: string; heading: boolean }
 
+// Where the reader scrolled the preview to: its top, or the first text below the header.
+export type PreviewScroll = { top: true } | { text: string; heading: boolean }
+
 export interface SearchResults {
   files: SearchFile[]
   total: number
@@ -420,6 +425,8 @@ export type MenuCommand =
   | 'trash-page'
   | 'open-in-browser'
   | 'show-in-finder'
+  | 'back'
+  | 'forward'
 
 // What the menu's items can act on: an open site, an open page in it, and its preview.
 export interface MenuState {
