@@ -55,6 +55,10 @@ Galley's features to work is in ${contractFile()}.
 function rules(hosts: string[]): Record<string, unknown> {
   const rule = (dir: string): string => `//${dir.replace(/^\//, '')}/**`
   return {
+    // When Claude waits on the editor, Galley marks its Dock icon itself. Claude Code's own
+    // notification, or a hook acting on it, would bring Galley to the front from whatever
+    // the editor is doing in another app.
+    preferredNotifChannel: 'notifications_disabled',
     // The pane takes Galley's colours whatever theme the user's own Claude Code uses; a
     // dark one draws some text in white, which a light pane would hide.
     theme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
@@ -99,6 +103,9 @@ function rules(hosts: string[]): Record<string, unknown> {
 async function writeSettings(hosts: string[]): Promise<void> {
   const settings = {
     ...rules(hosts),
+    // Claude Code rings the terminal's bell when it waits on the editor, and Galley marks
+    // its Dock icon; see attention in index.ts.
+    preferredNotifChannel: 'terminal_bell',
     hooks: {
       UserPromptSubmit: [
         {

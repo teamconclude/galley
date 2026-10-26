@@ -424,7 +424,9 @@ draft or a screenshot. Word documents and web pages arrive as text with their li
 
 **When Claude asks.** Sometimes Claude needs your go-ahead, for example to run a command,
 or asks a question with a few answers to choose from. It shows a card in the conversation:
-click **Allow** or **Don't allow**, or an answer. The button at the right of the row below
+click **Allow** or **Don't allow**, or an answer. If you are working in another app
+meanwhile, Galley stays where it is: its icon in the Dock bounces once and shows how many
+questions wait. The button at the right of the row below
 the text field sets how often Claude asks:
 
 - **Auto**, the usual setting: Claude goes ahead with what is safe and asks when unsure.

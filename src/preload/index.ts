@@ -123,7 +123,8 @@ const api: Api = {
     drop: (paths) => ipcRenderer.invoke('terminal:drop', paths),
     context: (path) => ipcRenderer.send('terminal:context', path),
     onData: (cb) => on('terminal:data', cb),
-    onExit: (cb) => on('terminal:exit', cb)
+    onExit: (cb) => on('terminal:exit', cb),
+    bell: () => ipcRenderer.send('terminal:bell')
   },
   chat: {
     start: () => ipcRenderer.send('chat:start'),

@@ -195,6 +195,8 @@ export interface Api {
     context: (path: string | null) => void
     onData: (cb: (data: string) => void) => Unsubscribe
     onExit: (cb: (code: number) => void) => Unsubscribe
+    // Claude Code rang the bell: it waits on the editor.
+    bell: () => void
   }
   // Claude as a chat. Starting begins a new conversation, after checking the sign-in.
   chat: {

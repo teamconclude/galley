@@ -92,6 +92,7 @@ export function TerminalView({ login, onExit, onTerminal }: ViewProps): React.JS
     const offData = window.api.terminal.onData((data) => term.write(data))
     const offExit = window.api.terminal.onExit((code) => exited(code))
     const input = term.onData((data) => window.api.terminal.write(data))
+    const bell = term.onBell(() => window.api.terminal.bell())
     const observer = new ResizeObserver(() => {
       if (el.clientWidth === 0 || el.clientHeight === 0) return
       const before = `${term.cols}x${term.rows}`
@@ -104,6 +105,7 @@ export function TerminalView({ login, onExit, onTerminal }: ViewProps): React.JS
       dark.removeEventListener('change', recolour)
       observer.disconnect()
       input.dispose()
+      bell.dispose()
       offData()
       offExit()
       report(null)

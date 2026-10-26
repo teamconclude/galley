@@ -78,14 +78,33 @@ const terminal = new ClaudeTerminal(
   (data) => send('terminal:data', data),
   (code) => send('terminal:exit', code)
 )
+// Claude waiting on the editor: the requests in the chat, and a bell from the terminal that
+// the window has not seen yet. Galley never takes the focus for them; while it is in the
+// background its Dock icon bounces once and carries a badge, with the number of requests.
+const waiting = new Set<string>()
+let rang = false
+
+function attention(news: boolean): void {
+  if (news && win && !win.isFocused()) app.dock?.bounce('informational')
+  app.dock?.setBadge(waiting.size > 0 ? String(waiting.size) : rang ? '•' : '')
+}
+
 // Commits Claude asked for, waiting on the main window to make them.
 const commits = new Map<string, (answer: string) => void>()
 
 const chat = new ClaudeChat({
   status: (status) => send('chat:status', status),
   item: (item) => send('chat:item', item),
-  request: (request) => send('chat:request', request),
-  settled: (id) => send('chat:settled', id),
+  request: (request) => {
+    waiting.add(request.id)
+    attention(true)
+    send('chat:request', request)
+  },
+  settled: (id) => {
+    waiting.delete(id)
+    attention(false)
+    send('chat:settled', id)
+  },
   commit: (message, files) =>
     new Promise((resolve) => {
       if (!win) return resolve('Galley has no window open, so nothing was committed.')
@@ -221,6 +240,10 @@ function createWindow(): void {
     }
   })
   rememberBounds(win, 'main')
+  win.on('focus', () => {
+    rang = false
+    attention(false)
+  })
   win.on('ready-to-show', () => win?.show())
   win.webContents.on('did-finish-load', () => {
     win?.webContents.setZoomLevel(loadSettings().zoom ?? 0)
@@ -594,6 +617,11 @@ function registerIpc(): void {
   ipcMain.on('chat:answer', (_e, id: string, answer: ChatAnswer) => chat.answer(id, answer))
   ipcMain.on('chat:interrupt', () => chat.interrupt())
   ipcMain.on('chat:stop', () => chat.stop())
+  ipcMain.on('terminal:bell', () => {
+    if (win?.isFocused()) return
+    rang = true
+    attention(true)
+  })
   ipcMain.on('chat:committed', (_e, id: string, answer: string) => {
     commits.get(id)?.(answer)
     commits.delete(id)
