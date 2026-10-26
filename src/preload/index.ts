@@ -101,6 +101,7 @@ const api: Api = {
   tools: {
     onClosed: (cb) => on('tool:closed', cb),
     place: (tool, x, y) => ipcRenderer.send('tool:place', tool, x, y),
+    snapshot: (rect) => ipcRenderer.invoke('tool:snapshot', rect),
     seeThrough: (tool, on) => ipcRenderer.send('tool:seeThrough', tool, on)
   },
   terminal: {

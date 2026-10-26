@@ -442,20 +442,21 @@ button.primary:disabled:hover {
 .dock-ghost {
   position: fixed;
   display: flex;
-  padding: 6px 8px 0;
-  min-width: 160px;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--gray3);
   border-radius: 6px;
   background: var(--bg-muted);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-  opacity: 0.9;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 30%);
+  opacity: 0.65;
   pointer-events: none;
 }
 
-.dock-ghost span {
-  padding: 4px 10px 6px;
-  border-bottom: 2px solid var(--accent);
-  color: var(--text);
+.dock-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
 }
 
 .tree-root {

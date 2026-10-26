@@ -60,8 +60,19 @@ interface Drag {
   target: DropTarget | null
   // Where the tool window would land, drawn over the window.
   box: Box | null
-  // The tool window's own window moves along, rather than a ghost of its tab.
+  // The tool window's own window moves along, rather than a ghost of it.
   byWindow?: boolean
+  // The tool window as it follows the pointer: its size, where it was taken hold of, and a
+  // picture of it once there is one.
+  ghost?: Ghost
+}
+
+interface Ghost {
+  width: number
+  height: number
+  dx: number
+  dy: number
+  image: string | null
 }
 
 // How far the pointer moves before a pressed tab starts to drag.
@@ -254,6 +265,30 @@ export default function DockLayout(props: Props): React.JSX.Element {
     const y0 = e.screenY
     let dragging = false
     let last: Drag | null = null
+    // Out of a dock, the whole tool window follows the pointer, held where it was taken:
+    // a picture of it, or, behind another tab, an empty frame with its title.
+    const group = fromMain
+      ? (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-group]')
+      : null
+    const g = group?.getBoundingClientRect()
+    let ghost: Ghost | undefined = g && {
+      width: g.width,
+      height: g.height,
+      dx: e.clientX - g.left,
+      dy: e.clientY - g.top,
+      image: null
+    }
+    // The picture is taken at the press, before anything of the drag is drawn over it.
+    if (g && !elementOf(tool).hidden) {
+      void window.api.tools
+        .snapshot({ x: g.left, y: g.top, width: g.width, height: g.height })
+        .then((image) => {
+          if (!ghost) return
+          ghost = { ...ghost, image }
+          if (last) setDrag((last = { ...last, ghost }))
+        })
+        .catch(() => {})
+    }
     const move = (ev: PointerEvent): void => {
       if (!dragging && Math.hypot(ev.screenX - x0, ev.screenY - y0) < threshold) return
       dragging = true
@@ -271,7 +306,7 @@ export default function DockLayout(props: Props): React.JSX.Element {
           window.api.tools.seeThrough(tool, !clear)
         }
       }
-      last = { tool, x, y, ...placed, byWindow: !fromMain }
+      last = { tool, x, y, ...placed, byWindow: !fromMain, ghost }
       setDrag(last)
     }
     const stop = (): void => {
@@ -279,6 +314,8 @@ export default function DockLayout(props: Props): React.JSX.Element {
       view.removeEventListener('pointerup', up)
       view.removeEventListener('keydown', key, true)
       if (!fromMain && !clear) window.api.tools.seeThrough(tool, false)
+      // A picture arriving after the drag has nothing to show.
+      ghost = undefined
       setDrag(null)
     }
     const up = (): void => {
@@ -372,9 +409,23 @@ export default function DockLayout(props: Props): React.JSX.Element {
               style={drag.box}
             />
           )}
-          {!drag.byWindow && (
-            <div className="dock-ghost" style={{ left: drag.x + 10, top: drag.y + 10 }}>
-              <span>{toolTitles[drag.tool]}</span>
+          {!drag.byWindow && drag.ghost && (
+            <div
+              className="dock-ghost"
+              style={{
+                left: drag.x - drag.ghost.dx,
+                top: drag.y - drag.ghost.dy,
+                width: drag.ghost.width,
+                height: drag.ghost.height
+              }}
+            >
+              {drag.ghost.image ? (
+                <img src={drag.ghost.image} alt="" />
+              ) : (
+                <div className="tool-tabs">
+                  <button className="on">{toolTitles[drag.tool]}</button>
+                </div>
+              )}
             </div>
           )}
         </div>

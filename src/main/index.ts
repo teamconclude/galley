@@ -644,6 +644,17 @@ function registerIpc(): void {
   ipcMain.on('chat:answer', (_e, id: string, answer: ChatAnswer) => chat.answer(id, answer))
   ipcMain.on('chat:interrupt', () => chat.interrupt())
   ipcMain.on('chat:stop', () => chat.stop())
+  // A picture of part of the window, for a tool window being dragged out of its dock.
+  ipcMain.handle('tool:snapshot', async (e, r: Rectangle) => {
+    const z = e.sender.getZoomFactor()
+    const image = await e.sender.capturePage({
+      x: Math.round(r.x * z),
+      y: Math.round(r.y * z),
+      width: Math.round(r.width * z),
+      height: Math.round(r.height * z)
+    })
+    return 'data:image/jpeg;base64,' + image.toJPEG(75).toString('base64')
+  })
   ipcMain.on('tool:place', (_e, tool: string, x: number, y: number) =>
     toolWindows.get(tool)?.setPosition(Math.round(x), Math.round(y))
   )

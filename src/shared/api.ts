@@ -163,6 +163,8 @@ export interface Api {
     // Moves a tool window's own window to a point on screen, as its tab bar is dragged,
     // and makes it see-through while it is over a place to dock.
     place: (tool: ToolId, x: number, y: number) => void
+    // A picture of a part of the main window, by its rectangle in the page, as a data URL.
+    snapshot: (rect: { x: number; y: number; width: number; height: number }) => Promise<string>
     seeThrough: (tool: ToolId, on: boolean) => void
   }
   terminal: {
