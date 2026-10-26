@@ -240,11 +240,9 @@ export interface Layout {
   showPreview: boolean
   showClaude: boolean
   detached: boolean
-  sidebarWidth: number
   previewWidth: number
-  claudeHeight: number
   frontmatterHeight: number
-  sidebarGroups: PanelGroup[]
+  docks: Docks
   showAllFiles: boolean
   // Content folders list pages by title and date rather than by file name.
   showTitles: boolean
@@ -269,15 +267,27 @@ export interface PreviewState {
   canForward: boolean
 }
 
-export type SidebarTab = 'files' | 'changes' | 'search'
+// The tool windows around the editor and the preview.
+export type ToolId = 'files' | 'changes' | 'search' | 'claude'
 
-// The sidebar's panels, top to bottom. A group shows its panels as tabs, one at a time.
-export interface PanelGroup {
-  tabs: SidebarTab[]
-  active: SidebarTab
-  // In pixels; the last group takes whatever room is left.
-  height: number
+export type DockSide = 'left' | 'right' | 'bottom'
+
+// Tool windows sharing a place, shown one at a time behind tabs.
+export interface ToolGroup {
+  tabs: ToolId[]
+  active: ToolId
 }
+
+// Where the tool windows are: up to two groups along the left and right edges, stacked,
+// and along the bottom, side by side. Size is a dock's width, or the bottom's height;
+// split is the first group's share of a dock with two.
+export interface Dock {
+  groups: ToolGroup[]
+  size: number
+  split: number
+}
+
+export type Docks = Record<DockSide, Dock>
 
 export interface SearchOptions {
   ignoreCase: boolean
@@ -432,6 +442,7 @@ export type MenuCommand =
   | 'show-in-finder'
   | 'back'
   | 'forward'
+  | 'reset-tool-windows'
 
 // What the menu's items can act on: an open site, an open page in it, and its preview.
 export interface MenuState {

@@ -83,24 +83,36 @@ Mac only. **File ▸ Open Recent** lists the sites you opened lately.
 
 ## The window
 
-- **Left: the sidebar**, with three panels. **Files** lists the site's pages and files,
-  **Changes** shows your work and the next step for it, and **Search** searches the whole
-  site. At first Files and Search share the top as two tabs and Changes sits below, so you
-  see your pages and your changes at once.
+- **Left: tool windows.** **Files** lists the site's pages and files, **Changes** shows your
+  work and the next step for it, and **Search** searches the whole site. At first Files
+  and Search share the top as two tabs and Changes sits below, so you see your pages and
+  your changes at once.
 - **Middle: the open page.** Its settings at the top, its text below. Galley starts on
   the home page.
 - **Right: the preview**, the page as it will look on the site.
-- **Bottom: Claude**, when you open it.
+- **Bottom: Claude**, a tool window too, when you open it.
 - **Top right:** the share button, which copies a link to your work for a colleague, and
   buttons to show or hide the preview and Claude.
 
 Drag the borders between the parts to make one larger. **View ▸ Larger text** (⌘+) makes
 everything larger.
 
-**Arranging the panels.** Drag a panel's tab onto another panel's tabs to put them
-together, and only one shows at a time; drag it onto **Drop to show apart**, between the
-panels, to give it a place of its own. Right-click a tab for the same, and for **Move up**
-and **Move down**. Putting all three together gives one panel at a time, with tabs.
+**Arranging the tool windows.** Files, Changes, Search and Claude can go along the left,
+the right and the bottom of the window, up to two in each place: stacked at the sides,
+side by side at the bottom. Drag a tool window by its tab; as you drag, a frame shows where
+it will go.
+
+- Over a row of tabs, it goes among them at the line that shows, for example to put
+  Search before Files.
+- Over the near half of a place with one tool window, it joins it as a tab: the top half
+  at the sides, the left half at the bottom. Over the far half, it gets a place of its own
+  next to it.
+- At the left or right edge of the window, where no tool windows are yet, it starts a new
+  place there; the same at the bottom of the editor.
+- Esc puts it back where it was.
+
+Drag the borders to size the places and to share one between two tool windows. **View ▸
+Reset Tool Windows** brings back the first arrangement.
 
 **Light or dark.** Galley follows macOS's light or dark appearance, in the colours of the
 Conclude app; **Settings** can keep it light or dark instead. The preview always shows the

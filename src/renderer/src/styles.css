@@ -302,11 +302,137 @@ button.primary:disabled:hover {
   min-height: 0;
 }
 
-.sidebar {
+.dock-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.dock-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dock-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* Docks hold up to two groups of tool windows: stacked along the sides, side by side
+   along the bottom. The first group's share is set inline; the second takes the rest. */
+.dock {
   flex: none;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   background: var(--bg-muted);
   user-select: none;
+}
+
+.dock.bottom {
+  flex-direction: row;
+}
+
+.tool-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tool-body {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tool {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tool[data-tool='claude'] {
+  background: var(--bg);
+  user-select: text;
+}
+
+/* Squeezed below its natural height, the Changes panel scrolls as a whole. */
+.tool > .changes {
+  overflow-y: auto;
+}
+
+/* While a tool window is dragged: the edges that can take a new dock, the place it would
+   land, and its tab following the pointer. */
+.dock-drag {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  cursor: grabbing;
+}
+
+.dock-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: var(--accent);
+  opacity: 0.35;
+}
+
+.dock-edge.left {
+  left: 0;
+}
+
+.dock-edge.right {
+  right: 0;
+}
+
+.dock-mark {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  pointer-events: none;
+  transition:
+    left 0.08s,
+    top 0.08s,
+    width 0.08s,
+    height 0.08s;
+}
+
+.dock-mark.line {
+  border: none;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.dock-ghost {
+  position: fixed;
+  display: flex;
+  padding: 6px 8px 0;
+  min-width: 160px;
+  border: 1px solid var(--gray3);
+  border-radius: 6px;
+  background: var(--bg-muted);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.dock-ghost span {
+  padding: 4px 10px 6px;
+  border-bottom: 2px solid var(--accent);
+  color: var(--text);
 }
 
 .tree-root {
@@ -592,11 +718,6 @@ body.dragging .terminal-host {
   flex: none;
   display: flex;
   min-width: 0;
-}
-
-.claude-row {
-  flex: none;
-  display: flex;
 }
 
 .pane-bar {
@@ -2245,77 +2366,36 @@ button.chat-chip.off:hover {
   opacity: 0.5;
 }
 
-.sidebar-tabs {
+.tool-tabs {
+  flex: none;
   display: flex;
   border-bottom: 1px solid var(--border);
   padding: 6px 8px 0;
   gap: 2px;
+  background: var(--bg-muted);
 }
 
-.sidebar-tabs button {
+.tool-tabs button {
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
   padding: 4px 10px 6px;
   color: var(--text-muted);
+  cursor: default;
 }
 
-.sidebar-tabs button.on {
+.tool-tabs button.on {
   color: var(--text);
   border-bottom-color: var(--accent);
 }
 
-/* Panel groups stack in the sidebar; the last one takes the room the others leave. */
-.panels {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+/* The tab being dragged stays behind as an outline of itself. */
+.tool-tabs button.lifted {
+  opacity: 0.35;
 }
 
-.panel-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Squeezed below its natural height, the Changes panel scrolls as a whole. */
-.panel > .changes {
-  overflow-y: auto;
-}
-
-.sidebar-tabs.over {
-  background: var(--accent-soft);
-}
-
-.panel-drop {
-  flex: none;
-  margin: 4px 8px;
-  padding: 6px;
-  border: 1px dashed var(--gray4);
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 11px;
-  text-align: center;
-}
-
-.panel-drop.over {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--text);
-}
-
-.sidebar-tabs .badge {
+.tool-tabs .badge {
   display: inline-block;
   min-width: 18px;
   padding: 0 5px;
@@ -3108,12 +3188,6 @@ button.chat-chip.off:hover {
   border-radius: 6px;
   padding: 5px 8px;
   background: var(--bg);
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .tree {

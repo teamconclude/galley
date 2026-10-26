@@ -141,6 +141,7 @@ function buildMenu(actions: Actions): Menu {
           accelerator: 'CmdOrCtrl+J',
           click: () => actions.command('toggle-terminal')
         },
+        { label: 'Reset Tool Windows', click: () => actions.command('reset-tool-windows') },
         {
           label: 'Reload preview',
           accelerator: 'CmdOrCtrl+Alt+R',

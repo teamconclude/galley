@@ -16,9 +16,9 @@ import type {
   Preferences,
   SearchMatch,
   SearchOptions,
-  PanelGroup,
+  Docks,
   PreviewScroll,
-  SidebarTab
+  ToolId
 } from '../../shared/types'
 import { EditorView } from '@codemirror/view'
 import ChangesPanel from './components/ChangesPanel'
@@ -62,8 +62,8 @@ import {
   type Place
 } from './lib/history'
 import { loadLayout, saveLayout } from './lib/layout'
-import { showPanel } from './lib/panels'
-import Sidebar from './components/Sidebar'
+import { defaultDocks, showTool } from './lib/docks'
+import DockLayout from './components/Docks'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
 import SettingsDialog from './components/SettingsDialog'
@@ -199,9 +199,7 @@ export default function App(): React.JSX.Element | null {
   const textView = useRef<EditorView | null>(null)
   const pendingSpot = useRef<{ path: string; spot: EditorSpot } | null>(null)
   const [showClaude, setShowClaude] = useState(layout.showClaude)
-  const [sidebarWidth, setSidebarWidth] = useState(layout.sidebarWidth)
   const [previewWidth, setPreviewWidth] = useState(layout.previewWidth)
-  const [claudeHeight, setClaudeHeight] = useState(layout.claudeHeight)
   const [frontmatterHeight, setFrontmatterHeight] = useState(layout.frontmatterHeight)
   const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
   const [showTitles, setShowTitles] = useState(layout.showTitles)
@@ -217,9 +215,13 @@ export default function App(): React.JSX.Element | null {
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null)
   const [identity, setIdentity] = useState<Identity | null>(null)
-  const [sidebarGroups, setSidebarGroups] = useState<PanelGroup[]>(layout.sidebarGroups)
-  const showSidebarPanel = (tab: SidebarTab): void =>
-    setSidebarGroups((groups) => showPanel(groups, tab))
+  const [docks, setDocks] = useState<Docks>(layout.docks)
+  const showSidebarPanel = (tool: ToolId): void => setDocks((d) => showTool(d, tool))
+  // Turning Claude on brings it to the front of its group.
+  const toggleClaude = (): void => {
+    if (!showClaude) setDocks((d) => showTool(d, 'claude'))
+    setShowClaude(!showClaude)
+  }
   const [draft, setDraft] = useState<CommitDraft>(emptyDraft)
   const [writingMessage, setWritingMessage] = useState(false)
   const settledDraft = newDraft(draft, gitStatus)
@@ -1220,11 +1222,9 @@ export default function App(): React.JSX.Element | null {
       showPreview,
       showClaude,
       detached,
-      sidebarWidth,
       previewWidth,
-      claudeHeight,
       frontmatterHeight,
-      sidebarGroups,
+      docks,
       showAllFiles,
       showTitles,
       previewMode
@@ -1233,11 +1233,9 @@ export default function App(): React.JSX.Element | null {
     showPreview,
     showClaude,
     detached,
-    sidebarWidth,
     previewWidth,
-    claudeHeight,
     frontmatterHeight,
-    sidebarGroups,
+    docks,
     showAllFiles,
     showTitles,
     previewMode
@@ -1347,7 +1345,7 @@ export default function App(): React.JSX.Element | null {
         toggleDetached()
         break
       case 'toggle-terminal':
-        if (claudeOn) setShowClaude((c) => !c)
+        if (claudeOn) toggleClaude()
         break
       case 'reload-preview':
         setReloadKey((k) => k + 1)
@@ -1375,6 +1373,9 @@ export default function App(): React.JSX.Element | null {
         break
       case 'back':
         void step(-1)
+        break
+      case 'reset-tool-windows':
+        setDocks(defaultDocks())
         break
       case 'forward':
         void step(1)
@@ -1496,7 +1497,7 @@ export default function App(): React.JSX.Element | null {
               {detached ? 'Preview ↗' : 'Preview'}
             </button>
             {claudeOn && (
-              <button className={showClaude ? 'on' : ''} onClick={() => setShowClaude(!showClaude)}>
+              <button className={showClaude ? 'on' : ''} onClick={toggleClaude}>
                 Claude
               </button>
             )}
@@ -1511,232 +1512,217 @@ export default function App(): React.JSX.Element | null {
             <button onClick={() => void endReview()}>Back to {gitStatus.review.from}</button>
           </div>
         )}
-        <div className="body">
-          <aside className="sidebar" style={{ width: sidebarWidth }}>
-            <Sidebar
-              groups={sidebarGroups}
-              onGroups={setSidebarGroups}
-              panels={{
-                files: {
-                  content: (
-                    <FileTree
-                      name={repo.name}
-                      selected={file?.path ?? null}
-                      expanded={expanded}
-                      onToggle={toggleDir}
-                      onSelect={(path) => void open(path)}
-                      onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
-                      onDropFiles={(dir, files) => void dropFiles(dir, files)}
-                      onDragImage={setDraggedImage}
-                      onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
-                      onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
-                      onRefresh={() => setTreeVersion((v) => v + 1)}
-                      onCollapseAll={() => setExpanded(new Set())}
-                      showAll={showAllFiles}
-                      onToggleShowAll={() => setShowAllFiles(!showAllFiles)}
-                      pages={pages}
-                      showTitles={showTitles}
-                      onToggleTitles={() => setShowTitles(!showTitles)}
-                      onFindPage={() => setFinding(true)}
-                      version={treeVersion}
-                    />
-                  )
-                },
-                changes: {
-                  badge: gitStatus?.changes.length,
-                  content: (
-                    <ChangesPanel
-                      status={gitStatus}
-                      me={identity}
-                      selected={diff?.change.path ?? null}
-                      onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
-                      onDiscard={(c) => void discardChange(c)}
-                      onDiscardAll={(cs) => void discardAll(cs)}
-                      draft={draft}
-                      onDraft={setDraft}
-                      onWriteMessage={claudeOn ? (paths) => void writeMessage(paths) : undefined}
-                      writingMessage={writingMessage}
-                      onCommit={commit}
-                      onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
-                      onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
-                      onUpdate={() =>
-                        void save().then(() => gitAction(() => window.api.git.update()))
-                      }
-                      onContinue={() => void continueRebase()}
-                      onCancelRebase={() => void cancelRebase()}
-                      onAskClaude={claudeOn ? resolveWithClaude : undefined}
-                      onFetch={() => void gitAction(() => window.api.git.fetch())}
-                      onNewBranch={() => setGitDialog('new-branch')}
-                      onMerge={() => setGitDialog('merge')}
-                      onMove={() => setGitDialog('move')}
-                      onOutside={(entry, action) =>
-                        action === 'reveal'
-                          ? void window.api.repo.reveal(entry.path)
-                          : setOutsideDialog({ entry, action })
-                      }
-                      onRelease={setReleaseDialog}
-                      onPublish={setReleaseDialog}
-                      onSwitchBranch={() => void openSwitchBranch()}
-                      onDeleteBranch={() => void openDeleteBranch()}
-                    />
-                  )
-                },
-                search: {
-                  content: (
-                    <SearchPanel
-                      request={searchRequest}
-                      selected={searchHit}
-                      onOpen={(path, match) => void openMatch(path, match)}
-                      onReplaceAll={replaceAll}
-                    />
-                  )
+        <DockLayout
+          docks={docks}
+          onDocks={setDocks}
+          hidden={showClaude ? [] : ['claude']}
+          tools={{
+            files: {
+              content: (
+                <FileTree
+                  name={repo.name}
+                  selected={file?.path ?? null}
+                  expanded={expanded}
+                  onToggle={toggleDir}
+                  onSelect={(path) => void open(path)}
+                  onContextMenu={(entry, x, y) => setMenu({ x, y, entry })}
+                  onDropFiles={(dir, files) => void dropFiles(dir, files)}
+                  onDragImage={setDraggedImage}
+                  onNewPage={() => setDialog({ kind: 'new-page', dir: newPageDir })}
+                  onNewFolder={() => setDialog({ kind: 'new-folder', dir: newPageDir })}
+                  onRefresh={() => setTreeVersion((v) => v + 1)}
+                  onCollapseAll={() => setExpanded(new Set())}
+                  showAll={showAllFiles}
+                  onToggleShowAll={() => setShowAllFiles(!showAllFiles)}
+                  pages={pages}
+                  showTitles={showTitles}
+                  onToggleTitles={() => setShowTitles(!showTitles)}
+                  onFindPage={() => setFinding(true)}
+                  version={treeVersion}
+                />
+              )
+            },
+            changes: {
+              badge: gitStatus?.changes.length,
+              content: (
+                <ChangesPanel
+                  status={gitStatus}
+                  me={identity}
+                  selected={diff?.change.path ?? null}
+                  onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
+                  onDiscard={(c) => void discardChange(c)}
+                  onDiscardAll={(cs) => void discardAll(cs)}
+                  draft={draft}
+                  onDraft={setDraft}
+                  onWriteMessage={claudeOn ? (paths) => void writeMessage(paths) : undefined}
+                  writingMessage={writingMessage}
+                  onCommit={commit}
+                  onPush={() => void save().then(() => gitAction(() => window.api.git.push()))}
+                  onPull={() => void save().then(() => gitAction(() => window.api.git.pull()))}
+                  onUpdate={() => void save().then(() => gitAction(() => window.api.git.update()))}
+                  onContinue={() => void continueRebase()}
+                  onCancelRebase={() => void cancelRebase()}
+                  onAskClaude={claudeOn ? resolveWithClaude : undefined}
+                  onFetch={() => void gitAction(() => window.api.git.fetch())}
+                  onNewBranch={() => setGitDialog('new-branch')}
+                  onMerge={() => setGitDialog('merge')}
+                  onMove={() => setGitDialog('move')}
+                  onOutside={(entry, action) =>
+                    action === 'reveal'
+                      ? void window.api.repo.reveal(entry.path)
+                      : setOutsideDialog({ entry, action })
+                  }
+                  onRelease={setReleaseDialog}
+                  onPublish={setReleaseDialog}
+                  onSwitchBranch={() => void openSwitchBranch()}
+                  onDeleteBranch={() => void openDeleteBranch()}
+                />
+              )
+            },
+            search: {
+              content: (
+                <SearchPanel
+                  request={searchRequest}
+                  selected={searchHit}
+                  onOpen={(path, match) => void openMatch(path, match)}
+                  onReplaceAll={replaceAll}
+                />
+              )
+            },
+            ...(claudeOn && prefs
+              ? {
+                  claude: {
+                    content: (
+                      <ClaudePane
+                        repoPath={repo.path}
+                        prefs={prefs}
+                        onPrefs={updatePrefs}
+                        openFile={filePath}
+                      />
+                    )
+                  }
                 }
-              }}
-            />
-          </aside>
-          <Splitter
-            direction="horizontal"
-            onDrag={(d) => setSidebarWidth((w) => clamp(w + d, 160, 500))}
-          />
-          <div className="center">
-            <div className="upper">
-              <main className="editor-column">
-                {diff ? (
-                  <DiffView
-                    change={diff.change}
-                    diff={diff.text}
-                    onOpen={() => void open(diff.change.path)}
-                    onDiscard={() => void discardChange(diff.change)}
-                    onRevertHunk={(i) => void revertHunk(diff.change, i)}
-                  />
-                ) : file && rebaseState && inConflict(file.path) ? (
-                  <ConflictEditor
-                    key={`conflict:${file.path}`}
-                    path={file.path}
-                    text={file.text}
-                    state={rebaseState}
-                    onChange={changeText}
-                    onSave={() => void save()}
-                    onContinue={() => void continueRebase()}
-                    onAskClaude={
-                      claudeOn ? () => resolveWithClaude(conflictPaths, rebaseState) : undefined
-                    }
-                  />
-                ) : !file ? (
-                  <div className="pane-empty">Choose a page on the left.</div>
-                ) : imageFile.test(file.path) ? (
-                  <div className="image-view">
-                    <img src={`galley://repo/${file.path}?v=${imageVersion}`} alt={file.path} />
-                  </div>
-                ) : binaryFile.test(file.path) ? (
-                  <div className="pane-empty">This file cannot be edited here.</div>
-                ) : (
-                  <>
-                    {parts && parts.frontmatter !== null && (
-                      <Frontmatter
-                        key={`settings:${file.path}`}
-                        text={parts.frontmatter}
-                        format={parts.format}
-                        onChange={(fm) => changeText(join(fm, parts.body, parts.format))}
-                        grow={blocksPage}
-                        height={blocksPage ? undefined : frontmatterHeight}
-                        select={selectIn('frontmatter')}
-                      />
-                    )}
-                    {parts && parts.frontmatter !== null && !blocksPage && (
-                      <Splitter
-                        direction="vertical"
-                        onDrag={(d) => setFrontmatterHeight((h) => Math.max(80, h + d))}
-                      />
-                    )}
-                    {blocksPage && (
-                      <button
-                        className="body-toggle"
-                        onClick={() => setBodyShownFor(showBody ? null : file.path)}
-                      >
-                        {showBody ? 'Hide body text' : 'Show body text (empty)'}
-                      </button>
-                    )}
-                    {showBody && (
-                      <>
-                        {isMarkdown && <Toolbar view={bodyView} />}
-                        {isMarkdown && <BodyFollower view={bodyView} />}
-                        <Editor
-                          key={`body:${file.path}`}
-                          filename={file.path}
-                          value={parts ? parts.body : file.text}
-                          onChange={(body) =>
-                            changeText(parts ? join(parts.frontmatter, body, parts.format) : body)
-                          }
-                          onSave={() => void save()}
-                          importImages={isMarkdown ? importImages : undefined}
-                          paste={isMarkdown ? { pasteImage, pasteDocument } : undefined}
-                          prose={isMarkdown}
-                          select={selectIn('body')}
-                          onView={(view) => {
-                            takeTextView(view, file.path)
-                            if (isMarkdown) setBodyView(view)
-                          }}
-                        />
-                      </>
-                    )}
-                  </>
-                )}
-              </main>
-              {showPreview && !detached && (
+              : {})
+          }}
+        >
+          <div className="upper">
+            <main className="editor-column">
+              {diff ? (
+                <DiffView
+                  change={diff.change}
+                  diff={diff.text}
+                  onOpen={() => void open(diff.change.path)}
+                  onDiscard={() => void discardChange(diff.change)}
+                  onRevertHunk={(i) => void revertHunk(diff.change, i)}
+                />
+              ) : file && rebaseState && inConflict(file.path) ? (
+                <ConflictEditor
+                  key={`conflict:${file.path}`}
+                  path={file.path}
+                  text={file.text}
+                  state={rebaseState}
+                  onChange={changeText}
+                  onSave={() => void save()}
+                  onContinue={() => void continueRebase()}
+                  onAskClaude={
+                    claudeOn ? () => resolveWithClaude(conflictPaths, rebaseState) : undefined
+                  }
+                />
+              ) : !file ? (
+                <div className="pane-empty">Choose a page on the left.</div>
+              ) : imageFile.test(file.path) ? (
+                <div className="image-view">
+                  <img src={`galley://repo/${file.path}?v=${imageVersion}`} alt={file.path} />
+                </div>
+              ) : binaryFile.test(file.path) ? (
+                <div className="pane-empty">This file cannot be edited here.</div>
+              ) : (
                 <>
-                  <Splitter
-                    direction="horizontal"
-                    onDrag={(d) => setPreviewWidth((w) => clamp(w - d, 320, 1400))}
-                  />
-                  <section className="preview-column" style={{ width: previewWidth }}>
-                    <Preview
-                      status={hugo}
-                      url={previewUrl}
-                      reloadKey={reloadKey}
-                      mode={previewMode}
-                      onMode={setPreviewMode}
-                      version={contentVersion}
-                      markdownSuffix={site.markdownSuffix}
-                      detached={false}
-                      onDetach={toggleDetached}
-                      onAttach={toggleDetached}
-                      targets={onShow}
-                      notice={previewNotice}
-                      imageDrop={imageDrop}
-                      history={{
-                        canBack: history.canBack,
-                        canForward: history.canForward,
-                        onStep: (by) => void step(by)
-                      }}
-                      onNavigate={previewNavigated}
-                      onScrolled={previewScrolled}
+                  {parts && parts.frontmatter !== null && (
+                    <Frontmatter
+                      key={`settings:${file.path}`}
+                      text={parts.frontmatter}
+                      format={parts.format}
+                      onChange={(fm) => changeText(join(fm, parts.body, parts.format))}
+                      grow={blocksPage}
+                      height={blocksPage ? undefined : frontmatterHeight}
+                      select={selectIn('frontmatter')}
                     />
-                  </section>
+                  )}
+                  {parts && parts.frontmatter !== null && !blocksPage && (
+                    <Splitter
+                      direction="vertical"
+                      onDrag={(d) => setFrontmatterHeight((h) => Math.max(80, h + d))}
+                    />
+                  )}
+                  {blocksPage && (
+                    <button
+                      className="body-toggle"
+                      onClick={() => setBodyShownFor(showBody ? null : file.path)}
+                    >
+                      {showBody ? 'Hide body text' : 'Show body text (empty)'}
+                    </button>
+                  )}
+                  {showBody && (
+                    <>
+                      {isMarkdown && <Toolbar view={bodyView} />}
+                      {isMarkdown && <BodyFollower view={bodyView} />}
+                      <Editor
+                        key={`body:${file.path}`}
+                        filename={file.path}
+                        value={parts ? parts.body : file.text}
+                        onChange={(body) =>
+                          changeText(parts ? join(parts.frontmatter, body, parts.format) : body)
+                        }
+                        onSave={() => void save()}
+                        importImages={isMarkdown ? importImages : undefined}
+                        paste={isMarkdown ? { pasteImage, pasteDocument } : undefined}
+                        prose={isMarkdown}
+                        select={selectIn('body')}
+                        onView={(view) => {
+                          takeTextView(view, file.path)
+                          if (isMarkdown) setBodyView(view)
+                        }}
+                      />
+                    </>
+                  )}
                 </>
               )}
-            </div>
-            <Splitter
-              direction="vertical"
-              hidden={!showClaude || !claudeOn}
-              onDrag={(d) => setClaudeHeight((h) => clamp(h - d, 120, 900))}
-            />
-            <section
-              className="claude-row"
-              style={{ height: claudeHeight }}
-              hidden={!showClaude || !claudeOn}
-            >
-              {claudeOn && prefs && (
-                <ClaudePane
-                  repoPath={repo.path}
-                  prefs={prefs}
-                  onPrefs={updatePrefs}
-                  openFile={filePath}
+            </main>
+            {showPreview && !detached && (
+              <>
+                <Splitter
+                  direction="horizontal"
+                  onDrag={(d) => setPreviewWidth((w) => clamp(w - d, 320, 1400))}
                 />
-              )}
-            </section>
+                <section className="preview-column" style={{ width: previewWidth }}>
+                  <Preview
+                    status={hugo}
+                    url={previewUrl}
+                    reloadKey={reloadKey}
+                    mode={previewMode}
+                    onMode={setPreviewMode}
+                    version={contentVersion}
+                    markdownSuffix={site.markdownSuffix}
+                    detached={false}
+                    onDetach={toggleDetached}
+                    onAttach={toggleDetached}
+                    targets={onShow}
+                    notice={previewNotice}
+                    imageDrop={imageDrop}
+                    history={{
+                      canBack: history.canBack,
+                      canForward: history.canForward,
+                      onStep: (by) => void step(by)
+                    }}
+                    onNavigate={previewNavigated}
+                    onScrolled={previewScrolled}
+                  />
+                </section>
+              </>
+            )}
           </div>
-        </div>
+        </DockLayout>
         {showSetup && setup && <SetupDialog status={setup} onClose={() => setShowSetup(false)} />}
         {siteDialog === 'new' && <NewSiteDialog onCancel={() => setSiteDialog(null)} />}
         {siteDialog === 'open' && <OpenSiteDialog onCancel={() => setSiteDialog(null)} />}
