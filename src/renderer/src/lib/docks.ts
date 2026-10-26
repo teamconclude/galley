@@ -127,12 +127,10 @@ export function showTool(docks: Docks, tool: ToolId): Docks {
   }))
 }
 
-// Where a dragged tool window lands: among a group's tabs at an index, in a group of its
-// own in a dock, after the group there, or in a window of its own at a point on screen.
+// Where a dragged tool window lands: among a group's tabs at an index, or in a group of
+// its own in a dock, after the group there.
 export type DropTarget =
-  | { kind: 'tab'; side: DockSide; group: number; index: number }
-  | { kind: 'apart'; side: DockSide }
-  | { kind: 'window'; screenX: number; screenY: number }
+  { kind: 'tab'; side: DockSide; group: number; index: number } | { kind: 'apart'; side: DockSide }
 
 export const isFloating = (docks: Docks, tool: ToolId): boolean => docks.floating.includes(tool)
 
@@ -146,7 +144,6 @@ export const dockTool = (docks: Docks, tool: ToolId): Docks =>
     : docks
 
 export function moveTool(docks: Docks, tool: ToolId, to: DropTarget): Docks {
-  if (to.kind === 'window') return floatTool(docks, tool)
   const from = placeOf(docks, tool)
   if (!from) return docks
   const next: Docks = {

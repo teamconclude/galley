@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { Dock, Docks, DockSide, ToolId } from '../../../shared/types'
 import {
   dockTool,
+  floatTool,
   isFloating,
   maxGroups,
   moveTool,
@@ -245,15 +246,17 @@ export default function DockLayout(props: Props): React.JSX.Element {
 
   // A drag starts in the main window or in a tool window's own window; either way the
   // pointer is followed in the main window's coordinates, and the window it started in
-  // keeps reporting it while the button is down, wherever it goes. Dragged by its tab bar,
-  // a tool window's own window moves along with the pointer, see-through while over a
-  // place to dock; it docks only once let go, never during the move.
+  // keeps reporting it while the button is down, wherever it goes. Within the main window
+  // a picture of the tool window follows the pointer. Leaving it, the tool window tears
+  // off into a window of its own under the pointer, as a browser tab does, which then
+  // follows the pointer; so does a tool window's own window dragged by its tab bar. Such a
+  // window turns see-through over a place to dock, and docks there only once let go,
+  // never during the move; let go elsewhere, it stays a window where it is. Esc undoes it.
   const startDrag = (tool: ToolId, e: React.PointerEvent): void => {
     if (e.button !== 0) return
     const view = (e.view as unknown as Window | null) ?? window
     const fromMain = view === window
     const start = { x: view.screenX, y: view.screenY }
-    let clear = true
     const local = (ev: PointerEvent): { x: number; y: number } =>
       fromMain
         ? { x: ev.clientX, y: ev.clientY }
@@ -264,9 +267,10 @@ export default function DockLayout(props: Props): React.JSX.Element {
     const x0 = e.screenX
     const y0 = e.screenY
     let dragging = false
+    let tornOff = false
+    let seeThrough = false
     let last: Drag | null = null
-    // Out of a dock, the whole tool window follows the pointer, held where it was taken:
-    // a picture of it, or, behind another tab, an empty frame with its title.
+    // The picture: the tool window's own contents, under a tab bar with its tab alone.
     const group = fromMain
       ? (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-group]')
       : null
@@ -278,10 +282,13 @@ export default function DockLayout(props: Props): React.JSX.Element {
       dy: e.clientY - g.top,
       image: null
     }
-    // The picture is taken at the press, before anything of the drag is drawn over it.
-    if (g && !elementOf(tool).hidden) {
+    // Taken at the press, before anything of the drag is drawn over it; a tool window
+    // behind another tab has nothing to show but its frame.
+    const content = elementOf(tool)
+    if (g && !content.hidden) {
+      const c = content.getBoundingClientRect()
       void window.api.tools
-        .snapshot({ x: g.left, y: g.top, width: g.width, height: g.height })
+        .snapshot({ x: c.left, y: c.top, width: c.width, height: c.height })
         .then((image) => {
           if (!ghost) return
           ghost = { ...ghost, image }
@@ -289,31 +296,42 @@ export default function DockLayout(props: Props): React.JSX.Element {
         })
         .catch(() => {})
     }
+    // Where the moving window goes: its tab bar under the pointer as it tears off, or as
+    // far as the pointer moved, for a window that was there already.
+    const windowAt = (ev: PointerEvent): { x: number; y: number } =>
+      fromMain
+        ? { x: ev.screenX - 110, y: ev.screenY - 20 }
+        : { x: start.x + ev.screenX - x0, y: start.y + ev.screenY - y0 }
     const move = (ev: PointerEvent): void => {
       if (!dragging && Math.hypot(ev.screenX - x0, ev.screenY - y0) < threshold) return
       dragging = true
       const { x, y } = local(ev)
       const outside = x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight
+      if (fromMain && outside && !tornOff && !isFloating(docksRef.current, tool)) {
+        tornOff = true
+        dropped.current.set(tool, windowAt(ev))
+        onDocks((d) => floatTool(d, tool))
+      }
+      const moving = !fromMain || tornOff
       const placed: Pick<Drag, 'target' | 'box'> = outside
-        ? fromMain && !isFloating(docksRef.current, tool)
-          ? { target: { kind: 'window', screenX: ev.screenX, screenY: ev.screenY }, box: null }
-          : { target: null, box: null }
+        ? { target: null, box: null }
         : targetAt(tool, x, y)
-      if (!fromMain) {
-        window.api.tools.place(tool, start.x + ev.screenX - x0, start.y + ev.screenY - y0)
-        if (clear === !!placed.target) {
-          clear = !placed.target
-          window.api.tools.seeThrough(tool, !clear)
+      if (moving) {
+        const at = windowAt(ev)
+        window.api.tools.place(tool, at.x, at.y)
+        if (seeThrough !== !!placed.target) {
+          seeThrough = !!placed.target
+          window.api.tools.seeThrough(tool, seeThrough)
         }
       }
-      last = { tool, x, y, ...placed, byWindow: !fromMain, ghost }
+      last = { tool, x, y, ...placed, byWindow: moving, ghost }
       setDrag(last)
     }
     const stop = (): void => {
       view.removeEventListener('pointermove', move)
       view.removeEventListener('pointerup', up)
       view.removeEventListener('keydown', key, true)
-      if (!fromMain && !clear) window.api.tools.seeThrough(tool, false)
+      if (seeThrough) window.api.tools.seeThrough(tool, false)
       // A picture arriving after the drag has nothing to show.
       ghost = undefined
       setDrag(null)
@@ -321,19 +339,15 @@ export default function DockLayout(props: Props): React.JSX.Element {
     const up = (): void => {
       stop()
       const target = last?.target
-      if (!target) return
-      // The window opens with its title bar under the pointer.
-      if (target.kind === 'window') {
-        dropped.current.set(tool, { x: target.screenX - 60, y: target.screenY - 12 })
-      }
-      onDocks((d) => moveTool(d, tool, target))
+      if (target) onDocks((d) => moveTool(d, tool, target))
     }
     const key = (ev: KeyboardEvent): void => {
       if (ev.key !== 'Escape') return
       ev.preventDefault()
       ev.stopPropagation()
       stop()
-      if (!fromMain && dragging) window.api.tools.place(tool, start.x, start.y)
+      if (tornOff) onDocks((d) => dockTool(d, tool))
+      else if (!fromMain && dragging) window.api.tools.place(tool, start.x, start.y)
     }
     view.addEventListener('pointermove', move)
     view.addEventListener('pointerup', up)
@@ -419,13 +433,10 @@ export default function DockLayout(props: Props): React.JSX.Element {
                 height: drag.ghost.height
               }}
             >
-              {drag.ghost.image ? (
-                <img src={drag.ghost.image} alt="" />
-              ) : (
-                <div className="tool-tabs">
-                  <button className="on">{toolTitles[drag.tool]}</button>
-                </div>
-              )}
+              <div className="tool-tabs">
+                <button className="on">{toolTitles[drag.tool]}</button>
+              </div>
+              {drag.ghost.image && <img src={drag.ghost.image} alt="" />}
             </div>
           )}
         </div>

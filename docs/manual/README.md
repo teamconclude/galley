@@ -109,8 +109,9 @@ it will go.
   next to it.
 - At the left or right edge of the window, where no tool windows are yet, it starts a new
   place there; the same at the bottom of the editor.
-- Outside Galley's window, it opens in a window of its own there, for example on a second
-  screen.
+- Dragged out of Galley's window, it gets a window of its own, which follows the pointer
+  from there; let go anywhere, for example on a second screen, and it stays there. Dragged
+  back over Galley's window before letting go, it docks where the frame shows.
 - Esc puts it back where it was.
 
 Such a window moves by its tab bar, which is its title bar. Moved over Galley's window it
