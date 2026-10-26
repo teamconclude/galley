@@ -160,6 +160,10 @@ export interface Api {
   tools: {
     // A tool window's own window was closed, by the editor rather than with Galley.
     onClosed: (cb: (tool: ToolId) => void) => Unsubscribe
+    // A tool window's own window is being moved by its title bar, with the pointer at a
+    // point of the main window, or elsewhere (null); and where it was let go.
+    onMoving: (cb: (tool: ToolId, at: { x: number; y: number } | null) => void) => Unsubscribe
+    onMoved: (cb: (tool: ToolId, at: { x: number; y: number } | null) => void) => Unsubscribe
   }
   terminal: {
     // Starts Claude Code, or with login its sign-in, which the chat needs first.

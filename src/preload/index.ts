@@ -99,7 +99,9 @@ const api: Api = {
     fetchText: (url) => ipcRenderer.invoke('preview:fetch', url)
   },
   tools: {
-    onClosed: (cb) => on('tool:closed', cb)
+    onClosed: (cb) => on('tool:closed', cb),
+    onMoving: (cb) => on('tool:moving', cb),
+    onMoved: (cb) => on('tool:moved', cb)
   },
   terminal: {
     start: (cols, rows, login) => ipcRenderer.send('terminal:start', cols, rows, login),

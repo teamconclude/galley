@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Dock, Docks, DockSide, ToolId } from '../../../shared/types'
 import {
@@ -60,6 +60,8 @@ interface Drag {
   target: DropTarget | null
   // Where the tool window would land, drawn over the window.
   box: Box | null
+  // The tool window's own window is moved, rather than its tab dragged.
+  byWindow?: boolean
 }
 
 // How far the pointer moves before a pressed tab starts to drag.
@@ -125,6 +127,7 @@ export default function DockLayout(props: Props): React.JSX.Element {
       }),
     [onDocks]
   )
+
   const shown = Object.fromEntries(sides.map((s) => [s, shownGroups(docks[s], has)])) as Record<
     DockSide,
     Shown[]
@@ -228,6 +231,21 @@ export default function DockLayout(props: Props): React.JSX.Element {
     }
     return none
   }
+
+  // A tool window's own window moved by its title bar over this one shows where it would
+  // dock, and docks there when let go; let go elsewhere, it only moves.
+  const moving = useEffectEvent((tool: ToolId, at: { x: number; y: number } | null) =>
+    setDrag(at ? { tool, ...at, ...targetAt(tool, at.x, at.y), byWindow: true } : null)
+  )
+  const moved = useEffectEvent((tool: ToolId, at: { x: number; y: number } | null) => {
+    setDrag(null)
+    const target = at && targetAt(tool, at.x, at.y).target
+    if (target) onDocks((d) => moveTool(d, tool, target))
+  })
+  useEffect(() => {
+    const offs = [window.api.tools.onMoving(moving), window.api.tools.onMoved(moved)]
+    return () => offs.forEach((off) => off())
+  }, [])
 
   // A drag starts in the main window or in a tool window's own window; either way the
   // pointer is followed in the main window's coordinates, and the window it started in
@@ -356,9 +374,11 @@ export default function DockLayout(props: Props): React.JSX.Element {
               style={drag.box}
             />
           )}
-          <div className="dock-ghost" style={{ left: drag.x + 10, top: drag.y + 10 }}>
-            <span>{toolTitles[drag.tool]}</span>
-          </div>
+          {!drag.byWindow && (
+            <div className="dock-ghost" style={{ left: drag.x + 10, top: drag.y + 10 }}>
+              <span>{toolTitles[drag.tool]}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
