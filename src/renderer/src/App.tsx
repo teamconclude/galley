@@ -62,7 +62,7 @@ import {
   type Place
 } from './lib/history'
 import { loadLayout, saveLayout } from './lib/layout'
-import { defaultDocks, showTool } from './lib/docks'
+import { defaultDocks, dockTool, floatTool, isFloating, showTool } from './lib/docks'
 import DockLayout from './components/Docks'
 import Toolbar from './components/Toolbar'
 import SetupDialog from './components/SetupDialog'
@@ -142,7 +142,6 @@ function hashText(text: string): number {
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0
   return h
 }
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 const parentOf = (path: string): string =>
   path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
 const inDir = (dir: string, name: string): string => (dir ? `${dir}/${name}` : name)
@@ -191,7 +190,6 @@ export default function App(): React.JSX.Element | null {
   // New site or Clone, from the Welcome screen or the File menu.
   const [siteDialog, setSiteDialog] = useState<SiteDialog>(null)
   const [showPreview, setShowPreview] = useState(layout.showPreview)
-  const [detached, setDetached] = useState(layout.detached)
   const [pagePath, setPagePath] = useState('/')
   const history = useHistory()
   // The text editor of the open file, whatever its kind, and the spot to put it back to
@@ -199,7 +197,6 @@ export default function App(): React.JSX.Element | null {
   const textView = useRef<EditorView | null>(null)
   const pendingSpot = useRef<{ path: string; spot: EditorSpot } | null>(null)
   const [showClaude, setShowClaude] = useState(layout.showClaude)
-  const [previewWidth, setPreviewWidth] = useState(layout.previewWidth)
   const [frontmatterHeight, setFrontmatterHeight] = useState(layout.frontmatterHeight)
   const [showAllFiles, setShowAllFiles] = useState(layout.showAllFiles)
   const [showTitles, setShowTitles] = useState(layout.showTitles)
@@ -217,7 +214,11 @@ export default function App(): React.JSX.Element | null {
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [docks, setDocks] = useState<Docks>(layout.docks)
   const showSidebarPanel = (tool: ToolId): void => setDocks((d) => showTool(d, tool))
-  // Turning Claude on brings it to the front of its group.
+  // Turning the preview or Claude on brings it to the front of its group.
+  const togglePreview = (): void => {
+    if (!showPreview) setDocks((d) => showTool(d, 'preview'))
+    setShowPreview(!showPreview)
+  }
   const toggleClaude = (): void => {
     if (!showClaude) setDocks((d) => showTool(d, 'claude'))
     setShowClaude(!showClaude)
@@ -1221,25 +1222,13 @@ export default function App(): React.JSX.Element | null {
     saveLayout({
       showPreview,
       showClaude,
-      detached,
-      previewWidth,
       frontmatterHeight,
       docks,
       showAllFiles,
       showTitles,
       previewMode
     })
-  }, [
-    showPreview,
-    showClaude,
-    detached,
-    previewWidth,
-    frontmatterHeight,
-    docks,
-    showAllFiles,
-    showTitles,
-    previewMode
-  ])
+  }, [showPreview, showClaude, frontmatterHeight, docks, showAllFiles, showTitles, previewMode])
 
   // The text view fetches again when the file's text changes.
   const fileText = file?.text ?? ''
@@ -1249,47 +1238,6 @@ export default function App(): React.JSX.Element | null {
     conflictPaths.length > 0
       ? 'The preview is paused while changes conflict.\n\nSettle the conflicts in the editor and click Continue; the preview comes back then.'
       : null
-  const previewState = useMemo(
-    () => ({
-      url: previewUrl,
-      mode: previewMode,
-      version: contentVersion,
-      status: hugo,
-      markdownSuffix: site.markdownSuffix,
-      notice: previewNotice,
-      canBack: history.canBack,
-      canForward: history.canForward
-    }),
-    [
-      previewUrl,
-      previewMode,
-      contentVersion,
-      hugo,
-      site.markdownSuffix,
-      previewNotice,
-      history.canBack,
-      history.canForward
-    ]
-  )
-
-  // A preview in its own window follows what the bar in this window says; one that was
-  // detached when Galley closed reopens there.
-  useEffect(() => {
-    if (detached) window.api.preview.detach(previewState)
-  }, [detached, previewState])
-
-  const toggleDetached = useCallback(() => {
-    if (detached) window.api.preview.attach()
-    else setDetached(true)
-  }, [detached])
-
-  useEffect(() => window.api.preview.onClosed(() => setDetached(false)), [])
-  useEffect(() => window.api.preview.onMode(setPreviewMode), [])
-
-  useEffect(() => {
-    if (detached && reloadKey) window.api.preview.reload()
-  }, [detached, reloadKey])
-
   // The folder new pages go to: the open page's, else the content folder.
   const pageDir = (): string =>
     file?.path.startsWith(site.contentDir + '/') ? parentOf(file.path) : site.contentDir
@@ -1327,7 +1275,7 @@ export default function App(): React.JSX.Element | null {
         void save()
         break
       case 'toggle-preview':
-        setShowPreview((p) => !p)
+        togglePreview()
         break
       case 'setup':
         setShowSetup(true)
@@ -1342,7 +1290,10 @@ export default function App(): React.JSX.Element | null {
         setShowSettings(true)
         break
       case 'detach-preview':
-        toggleDetached()
+        setShowPreview(true)
+        setDocks((d) =>
+          isFloating(d, 'preview') ? dockTool(d, 'preview') : floatTool(d, 'preview')
+        )
         break
       case 'toggle-terminal':
         if (claudeOn) toggleClaude()
@@ -1423,25 +1374,14 @@ export default function App(): React.JSX.Element | null {
   )
   useEffect(() => window.api.chat.onCommit(commitAsked), [])
 
-  // The preview in its own window reports as the one in this window does; a mouse's own
-  // back and forward buttons step too.
-  const navigated = useEffectEvent(previewNavigated)
-  const scrolled = useEffectEvent(previewScrolled)
+  // A mouse's own back and forward buttons step too.
   const stepBy = useEffectEvent((by: -1 | 1) => void step(by))
   useEffect(() => {
-    const offs = [
-      window.api.preview.onNavigated(navigated),
-      window.api.preview.onScrolled(scrolled),
-      window.api.preview.onStep(stepBy)
-    ]
     const onMouse = (e: MouseEvent): void => {
       if (e.button === 3 || e.button === 4) stepBy(e.button === 3 ? -1 : 1)
     }
     window.addEventListener('mouseup', onMouse)
-    return () => {
-      offs.forEach((off) => off())
-      window.removeEventListener('mouseup', onMouse)
-    }
+    return () => window.removeEventListener('mouseup', onMouse)
   }, [])
   useEffect(
     () => window.api.setMenuState({ site: !!repo, page: !!file, preview: !!previewUrl }),
@@ -1488,13 +1428,11 @@ export default function App(): React.JSX.Element | null {
               onShare={shareReview}
             />
             <button
-              className={showPreview || detached ? 'on' : ''}
-              title={
-                detached ? 'Bring the preview back into this window' : 'Show or hide the preview'
-              }
-              onClick={() => (detached ? toggleDetached() : setShowPreview(!showPreview))}
+              className={showPreview ? 'on' : ''}
+              title="Show or hide the preview"
+              onClick={togglePreview}
             >
-              {detached ? 'Preview ↗' : 'Preview'}
+              Preview
             </button>
             {claudeOn && (
               <button className={showClaude ? 'on' : ''} onClick={toggleClaude}>
@@ -1515,7 +1453,10 @@ export default function App(): React.JSX.Element | null {
         <DockLayout
           docks={docks}
           onDocks={setDocks}
-          hidden={showClaude ? [] : ['claude']}
+          hidden={[
+            ...(showClaude ? [] : ['claude' as const]),
+            ...(showPreview ? [] : ['preview' as const])
+          ]}
           tools={{
             files: {
               content: (
@@ -1586,6 +1527,31 @@ export default function App(): React.JSX.Element | null {
                   selected={searchHit}
                   onOpen={(path, match) => void openMatch(path, match)}
                   onReplaceAll={replaceAll}
+                />
+              )
+            },
+            preview: {
+              content: (
+                <Preview
+                  status={hugo}
+                  url={previewUrl}
+                  reloadKey={reloadKey}
+                  mode={previewMode}
+                  onMode={setPreviewMode}
+                  version={contentVersion}
+                  markdownSuffix={site.markdownSuffix}
+                  floating={isFloating(docks, 'preview')}
+                  onOwnWindow={() => setDocks((d) => floatTool(d, 'preview'))}
+                  targets={onShow}
+                  notice={previewNotice}
+                  imageDrop={imageDrop}
+                  history={{
+                    canBack: history.canBack,
+                    canForward: history.canForward,
+                    onStep: (by) => void step(by)
+                  }}
+                  onNavigate={previewNavigated}
+                  onScrolled={previewScrolled}
                 />
               )
             },
@@ -1689,38 +1655,6 @@ export default function App(): React.JSX.Element | null {
                 </>
               )}
             </main>
-            {showPreview && !detached && (
-              <>
-                <Splitter
-                  direction="horizontal"
-                  onDrag={(d) => setPreviewWidth((w) => clamp(w - d, 320, 1400))}
-                />
-                <section className="preview-column" style={{ width: previewWidth }}>
-                  <Preview
-                    status={hugo}
-                    url={previewUrl}
-                    reloadKey={reloadKey}
-                    mode={previewMode}
-                    onMode={setPreviewMode}
-                    version={contentVersion}
-                    markdownSuffix={site.markdownSuffix}
-                    detached={false}
-                    onDetach={toggleDetached}
-                    onAttach={toggleDetached}
-                    targets={onShow}
-                    notice={previewNotice}
-                    imageDrop={imageDrop}
-                    history={{
-                      canBack: history.canBack,
-                      canForward: history.canForward,
-                      onStep: (by) => void step(by)
-                    }}
-                    onNavigate={previewNavigated}
-                    onScrolled={previewScrolled}
-                  />
-                </section>
-              </>
-            )}
           </div>
         </DockLayout>
         {showSetup && setup && <SetupDialog status={setup} onClose={() => setShowSetup(false)} />}

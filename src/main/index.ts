@@ -26,10 +26,6 @@ import type {
   MenuCommand,
   MenuState,
   Preferences,
-  PreviewMode,
-  PreviewScroll,
-  PreviewState,
-  PreviewTarget,
   SearchOptions,
   SetupStepId
 } from '../shared/types'
@@ -55,9 +51,7 @@ import { ClaudeTerminal } from './terminal'
 import { Updater } from './updater'
 
 let win: BrowserWindow | null = null
-let previewWin: BrowserWindow | null = null
 // What the detached preview window shows; it asks on load and is told of changes.
-let previewState: PreviewState | null = null
 let repo: Repo | null = null
 let git: Git | null = null
 
@@ -194,7 +188,7 @@ async function chooseRepo(): Promise<boolean> {
 }
 
 // Saved bounds are used only when they still fall on a connected display.
-function savedBounds(name: 'main' | 'preview'): Partial<Rectangle> {
+function savedBounds(name: string): Partial<Rectangle> {
   const bounds = loadSettings().windows?.[name]
   if (!bounds) return {}
   const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
@@ -206,7 +200,7 @@ function savedBounds(name: 'main' | 'preview'): Partial<Rectangle> {
   return onScreen ? bounds : {}
 }
 
-function rememberBounds(window: BrowserWindow, name: 'main' | 'preview'): void {
+function rememberBounds(window: BrowserWindow, name: string): void {
   let timer: NodeJS.Timeout | null = null
   const save = (): void => {
     if (window.isDestroyed() || window.isMinimized()) return
@@ -248,13 +242,28 @@ function createWindow(): void {
   win.webContents.on('did-finish-load', () => {
     win?.webContents.setZoomLevel(loadSettings().zoom ?? 0)
   })
+  closingTools = false
+  win.on('close', () => {
+    closingTools = true
+    for (const child of toolWindows.values()) child.close()
+  })
   win.on('closed', () => {
     win = null
-    previewWin?.close()
   })
   win.webContents.setWindowOpenHandler((details) => {
+    const tool = toolOf(details.frameName)
+    if (tool) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: toolWindowOptions(tool, details.features)
+      }
+    }
     void shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+  win.webContents.on('did-create-window', (child, { frameName }) => {
+    const tool = toolOf(frameName)
+    if (tool) watchToolWindow(child, tool)
   })
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -306,49 +315,76 @@ function showManual(): void {
   }
 }
 
-// The detached preview is Galley's own renderer page in preview mode, so it can show the
-// rendered page or the markdown twin alike and follow the cursor as the embedded one does.
-function detachPreview(state: PreviewState): void {
-  previewState = state
-  if (previewWin) {
-    previewWin.webContents.send('preview:state', state)
-    return
+// Tool windows the editor gave windows of their own, by tool. The renderer opens them
+// from its own page (see toolWindows.ts); here they get their size and place, the one
+// each had last when that is still on a connected screen, and their closing is reported.
+const toolWindows = new Map<string, BrowserWindow>()
+// The main window is closing and takes them along; they stay tool windows of their own,
+// to open again next time.
+let closingTools = false
+
+const toolOf = (frameName: string): string | null =>
+  frameName.match(/^galley-tool:(\w+)$/)?.[1] ?? null
+
+const toolTitles: Record<string, string> = {
+  files: 'Files',
+  changes: 'Changes',
+  search: 'Search',
+  claude: 'Claude',
+  preview: 'Preview'
+}
+
+// Where a tool window's own window opens: at the point it was dropped, the size it had
+// last; else where it was last; else beside the main window.
+function toolWindowOptions(
+  tool: string,
+  features: string
+): Electron.BrowserWindowConstructorOptions {
+  const at = Object.fromEntries(
+    features
+      .split(',')
+      .map((f) => f.split('='))
+      .filter(([k, v]) => k && v)
+      .map(([k, v]) => [k.trim(), Number(v)])
+  )
+  const saved = savedBounds(`tool:${tool}`)
+  const fallback = tool === 'preview' ? [900, 800] : tool === 'claude' ? [560, 700] : [360, 640]
+  const size = { width: saved.width ?? fallback[0], height: saved.height ?? fallback[1] }
+  let place: Partial<Rectangle> = {}
+  if (Number.isFinite(at['left']) && Number.isFinite(at['top'])) {
+    place = { x: at['left'], y: at['top'] }
+  } else if (saved.x !== undefined) {
+    place = { x: saved.x, y: saved.y }
+  } else if (win) {
+    const main = win.getBounds()
+    place = { x: main.x + main.width - size.width - 40, y: main.y + 80 }
   }
-  previewWin = new BrowserWindow({
-    width: 1100,
-    height: 850,
-    ...savedBounds('preview'),
-    title: 'Preview',
+  return {
+    ...size,
+    ...place,
+    title: toolTitles[tool] ?? 'Galley',
+    minWidth: 240,
+    minHeight: 160,
     backgroundColor: windowBackground(),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      webviewTag: true
-    }
-  })
-  rememberBounds(previewWin, 'preview')
-  // The page is Galley's own; its title would otherwise replace "Preview".
-  previewWin.on('page-title-updated', (e) => e.preventDefault())
-  // The File menu has no Close, so the preview window closes on ⌘W itself.
-  previewWin.webContents.on('before-input-event', (e, input) => {
+    webPreferences: { sandbox: false, webviewTag: true }
+  }
+}
+
+function watchToolWindow(child: BrowserWindow, tool: string): void {
+  toolWindows.set(tool, child)
+  rememberBounds(child, `tool:${tool}`)
+  child.webContents.setZoomLevel(loadSettings().zoom ?? 0)
+  // The File menu has no Close, so the window closes on ⌘W itself.
+  child.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.meta && input.key.toLowerCase() === 'w') {
       e.preventDefault()
-      previewWin?.close()
+      child.close()
     }
   })
-  previewWin.webContents.setWindowOpenHandler((details) => {
-    void shell.openExternal(details.url)
-    return { action: 'deny' }
+  child.on('closed', () => {
+    if (toolWindows.get(tool) === child) toolWindows.delete(tool)
+    if (!closingTools) send('tool:closed', tool)
   })
-  previewWin.on('closed', () => {
-    previewWin = null
-    send('preview:closed')
-  })
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    void previewWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#preview')
-  } else {
-    void previewWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'preview' })
-  }
 }
 
 // The preview stays on the site: a link to anywhere else opens in the browser, and one
@@ -563,25 +599,10 @@ function registerIpc(): void {
     openRepo(dest)
   })
   ipcMain.on('menu:state', (_e, state: MenuState) => setMenuState(state))
-  ipcMain.on('preview:detach', (_e, state: PreviewState) => detachPreview(state))
-  ipcMain.on('preview:update', (_e, state: PreviewState) => {
-    previewState = state
-    previewWin?.webContents.send('preview:state', state)
-  })
-  ipcMain.handle('preview:state', () => previewState)
-  ipcMain.on('preview:setMode', (_e, mode: PreviewMode) => send('preview:mode', mode))
-  ipcMain.on('preview:navigated', (_e, url: string) => send('preview:navigated', url))
-  ipcMain.on('preview:scrolled', (_e, scroll: PreviewScroll) => send('preview:scrolled', scroll))
-  ipcMain.on('preview:step', (_e, by: -1 | 1) => send('preview:step', by))
-  ipcMain.on('preview:reload', () => previewWin?.webContents.reload())
-  ipcMain.on('preview:attach', () => previewWin?.close())
   ipcMain.handle('preview:fetch', async (_e, url: string) => {
     const res = await net.fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error(String(res.status))
     return res.text()
-  })
-  ipcMain.on('preview:show', (_e, target: PreviewTarget) => {
-    previewWin?.webContents.send('preview:target', target)
   })
   // The terminal runs Claude Code itself, or its sign-in for the chat.
   ipcMain.on('terminal:start', async (_e, cols: number, rows: number, login?: boolean) => {
@@ -668,6 +689,7 @@ function zoom(step: number | null): void {
   const level = step === null ? 0 : Math.max(-3, Math.min(4, current + step * 0.5))
   saveSettings({ ...loadSettings(), zoom: level })
   win?.webContents.setZoomLevel(level)
+  for (const child of toolWindows.values()) child.webContents.setZoomLevel(level)
 }
 
 function offerMoveToApplications(): boolean {

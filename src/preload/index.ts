@@ -96,24 +96,10 @@ const api: Api = {
     onCloneProgress: (cb) => on('git:cloneProgress', cb)
   },
   preview: {
-    detach: (state) => ipcRenderer.send('preview:detach', state),
-    update: (state) => ipcRenderer.send('preview:update', state),
-    reload: () => ipcRenderer.send('preview:reload'),
-    attach: () => ipcRenderer.send('preview:attach'),
-    show: (target) => ipcRenderer.send('preview:show', target),
-    fetchText: (url) => ipcRenderer.invoke('preview:fetch', url),
-    onClosed: (cb) => on('preview:closed', cb),
-    state: () => ipcRenderer.invoke('preview:state'),
-    onState: (cb) => on('preview:state', cb),
-    onTarget: (cb) => on('preview:target', cb),
-    setMode: (mode) => ipcRenderer.send('preview:setMode', mode),
-    onMode: (cb) => on('preview:mode', cb),
-    navigated: (url) => ipcRenderer.send('preview:navigated', url),
-    scrolled: (scroll) => ipcRenderer.send('preview:scrolled', scroll),
-    step: (by) => ipcRenderer.send('preview:step', by),
-    onNavigated: (cb) => on('preview:navigated', cb),
-    onScrolled: (cb) => on('preview:scrolled', cb),
-    onStep: (cb) => on('preview:step', cb)
+    fetchText: (url) => ipcRenderer.invoke('preview:fetch', url)
+  },
+  tools: {
+    onClosed: (cb) => on('tool:closed', cb)
   },
   terminal: {
     start: (cols, rows, login) => ipcRenderer.send('terminal:start', cols, rows, login),

@@ -22,10 +22,6 @@ import type {
   PageInfo,
   Placement,
   Preferences,
-  PreviewMode,
-  PreviewScroll,
-  PreviewState,
-  PreviewTarget,
   PublishResult,
   ReplaceResult,
   RepoInfo,
@@ -35,7 +31,8 @@ import type {
   SetupStepId,
   SiteInfo,
   Snippet,
-  UpdateStatus
+  UpdateStatus,
+  ToolId
 } from './types'
 import type { ReviewLink } from './reviewLink'
 
@@ -156,32 +153,13 @@ export interface Api {
     onCloneProgress: (cb: (line: string) => void) => Unsubscribe
   }
   preview: {
-    // Opens the preview in its own window, showing this state; update keeps it current.
-    detach: (state: PreviewState) => void
-    update: (state: PreviewState) => void
-    reload: () => void
-    attach: () => void
-    // Scrolls the preview to a block or a piece of text.
-    show: (target: PreviewTarget) => void
     // The text at a preview server URL, e.g. a page's markdown twin; throws with the
     // HTTP status when there is none.
     fetchText: (url: string) => Promise<string>
-    onClosed: (cb: () => void) => Unsubscribe
-    // For the detached window: what to show, where to scroll, and its mode switch.
-    state: () => Promise<PreviewState | null>
-    onState: (cb: (state: PreviewState) => void) => Unsubscribe
-    onTarget: (cb: (target: PreviewTarget) => void) => Unsubscribe
-    setMode: (mode: PreviewMode) => void
-    // The main window hears of a mode chosen in the detached window.
-    onMode: (cb: (mode: PreviewMode) => void) => Unsubscribe
-    // The detached window's page moved, was scrolled, or Back or Forward was clicked
-    // there; the main window hears of each.
-    navigated: (url: string) => void
-    scrolled: (scroll: PreviewScroll) => void
-    step: (by: -1 | 1) => void
-    onNavigated: (cb: (url: string) => void) => Unsubscribe
-    onScrolled: (cb: (scroll: PreviewScroll) => void) => Unsubscribe
-    onStep: (cb: (by: -1 | 1) => void) => Unsubscribe
+  }
+  tools: {
+    // A tool window's own window was closed, by the editor rather than with Galley.
+    onClosed: (cb: (tool: ToolId) => void) => Unsubscribe
   }
   terminal: {
     // Starts Claude Code, or with login its sign-in, which the chat needs first.

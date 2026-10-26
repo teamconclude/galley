@@ -4,13 +4,10 @@ import '@xterm/xterm/css/xterm.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
-import DetachedPreview from './components/DetachedPreview'
 import Manual from './components/Manual'
 
-// The same bundle serves the editor and, at #preview and #manual, the detached preview
-// and the manual's windows.
+// The same bundle serves the editor and, at #manual, the manual's window.
 const pages: Record<string, () => React.JSX.Element | null> = {
-  '#preview': DetachedPreview,
   '#manual': Manual
 }
 const Page = pages[window.location.hash] ?? App

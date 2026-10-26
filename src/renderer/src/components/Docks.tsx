@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Dock, Docks, DockSide, ToolId } from '../../../shared/types'
 import {
+  dockTool,
+  isFloating,
   maxGroups,
   moveTool,
   placeOf,
@@ -12,6 +14,12 @@ import {
   withDock,
   type DropTarget
 } from '../lib/docks'
+import {
+  closeToolWindow,
+  openToolWindow,
+  toolWindowClosed,
+  useToolWindows
+} from '../lib/toolWindows'
 import Splitter from './Splitter'
 
 export interface Tool {
@@ -71,8 +79,9 @@ const shownGroups = (dock: Dock, has: (t: ToolId) => boolean): Shown[] =>
 // the preview. A tab dragged a few pixels lifts its tool window, which lands where the
 // marked place shows: among the tabs it is over, in the group it is over, in a group of
 // its own in the far half of a dock with one group, or in a dock of its own at an edge
-// that has none. Esc puts it back. Each tool window lives in an element of its own that
-// moves between the docks, so it keeps what it holds wherever it goes.
+// that has none, or, dropped outside the main window, in a window of its own there. Esc
+// puts it back. Each tool window lives in an element of its own that moves between the
+// docks and windows, so it keeps what it holds wherever it goes.
 export default function DockLayout(props: Props): React.JSX.Element {
   const { docks, onDocks, tools, hidden, children } = props
   const root = useRef<HTMLDivElement>(null)
@@ -94,7 +103,28 @@ export default function DockLayout(props: Props): React.JSX.Element {
   })
   const elementOf = (tool: ToolId): HTMLDivElement => elements.get(tool)!
 
-  const has = (tool: ToolId): boolean => !!tools[tool] && !hidden.includes(tool)
+  const available = (tool: ToolId): boolean => !!tools[tool] && !hidden.includes(tool)
+  const has = (tool: ToolId): boolean => available(tool) && !isFloating(docks, tool)
+
+  // Tool windows on their own: their windows open and close with the arrangement, and one
+  // the editor closes puts its tool window back in its dock.
+  const windows = useToolWindows()
+  const dropped = useRef(new Map<ToolId, { x: number; y: number }>())
+  const floating = docks.floating.filter(available)
+  useEffect(() => {
+    for (const tool of floating) {
+      openToolWindow(tool, toolTitles[tool], dropped.current.get(tool))
+      dropped.current.delete(tool)
+    }
+    for (const tool of windows.keys()) if (!floating.includes(tool)) closeToolWindow(tool)
+  })
+  useEffect(
+    () =>
+      window.api.tools.onClosed((tool) => {
+        if (toolWindowClosed(tool)) onDocks((d) => dockTool(d, tool))
+      }),
+    [onDocks]
+  )
   const shown = Object.fromEntries(sides.map((s) => [s, shownGroups(docks[s], has)])) as Record<
     DockSide,
     Shown[]
@@ -105,7 +135,9 @@ export default function DockLayout(props: Props): React.JSX.Element {
     const host = root.current
     if (!host) return none
     const current = docksRef.current
-    const from = placeOf(current, tool)
+    // A tool window on its own has a place in a dock but is not there, so anywhere in the
+    // docks brings it back.
+    const from = isFloating(current, tool) ? null : placeOf(current, tool)
     const inside = (r: DOMRect): boolean =>
       x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
     const box = (r: DOMRect | Box): Box => ({
@@ -160,7 +192,7 @@ export default function DockLayout(props: Props): React.JSX.Element {
       const near = side === 'bottom' ? x < r.left + r.width / 2 : y < r.top + r.height / 2
       if (near) return join(groupEls[0])
       const alone = own(Number(groupEls[0].dataset['group'])) && current[side].groups.length === 1
-      if (alone && current[side].groups[from!.group].tabs.length === 1) return none
+      if (alone && from && current[side].groups[from.group].tabs.length === 1) return none
       const half =
         side === 'bottom'
           ? { left: r.left + r.width / 2, top: r.top, width: r.width / 2, height: r.height }
@@ -197,28 +229,52 @@ export default function DockLayout(props: Props): React.JSX.Element {
     return none
   }
 
+  // A drag starts in the main window or in a tool window's own window; either way the
+  // pointer is followed in the main window's coordinates, and the window it started in
+  // keeps reporting it while the button is down, wherever it goes.
   const startDrag = (tool: ToolId, e: React.PointerEvent): void => {
     if (e.button !== 0) return
-    const x0 = e.clientX
-    const y0 = e.clientY
+    const view = (e.view as unknown as Window | null) ?? window
+    const fromMain = view === window
+    const local = (ev: PointerEvent): { x: number; y: number } =>
+      fromMain
+        ? { x: ev.clientX, y: ev.clientY }
+        : {
+            x: ev.screenX - window.screenX,
+            y: ev.screenY - window.screenY - (window.outerHeight - window.innerHeight)
+          }
+    const x0 = e.screenX
+    const y0 = e.screenY
     let dragging = false
     let last: Drag | null = null
     const move = (ev: PointerEvent): void => {
-      if (!dragging && Math.hypot(ev.clientX - x0, ev.clientY - y0) < threshold) return
+      if (!dragging && Math.hypot(ev.screenX - x0, ev.screenY - y0) < threshold) return
       dragging = true
-      last = { tool, x: ev.clientX, y: ev.clientY, ...targetAt(tool, ev.clientX, ev.clientY) }
+      const { x, y } = local(ev)
+      const outside = x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight
+      const placed: Pick<Drag, 'target' | 'box'> = outside
+        ? fromMain && !isFloating(docksRef.current, tool)
+          ? { target: { kind: 'window', screenX: ev.screenX, screenY: ev.screenY }, box: null }
+          : { target: null, box: null }
+        : targetAt(tool, x, y)
+      last = { tool, x, y, ...placed }
       setDrag(last)
     }
     const stop = (): void => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('keydown', key, true)
+      view.removeEventListener('pointermove', move)
+      view.removeEventListener('pointerup', up)
+      view.removeEventListener('keydown', key, true)
       setDrag(null)
     }
     const up = (): void => {
       stop()
       const target = last?.target
-      if (target) onDocks((d) => moveTool(d, tool, target))
+      if (!target) return
+      // The window opens with its title bar under the pointer.
+      if (target.kind === 'window') {
+        dropped.current.set(tool, { x: target.screenX - 60, y: target.screenY - 12 })
+      }
+      onDocks((d) => moveTool(d, tool, target))
     }
     const key = (ev: KeyboardEvent): void => {
       if (ev.key !== 'Escape') return
@@ -226,9 +282,9 @@ export default function DockLayout(props: Props): React.JSX.Element {
       ev.stopPropagation()
       stop()
     }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('keydown', key, true)
+    view.addEventListener('pointermove', move)
+    view.addEventListener('pointerup', up)
+    view.addEventListener('keydown', key, true)
   }
 
   const dockView = (side: DockSide): React.JSX.Element | null => {
@@ -269,13 +325,26 @@ export default function DockLayout(props: Props): React.JSX.Element {
         {dockView('bottom')}
       </div>
       {shown.right.length > 0 && (
-        <Splitter direction="horizontal" onDrag={(d) => resize('right', -d, 160, 600)} />
+        <Splitter direction="horizontal" onDrag={(d) => resize('right', -d, 160, 1400)} />
       )}
       {dockView('right')}
       {toolIds.map((id) => {
         const tool = tools[id]
         return tool ? createPortal(tool.content, elementOf(id), id) : null
       })}
+      {[...windows].map(([tool, win]) =>
+        floating.includes(tool) ? (
+          <ToolWindow
+            key={tool}
+            tool={tool}
+            win={win}
+            badge={tools[tool]?.badge}
+            elementOf={elementOf}
+            onPress={startDrag}
+            onDock={() => onDocks((d) => dockTool(d, tool))}
+          />
+        ) : null
+      )}
       {drag && (
         <div className="dock-drag">
           {shown.left.length === 0 && <div className="dock-edge left" />}
@@ -395,5 +464,42 @@ function GroupView(props: GroupViewProps): React.JSX.Element {
       </div>
       {after}
     </>
+  )
+}
+
+interface ToolWindowProps {
+  tool: ToolId
+  win: Window
+  badge?: number
+  elementOf: (tool: ToolId) => HTMLDivElement
+  onPress: (tool: ToolId, e: React.PointerEvent) => void
+  onDock: () => void
+}
+
+// A tool window in a window of its own: its tab, which drags it back into a dock, a
+// button that puts it back where it was, and the tool window itself.
+function ToolWindow(props: ToolWindowProps): React.JSX.Element {
+  const { tool, win, badge, elementOf, onPress, onDock } = props
+  const body = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = elementOf(tool)
+    if (body.current && el.parentElement !== body.current) body.current.appendChild(el)
+    el.hidden = false
+  })
+  return createPortal(
+    <div className="tool-window">
+      <div className="tool-tabs">
+        <button className="on" data-tab={tool} onPointerDown={(e) => onPress(tool, e)}>
+          {toolTitles[tool]}
+          {!!badge && <span className="badge">{badge}</span>}
+        </button>
+        <span className="tool-tabs-space" />
+        <button className="tool-dock" onClick={onDock} title="Put it back in the main window">
+          Back into main window
+        </button>
+      </div>
+      <div className="tool-body" ref={body} />
+    </div>,
+    win.document.body
   )
 }

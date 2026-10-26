@@ -238,8 +238,7 @@ button.primary:disabled:hover {
   background: var(--accent);
 }
 
-.app,
-.detached {
+.app {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -361,9 +360,41 @@ button.primary:disabled:hover {
   min-height: 0;
 }
 
-.tool[data-tool='claude'] {
+.tool[data-tool='claude'],
+.tool[data-tool='preview'] {
   background: var(--bg);
   user-select: text;
+}
+
+/* A tool window in a window of its own: its tab and a way back, above the tool window. */
+.tool-window-body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  font: 13px/1.4 var(--font);
+  color: var(--text);
+  background: var(--bg-muted);
+}
+
+.tool-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  user-select: none;
+}
+
+.tool-tabs-space {
+  flex: 1;
+}
+
+.tool-tabs .tool-dock {
+  align-self: center;
+  margin-bottom: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* Squeezed below its natural height, the Changes panel scrolls as a whole. */
@@ -711,12 +742,6 @@ body.dragging .terminal-host {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-}
-
-.preview-column {
-  flex: none;
-  display: flex;
   min-width: 0;
 }
 

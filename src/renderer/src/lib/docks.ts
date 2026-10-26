@@ -1,12 +1,13 @@
 import type { Dock, Docks, DockSide, ToolGroup, ToolId } from '../../../shared/types'
 
-export const toolIds: ToolId[] = ['files', 'changes', 'search', 'claude']
+export const toolIds: ToolId[] = ['files', 'changes', 'search', 'claude', 'preview']
 
 export const toolTitles: Record<ToolId, string> = {
   files: 'Files',
   changes: 'Changes',
   search: 'Search',
-  claude: 'Claude'
+  claude: 'Claude',
+  preview: 'Preview'
 }
 
 export const sides: DockSide[] = ['left', 'right', 'bottom']
@@ -17,19 +18,23 @@ export const maxGroups = 2
 
 const group = (...tabs: ToolId[]): ToolGroup => ({ tabs, active: tabs[0] })
 
-// Files above Changes, so both are in view, with Search sharing a place with Files;
-// Claude along the bottom.
+// Files above Changes, so both are in view, with Search sharing a place with Files; the
+// preview along the right and Claude along the bottom.
 export const defaultDocks = (): Docks => ({
   left: { groups: [group('files', 'search'), group('changes')], size: 260, split: 0.6 },
-  right: { groups: [], size: 320, split: 0.5 },
-  bottom: { groups: [group('claude')], size: 300, split: 0.5 }
+  right: { groups: [group('preview')], size: 600, split: 0.5 },
+  bottom: { groups: [group('claude')], size: 300, split: 0.5 },
+  floating: []
 })
 
-// What 0.7 saved: the sidebar's groups, its width and the Claude pane's height.
-interface Legacy {
+// What earlier versions saved: 0.7's sidebar groups, its width and the Claude pane's
+// height, and the preview's width and whether it had a window of its own.
+export interface Legacy {
   sidebarGroups?: { tabs?: ToolId[]; active?: ToolId }[]
   sidebarWidth?: number
   claudeHeight?: number
+  previewWidth?: number
+  detached?: boolean
 }
 
 const isSize = (n: unknown): n is number => typeof n === 'number' && n > 0
@@ -43,7 +48,8 @@ export function settleDocks(saved: Docks | undefined, legacy: Legacy): Docks {
     ? {
         left: { ...fresh.left, ...saved.left },
         right: { ...fresh.right, ...saved.right },
-        bottom: { ...fresh.bottom, ...saved.bottom }
+        bottom: { ...fresh.bottom, ...saved.bottom },
+        floating: saved.floating ?? (legacy.detached ? ['preview'] : [])
       }
     : {
         ...fresh,
@@ -52,10 +58,15 @@ export function settleDocks(saved: Docks | undefined, legacy: Legacy): Docks {
           groups: (legacy.sidebarGroups as ToolGroup[] | undefined) ?? fresh.left.groups,
           size: isSize(legacy.sidebarWidth) ? legacy.sidebarWidth : fresh.left.size
         },
+        right: {
+          ...fresh.right,
+          size: isSize(legacy.previewWidth) ? legacy.previewWidth : fresh.right.size
+        },
         bottom: {
           ...fresh.bottom,
           size: isSize(legacy.claudeHeight) ? legacy.claudeHeight : fresh.bottom.size
-        }
+        },
+        floating: legacy.detached ? ['preview'] : []
       }
   const seen = new Set<ToolId>()
   for (const side of sides) {
@@ -74,11 +85,18 @@ export function settleDocks(saved: Docks | undefined, legacy: Legacy): Docks {
   }
   for (const tool of toolIds) {
     if (seen.has(tool)) continue
-    const side: DockSide = tool === 'claude' ? 'bottom' : 'left'
+    const side: DockSide = tool === 'claude' ? 'bottom' : tool === 'preview' ? 'right' : 'left'
     const groups = docks[side].groups
+    // The preview arriving in a dock of its own keeps the width it had beside the editor.
+    if (tool === 'preview' && groups.length === 0) {
+      docks.right.size = isSize(legacy.previewWidth) ? legacy.previewWidth : fresh.right.size
+    }
     if (groups.length < maxGroups) groups.push(group(tool))
     else groups[groups.length - 1].tabs.push(tool)
   }
+  docks.floating = (Array.isArray(docks.floating) ? docks.floating : []).filter(
+    (t, i, all) => toolIds.includes(t) && all.indexOf(t) === i
+  )
   return docks
 }
 
@@ -109,18 +127,33 @@ export function showTool(docks: Docks, tool: ToolId): Docks {
   }))
 }
 
-// Where a dragged tool window lands: among a group's tabs at an index, or in a group of
-// its own in a dock, after the group there.
+// Where a dragged tool window lands: among a group's tabs at an index, in a group of its
+// own in a dock, after the group there, or in a window of its own at a point on screen.
 export type DropTarget =
-  { kind: 'tab'; side: DockSide; group: number; index: number } | { kind: 'apart'; side: DockSide }
+  | { kind: 'tab'; side: DockSide; group: number; index: number }
+  | { kind: 'apart'; side: DockSide }
+  | { kind: 'window'; screenX: number; screenY: number }
+
+export const isFloating = (docks: Docks, tool: ToolId): boolean => docks.floating.includes(tool)
+
+export const floatTool = (docks: Docks, tool: ToolId): Docks =>
+  isFloating(docks, tool) ? docks : { ...docks, floating: [...docks.floating, tool] }
+
+// Back in its place in the docks, in front of its group.
+export const dockTool = (docks: Docks, tool: ToolId): Docks =>
+  isFloating(docks, tool)
+    ? showTool({ ...docks, floating: docks.floating.filter((t) => t !== tool) }, tool)
+    : docks
 
 export function moveTool(docks: Docks, tool: ToolId, to: DropTarget): Docks {
+  if (to.kind === 'window') return floatTool(docks, tool)
   const from = placeOf(docks, tool)
   if (!from) return docks
   const next: Docks = {
     left: copy(docks.left),
     right: copy(docks.right),
-    bottom: copy(docks.bottom)
+    bottom: copy(docks.bottom),
+    floating: docks.floating.filter((t) => t !== tool)
   }
   const source = next[from.side].groups[from.group]
   source.tabs.splice(from.index, 1)

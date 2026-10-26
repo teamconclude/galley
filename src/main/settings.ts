@@ -9,7 +9,8 @@ export interface Settings {
   recent?: string[]
   declinedMove?: boolean
   hugoChecked?: number
-  windows?: { main?: Rectangle; preview?: Rectangle }
+  // Window bounds: the main window's, and each tool window's own window's as tool:<id>.
+  windows?: Partial<Record<string, Rectangle>>
   layout?: Layout
   githubToken?: string
   githubSkipped?: boolean

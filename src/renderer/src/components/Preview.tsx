@@ -28,11 +28,10 @@ interface Props {
   version: number
   // The site's markdown rendition suffix; without one there is no Markdown mode.
   markdownSuffix: string | null
-  // Shown in the preview's own window: the last button brings it back.
-  detached: boolean
-  onDetach: () => void
-  onAttach: () => void
-  // Where scroll targets come from: the store in this window, or IPC in the detached one.
+  // In a window of its own, whose bar has the button that brings it back.
+  floating: boolean
+  onOwnWindow: () => void
+  // Where scroll targets come from.
   targets: (cb: (target: PreviewTarget) => void) => () => void
   // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
   notice?: string | null
@@ -68,8 +67,8 @@ function textUrlFor(url: string, suffix: string | null): string {
 const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? false
 
 export default function Preview(props: Props): React.JSX.Element {
-  const { status, url, reloadKey, mode, onMode, version, detached, markdownSuffix } = props
-  const { onDetach, onAttach, targets, notice, imageDrop, history, onNavigate, onScrolled } = props
+  const { status, url, reloadKey, mode, onMode, version, floating, markdownSuffix } = props
+  const { onOwnWindow, targets, notice, imageDrop, history, onNavigate, onScrolled } = props
   const plainFile = isPlainFile(url)
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -112,14 +111,9 @@ export default function Preview(props: Props): React.JSX.Element {
         {shownUrl && (
           <button onClick={() => window.api.openExternal(shownUrl)}>Open in browser</button>
         )}
-        {url && !detached && (
-          <button onClick={onDetach} title="Move the preview into its own window">
-            Separate window
-          </button>
-        )}
-        {detached && (
-          <button onClick={onAttach} title="Bring the preview back into the main window">
-            Back into main window
+        {url && !floating && (
+          <button onClick={onOwnWindow} title="Move the preview into a window of its own">
+            Own window
           </button>
         )}
         {status.state === 'error' && status.missing && (
@@ -154,7 +148,7 @@ interface ContentProps {
   version: number
   reloadKey: number
   markdownSuffix: string | null
-  // Where scroll targets come from: the store in this window, or IPC in the detached one.
+  // Where scroll targets come from.
   targets: (cb: (target: PreviewTarget) => void) => () => void
   empty: string
   notice: string | null
@@ -163,7 +157,7 @@ interface ContentProps {
   onScrolled?: (scroll: PreviewScroll) => void
 }
 
-// The page in a webview, or its text rendered; shared by the pane and the detached window.
+// The page in a webview, or its text rendered.
 export function PreviewContent(props: ContentProps): React.JSX.Element {
   const { url, mode, version, reloadKey, targets, empty, markdownSuffix, notice, imageDrop } = props
   const { onNavigate, onScrolled } = props

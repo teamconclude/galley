@@ -89,7 +89,7 @@ Mac only. **File ▸ Open Recent** lists the sites you opened lately.
   your changes at once.
 - **Middle: the open page.** Its settings at the top, its text below. Galley starts on
   the home page.
-- **Right: the preview**, the page as it will look on the site.
+- **Right: the preview**, the page as it will look on the site, a tool window too.
 - **Bottom: Claude**, a tool window too, when you open it.
 - **Top right:** the share button, which copies a link to your work for a colleague, and
   buttons to show or hide the preview and Claude.
@@ -97,8 +97,8 @@ Mac only. **File ▸ Open Recent** lists the sites you opened lately.
 Drag the borders between the parts to make one larger. **View ▸ Larger text** (⌘+) makes
 everything larger.
 
-**Arranging the tool windows.** Files, Changes, Search and Claude can go along the left,
-the right and the bottom of the window, up to two in each place: stacked at the sides,
+**Arranging the tool windows.** Files, Changes, Search, the preview and Claude can go along
+the left, the right and the bottom of the window, up to two in each place: stacked at the sides,
 side by side at the bottom. Drag a tool window by its tab; as you drag, a frame shows where
 it will go.
 
@@ -109,7 +109,14 @@ it will go.
   next to it.
 - At the left or right edge of the window, where no tool windows are yet, it starts a new
   place there; the same at the bottom of the editor.
+- Outside Galley's window, it opens in a window of its own there, for example on a second
+  screen.
 - Esc puts it back where it was.
+
+A tool window in a window of its own goes back with **Back into main window** at its top,
+by closing its window, or by dragging its tab into Galley's window. Galley remembers where
+each such window was, on which screen and how large, and opens it there again, also the
+next time Galley starts.
 
 Drag the borders to size the places and to share one between two tool windows. **View ▸
 Reset Tool Windows** brings back the first arrangement.
@@ -255,7 +262,7 @@ file in the list for the same commands, and for **New folder…**.
 
 The preview shows the page as the site will show it, and follows along as you type and
 move through the text. **Markdown** shows the plain-text version of the page that the site
-offers to AI tools. **Separate window** moves the preview into its own window, for example
+offers to AI tools. **Own window** moves the preview into a window of its own, for example
 for a second screen. **Open in Browser** opens it in your web browser.
 
 **Following links.** Click a link in the preview and the page it leads to opens in the
@@ -471,7 +478,7 @@ browser.
 | ⌘⇧R      | Search and replace in the site |
 | ⌘⇧V      | Paste as plain text            |
 | ⌘⇧P      | Show or hide the preview       |
-| ⌥⌘P      | Preview in a separate window   |
+| ⌥⌘P      | Preview in its own window      |
 | ⌥⌘R      | Reload the preview             |
 | ⌘[, ⌘]   | Back, forward                  |
 | ⌘Return  | Commit, in the commit note     |

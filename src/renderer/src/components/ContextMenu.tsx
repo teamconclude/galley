@@ -1,4 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { pointerDocument } from '../lib/pointerDocument'
 import { Check } from 'lucide-react'
 
 export interface MenuItem {
@@ -20,31 +22,34 @@ interface Props {
   onClose: () => void
 }
 
+// Opens in the window that was clicked, which may be a tool window's own.
 export default function ContextMenu({ x, y, above, items, onClose }: Props): React.JSX.Element {
+  const [doc] = useState(pointerDocument)
+  const view = doc.defaultView ?? window
   useEffect(() => {
     const close = (): void => onClose()
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
     }
-    window.addEventListener('mousedown', close)
-    window.addEventListener('blur', close)
-    window.addEventListener('keydown', onKey)
+    view.addEventListener('mousedown', close)
+    view.addEventListener('blur', close)
+    view.addEventListener('keydown', onKey)
     return () => {
-      window.removeEventListener('mousedown', close)
-      window.removeEventListener('blur', close)
-      window.removeEventListener('keydown', onKey)
+      view.removeEventListener('mousedown', close)
+      view.removeEventListener('blur', close)
+      view.removeEventListener('keydown', onKey)
     }
-  }, [onClose])
+  }, [onClose, view])
 
   const described = items.some((item) => item.description)
   const rowHeight = described ? 46 : 28
-  const height = Math.min(items.length * rowHeight + 12, window.innerHeight * 0.7)
-  const left = Math.min(x, window.innerWidth - (described ? 320 : 200))
-  const top = Math.min(y, window.innerHeight - height - 12)
-  return (
+  const height = Math.min(items.length * rowHeight + 12, view.innerHeight * 0.7)
+  const left = Math.min(x, view.innerWidth - (described ? 320 : 200))
+  const top = Math.min(y, view.innerHeight - height - 12)
+  return createPortal(
     <div
       className={described ? 'context-menu described' : 'context-menu'}
-      style={above ? { left, bottom: window.innerHeight - y } : { left, top }}
+      style={above ? { left, bottom: view.innerHeight - y } : { left, top }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (
@@ -69,6 +74,7 @@ export default function ContextMenu({ x, y, above, items, onClose }: Props): Rea
           </span>
         </button>
       ))}
-    </div>
+    </div>,
+    doc.body
   )
 }

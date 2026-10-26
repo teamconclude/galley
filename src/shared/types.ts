@@ -239,8 +239,6 @@ export interface Identity {
 export interface Layout {
   showPreview: boolean
   showClaude: boolean
-  detached: boolean
-  previewWidth: number
   frontmatterHeight: number
   docks: Docks
   showAllFiles: boolean
@@ -252,23 +250,8 @@ export interface Layout {
 
 export type PreviewMode = 'html' | 'markdown'
 
-// What the preview shows, also handed to the detached preview window.
-export interface PreviewState {
-  url: string | null
-  mode: PreviewMode
-  // Changes whenever the open file's text does; the text view fetches again.
-  version: number
-  status: HugoStatus
-  // The site's markdown rendition suffix, or null when it has none.
-  markdownSuffix: string | null
-  // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
-  notice: string | null
-  canBack: boolean
-  canForward: boolean
-}
-
 // The tool windows around the editor and the preview.
-export type ToolId = 'files' | 'changes' | 'search' | 'claude'
+export type ToolId = 'files' | 'changes' | 'search' | 'claude' | 'preview'
 
 export type DockSide = 'left' | 'right' | 'bottom'
 
@@ -287,7 +270,14 @@ export interface Dock {
   split: number
 }
 
-export type Docks = Record<DockSide, Dock>
+export interface Docks {
+  left: Dock
+  right: Dock
+  bottom: Dock
+  // Tool windows shown in windows of their own. Each keeps its place in a dock, where it
+  // returns when its window closes.
+  floating: ToolId[]
+}
 
 export interface SearchOptions {
   ignoreCase: boolean

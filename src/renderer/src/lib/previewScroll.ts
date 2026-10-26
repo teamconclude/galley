@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view'
 import { textKey } from '../../../shared/previewScript'
 import type { PreviewScroll, PreviewTarget } from '../../../shared/types'
 
-// Tells the preview, in the window or detached, where to scroll to.
+// Tells the preview where to scroll to.
 const listeners = new Set<(target: PreviewTarget) => void>()
 let last = ''
 
@@ -12,7 +12,6 @@ export function showInPreview(target: PreviewTarget): void {
   if (key === last) return
   last = key
   for (const l of listeners) l(target)
-  window.api.preview.show(target)
 }
 
 export const showBlock = (index: number): void => showInPreview({ kind: 'block', index })

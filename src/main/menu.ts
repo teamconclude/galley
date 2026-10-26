@@ -132,7 +132,7 @@ function buildMenu(actions: Actions): Menu {
           click: () => actions.command('toggle-preview')
         },
         {
-          label: 'Preview in separate window',
+          label: 'Preview in its own window',
           accelerator: 'CmdOrCtrl+Alt+P',
           click: () => actions.command('detach-preview')
         },
