@@ -113,8 +113,8 @@ it will go.
   screen.
 - Esc puts it back where it was.
 
-A tool window in a window of its own goes back with **Back into main window** at its top,
-by closing its window, or by dragging its tab into Galley's window. Galley remembers where
+A tool window in a window of its own goes back when you close its window, or drag its tab
+into Galley's window. Galley remembers where
 each such window was, on which screen and how large, and opens it there again, also the
 next time Galley starts.
 
@@ -262,8 +262,9 @@ file in the list for the same commands, and for **New folder…**.
 
 The preview shows the page as the site will show it, and follows along as you type and
 move through the text. **Markdown** shows the plain-text version of the page that the site
-offers to AI tools. **Own window** moves the preview into a window of its own, for example
-for a second screen. **Open in Browser** opens it in your web browser.
+offers to AI tools. **View ▸ Preview in its own window** (⌥⌘P) moves it into a window of
+its own and back, for example for a second screen; dragging its tab out of Galley's window
+does the same. **Open in Browser** opens it in your web browser.
 
 **Following links.** Click a link in the preview and the page it leads to opens in the
 editor too. Some pages of the site have no file of their own, such as the list of posts

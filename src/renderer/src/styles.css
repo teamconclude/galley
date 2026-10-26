@@ -366,7 +366,7 @@ button.primary:disabled:hover {
   user-select: text;
 }
 
-/* A tool window in a window of its own: its tab and a way back, above the tool window. */
+/* A tool window in a window of its own: its tab above the tool window. */
 .tool-window-body {
   margin: 0;
   height: 100vh;
@@ -381,20 +381,6 @@ button.primary:disabled:hover {
   flex-direction: column;
   height: 100%;
   user-select: none;
-}
-
-.tool-tabs-space {
-  flex: 1;
-}
-
-.tool-tabs .tool-dock {
-  align-self: center;
-  margin-bottom: 4px;
-  padding: 2px 10px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 /* Squeezed below its natural height, the Changes panel scrolls as a whole. */

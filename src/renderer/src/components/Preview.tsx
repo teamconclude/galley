@@ -28,9 +28,6 @@ interface Props {
   version: number
   // The site's markdown rendition suffix; without one there is no Markdown mode.
   markdownSuffix: string | null
-  // In a window of its own, whose bar has the button that brings it back.
-  floating: boolean
-  onOwnWindow: () => void
   // Where scroll targets come from.
   targets: (cb: (target: PreviewTarget) => void) => () => void
   // Shown instead of the page, e.g. while conflicts keep Hugo from building it.
@@ -67,8 +64,8 @@ function textUrlFor(url: string, suffix: string | null): string {
 const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? false
 
 export default function Preview(props: Props): React.JSX.Element {
-  const { status, url, reloadKey, mode, onMode, version, floating, markdownSuffix } = props
-  const { onOwnWindow, targets, notice, imageDrop, history, onNavigate, onScrolled } = props
+  const { status, url, reloadKey, mode, onMode, version, markdownSuffix } = props
+  const { targets, notice, imageDrop, history, onNavigate, onScrolled } = props
   const plainFile = isPlainFile(url)
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -110,11 +107,6 @@ export default function Preview(props: Props): React.JSX.Element {
         {url && <button onClick={() => setReloads((n) => n + 1)}>Reload</button>}
         {shownUrl && (
           <button onClick={() => window.api.openExternal(shownUrl)}>Open in browser</button>
-        )}
-        {url && !floating && (
-          <button onClick={onOwnWindow} title="Move the preview into a window of its own">
-            Own window
-          </button>
         )}
         {status.state === 'error' && status.missing && (
           <button className="primary" onClick={() => void window.api.hugo.install()}>

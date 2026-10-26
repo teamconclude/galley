@@ -341,7 +341,6 @@ export default function DockLayout(props: Props): React.JSX.Element {
             badge={tools[tool]?.badge}
             elementOf={elementOf}
             onPress={startDrag}
-            onDock={() => onDocks((d) => dockTool(d, tool))}
           />
         ) : null
       )}
@@ -473,13 +472,12 @@ interface ToolWindowProps {
   badge?: number
   elementOf: (tool: ToolId) => HTMLDivElement
   onPress: (tool: ToolId, e: React.PointerEvent) => void
-  onDock: () => void
 }
 
-// A tool window in a window of its own: its tab, which drags it back into a dock, a
-// button that puts it back where it was, and the tool window itself.
+// A tool window in a window of its own: its tab, which drags it back into a dock, and the
+// tool window itself. Closing the window puts it back where it was.
 function ToolWindow(props: ToolWindowProps): React.JSX.Element {
-  const { tool, win, badge, elementOf, onPress, onDock } = props
+  const { tool, win, badge, elementOf, onPress } = props
   const body = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const el = elementOf(tool)
@@ -492,10 +490,6 @@ function ToolWindow(props: ToolWindowProps): React.JSX.Element {
         <button className="on" data-tab={tool} onPointerDown={(e) => onPress(tool, e)}>
           {toolTitles[tool]}
           {!!badge && <span className="badge">{badge}</span>}
-        </button>
-        <span className="tool-tabs-space" />
-        <button className="tool-dock" onClick={onDock} title="Put it back in the main window">
-          Back into main window
         </button>
       </div>
       <div className="tool-body" ref={body} />

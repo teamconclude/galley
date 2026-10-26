@@ -1540,8 +1540,6 @@ export default function App(): React.JSX.Element | null {
                   onMode={setPreviewMode}
                   version={contentVersion}
                   markdownSuffix={site.markdownSuffix}
-                  floating={isFloating(docks, 'preview')}
-                  onOwnWindow={() => setDocks((d) => floatTool(d, 'preview'))}
                   targets={onShow}
                   notice={previewNotice}
                   imageDrop={imageDrop}
