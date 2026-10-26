@@ -113,10 +113,9 @@ it will go.
   screen.
 - Esc puts it back where it was.
 
-A tool window in a window of its own goes back when you close its window, or drag its tab
-into Galley's window. You can also move the window itself by its title bar: over Galley's
-window it turns see-through and the frame shows where it would go, and let go there, it
-docks. Let go anywhere else, it just moves. Galley remembers where
+Such a window moves by its tab bar, which is its title bar. Moved over Galley's window it
+turns see-through and a frame shows where it would go; let go there, it docks. Let go
+anywhere else, the window just moves. Closing the window also puts the tool window back. Galley remembers where
 each such window was, on which screen and how large, and opens it there again, also the
 next time Galley starts.
 

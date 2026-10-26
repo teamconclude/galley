@@ -366,8 +366,11 @@ function toolWindowOptions(
     minWidth: 240,
     minHeight: 160,
     backgroundColor: windowBackground(),
-    // A press on the tab of a window in the background starts a drag at once, rather than
-    // only bringing the window forward.
+    // Its tab bar is its title bar: Galley moves the window itself as the bar is dragged,
+    // so it knows when the drag ends and can dock it then (see Docks.tsx). A press on a
+    // window in the background starts that at once, rather than only bringing it forward.
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 12, y: 12 },
     acceptFirstMouse: true,
     webPreferences: { sandbox: false, webviewTag: true }
   }
@@ -383,26 +386,6 @@ function watchToolWindow(child: BrowserWindow, tool: string): void {
       e.preventDefault()
       child.close()
     }
-  })
-  // Moved by its title bar over the main window, the window shows the main window's drop
-  // places through itself, and docks where it is let go over one; see Docks.tsx. Moves in
-  // its first moment are its own placing, not the editor's.
-  const opened = Date.now()
-  const over = (): { x: number; y: number } | null => {
-    if (!win || Date.now() - opened < 1000) return null
-    const p = screen.getCursorScreenPoint()
-    const b = win.getContentBounds()
-    const inside = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height
-    return inside ? { x: p.x - b.x, y: p.y - b.y } : null
-  }
-  child.on('move', () => {
-    const at = over()
-    child.setOpacity(at ? 0.55 : 1)
-    send('tool:moving', tool, at)
-  })
-  child.on('moved', () => {
-    child.setOpacity(1)
-    send('tool:moved', tool, over())
   })
   child.on('closed', () => {
     if (toolWindows.get(tool) === child) toolWindows.delete(tool)
@@ -661,6 +644,12 @@ function registerIpc(): void {
   ipcMain.on('chat:answer', (_e, id: string, answer: ChatAnswer) => chat.answer(id, answer))
   ipcMain.on('chat:interrupt', () => chat.interrupt())
   ipcMain.on('chat:stop', () => chat.stop())
+  ipcMain.on('tool:place', (_e, tool: string, x: number, y: number) =>
+    toolWindows.get(tool)?.setPosition(Math.round(x), Math.round(y))
+  )
+  ipcMain.on('tool:seeThrough', (_e, tool: string, on: boolean) =>
+    toolWindows.get(tool)?.setOpacity(on ? 0.55 : 1)
+  )
   ipcMain.on('terminal:bell', () => {
     if (win?.isFocused()) return
     rang = true

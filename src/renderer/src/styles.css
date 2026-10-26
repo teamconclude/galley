@@ -383,6 +383,12 @@ button.primary:disabled:hover {
   user-select: none;
 }
 
+/* The tab bar is the window's title bar, with room for its close and minimise buttons. */
+.tool-window > .tool-tabs {
+  padding-left: 80px;
+  padding-top: 8px;
+}
+
 /* Squeezed below its natural height, the Changes panel scrolls as a whole. */
 .tool > .changes {
   overflow-y: auto;

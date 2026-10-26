@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Dock, Docks, DockSide, ToolId } from '../../../shared/types'
 import {
@@ -60,7 +60,7 @@ interface Drag {
   target: DropTarget | null
   // Where the tool window would land, drawn over the window.
   box: Box | null
-  // The tool window's own window is moved, rather than its tab dragged.
+  // The tool window's own window moves along, rather than a ghost of its tab.
   byWindow?: boolean
 }
 
@@ -232,28 +232,17 @@ export default function DockLayout(props: Props): React.JSX.Element {
     return none
   }
 
-  // A tool window's own window moved by its title bar over this one shows where it would
-  // dock, and docks there when let go; let go elsewhere, it only moves.
-  const moving = useEffectEvent((tool: ToolId, at: { x: number; y: number } | null) =>
-    setDrag(at ? { tool, ...at, ...targetAt(tool, at.x, at.y), byWindow: true } : null)
-  )
-  const moved = useEffectEvent((tool: ToolId, at: { x: number; y: number } | null) => {
-    setDrag(null)
-    const target = at && targetAt(tool, at.x, at.y).target
-    if (target) onDocks((d) => moveTool(d, tool, target))
-  })
-  useEffect(() => {
-    const offs = [window.api.tools.onMoving(moving), window.api.tools.onMoved(moved)]
-    return () => offs.forEach((off) => off())
-  }, [])
-
   // A drag starts in the main window or in a tool window's own window; either way the
   // pointer is followed in the main window's coordinates, and the window it started in
-  // keeps reporting it while the button is down, wherever it goes.
+  // keeps reporting it while the button is down, wherever it goes. Dragged by its tab bar,
+  // a tool window's own window moves along with the pointer, see-through while over a
+  // place to dock; it docks only once let go, never during the move.
   const startDrag = (tool: ToolId, e: React.PointerEvent): void => {
     if (e.button !== 0) return
     const view = (e.view as unknown as Window | null) ?? window
     const fromMain = view === window
+    const start = { x: view.screenX, y: view.screenY }
+    let clear = true
     const local = (ev: PointerEvent): { x: number; y: number } =>
       fromMain
         ? { x: ev.clientX, y: ev.clientY }
@@ -275,13 +264,21 @@ export default function DockLayout(props: Props): React.JSX.Element {
           ? { target: { kind: 'window', screenX: ev.screenX, screenY: ev.screenY }, box: null }
           : { target: null, box: null }
         : targetAt(tool, x, y)
-      last = { tool, x, y, ...placed }
+      if (!fromMain) {
+        window.api.tools.place(tool, start.x + ev.screenX - x0, start.y + ev.screenY - y0)
+        if (clear === !!placed.target) {
+          clear = !placed.target
+          window.api.tools.seeThrough(tool, !clear)
+        }
+      }
+      last = { tool, x, y, ...placed, byWindow: !fromMain }
       setDrag(last)
     }
     const stop = (): void => {
       view.removeEventListener('pointermove', move)
       view.removeEventListener('pointerup', up)
       view.removeEventListener('keydown', key, true)
+      if (!fromMain && !clear) window.api.tools.seeThrough(tool, false)
       setDrag(null)
     }
     const up = (): void => {
@@ -299,6 +296,7 @@ export default function DockLayout(props: Props): React.JSX.Element {
       ev.preventDefault()
       ev.stopPropagation()
       stop()
+      if (!fromMain && dragging) window.api.tools.place(tool, start.x, start.y)
     }
     view.addEventListener('pointermove', move)
     view.addEventListener('pointerup', up)
@@ -494,8 +492,9 @@ interface ToolWindowProps {
   onPress: (tool: ToolId, e: React.PointerEvent) => void
 }
 
-// A tool window in a window of its own: its tab, which drags it back into a dock, and the
-// tool window itself. Closing the window puts it back where it was.
+// A tool window in a window of its own: its tab bar, which is the window's title bar and
+// moves it, or into a dock, and the tool window itself. Closing the window puts it back
+// where it was.
 function ToolWindow(props: ToolWindowProps): React.JSX.Element {
   const { tool, win, badge, elementOf, onPress } = props
   const body = useRef<HTMLDivElement>(null)
@@ -506,8 +505,8 @@ function ToolWindow(props: ToolWindowProps): React.JSX.Element {
   })
   return createPortal(
     <div className="tool-window">
-      <div className="tool-tabs">
-        <button className="on" data-tab={tool} onPointerDown={(e) => onPress(tool, e)}>
+      <div className="tool-tabs" onPointerDown={(e) => onPress(tool, e)}>
+        <button className="on" data-tab={tool}>
           {toolTitles[tool]}
           {!!badge && <span className="badge">{badge}</span>}
         </button>

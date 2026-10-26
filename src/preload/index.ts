@@ -100,8 +100,8 @@ const api: Api = {
   },
   tools: {
     onClosed: (cb) => on('tool:closed', cb),
-    onMoving: (cb) => on('tool:moving', cb),
-    onMoved: (cb) => on('tool:moved', cb)
+    place: (tool, x, y) => ipcRenderer.send('tool:place', tool, x, y),
+    seeThrough: (tool, on) => ipcRenderer.send('tool:seeThrough', tool, on)
   },
   terminal: {
     start: (cols, rows, login) => ipcRenderer.send('terminal:start', cols, rows, login),
