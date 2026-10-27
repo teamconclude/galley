@@ -138,6 +138,20 @@ export function pageAt(pages: Iterable<PageInfo>, address: string): PageMatch | 
   return forwarding
 }
 
+// The page a changed file shows on: the page itself, or for a picture or other file in a
+// page bundle, the bundle's page. Null for files no page is made of, e.g. layouts.
+export function pageOfFile(pages: Map<string, PageInfo>, path: string): PageInfo | null {
+  const own = pages.get(path)
+  if (own) return own
+  const dir = path.slice(0, path.lastIndexOf('/') + 1)
+  if (!dir) return null
+  for (const page of pages.values()) {
+    if (page.path.startsWith(dir) && /^_?index\.[^/]+$/.test(page.path.slice(dir.length)))
+      return page
+  }
+  return null
+}
+
 // The address a link to the site points at, whichever copy of the site it names: the
 // live one, the preview or a review link. https://conclude.io/blog/x?ref=1#top gives
 // /blog/x/. Null for text that is not a link.

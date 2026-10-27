@@ -311,7 +311,7 @@ too unless colleagues' work is on it. If you are on the branch, Galley moves you
 ### Committing
 
 1. Click a file to see what changed: removed text in red, added text in green, pictures
-   side by side.
+   side by side. For a page, or a picture of a page, the preview shows that page.
 2. Tick the files that belong together. Unticked files stay as they are, for a later
    commit.
 3. Write a short note on what you did, such as "Update pricing for the Pro plan", and

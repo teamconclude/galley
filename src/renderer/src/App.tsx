@@ -74,7 +74,7 @@ import { branchPrefix } from '../../shared/branchPrefix'
 import { askClaude } from './lib/claude'
 import { mergeSettings, newPageText } from './lib/newPage'
 import { setLinkTargets, siteFile } from './lib/linkCheck'
-import { pageAt, usePages } from './lib/pages'
+import { pageAt, pageOfFile, usePages } from './lib/pages'
 import { placeInBody, resizeTag, swapInBody, swapInSettings } from './lib/previewDrop'
 import { pageAddress, reviewLink as makeReviewLink, type ReviewLink } from '../../shared/reviewLink'
 import { currentListKey } from './lib/schema'
@@ -324,8 +324,12 @@ export default function App(): React.JSX.Element | null {
   const open = async (path: string, stepping = false): Promise<string | null> => {
     const spot = spotOf(textView.current)
     await save()
+    const address = pages.get(path)?.url ?? null
+    // A file opened from its change: the preview stays on its page rather than going back to
+    // the one open before.
+    if (diff && address) setPagePath(address)
     setDiff(null)
-    if (!stepping) history.visit({ path, address: pages.get(path)?.url ?? null }, spot)
+    if (!stepping) history.visit({ path, address }, spot)
     if (imageFile.test(path) || binaryFile.test(path)) {
       setFile({ path, text: '', saved: '' })
       return null
@@ -369,6 +373,8 @@ export default function App(): React.JSX.Element | null {
     if (pageAddress(address) === pageAddress(shownPath)) return
     const match = pageAt(pages.values(), pageAddress(address))
     setPagePath(address)
+    // A link followed while a change is shown leaves the change; its page is in the preview.
+    setDiff(null)
     if (match) {
       if (match.page.path !== fileRef.current?.path) void open(match.page.path)
     } else {
@@ -1202,8 +1208,12 @@ export default function App(): React.JSX.Element | null {
   // Claude hears which page is open, so "this page" means what the editor sees.
   useEffect(() => window.api.terminal.context(filePath), [filePath])
 
-  // A data file the home page renders as text, e.g. llms.txt, is previewed as that text.
-  const shownPath = textPreview ?? pagePath
+  // While a change is shown, the preview shows its page, when it has one that is still
+  // there; closing the change brings back the open file's page. A data file the home page
+  // renders as text, e.g. llms.txt, is previewed as that text.
+  const changedPage =
+    diff && diff.change.kind !== 'deleted' ? pageOfFile(pages, diff.change.path) : null
+  const shownPath = changedPage?.url ?? textPreview ?? pagePath
   const previewUrl = hugo.state === 'running' && hugo.url ? hugo.url + shownPath : null
 
   // The setup dialog appears by itself only when a step downloads, fails or needs the
