@@ -783,9 +783,13 @@ app.whenReady().then(() => {
   refreshMenu()
   registerIpc()
   registerRepoProtocol()
-  // Links reach whichever Galley registered last; a development build takes them over
-  // until the installed app starts again.
-  app.setAsDefaultProtocolClient('galley')
+  // Links reach whichever Galley registered last. A development build takes them over
+  // while it runs and hands them back to the installed app as it quits, since macOS would
+  // otherwise start it without Galley in it. Test instances leave links alone.
+  if (!userData) {
+    app.setAsDefaultProtocolClient('galley')
+    if (isDev) app.on('will-quit', () => app.removeAsDefaultProtocolClient('galley'))
+  }
   const { repoPath } = loadSettings()
   if (repoPath && Repo.isSite(repoPath)) openRepo(repoPath)
   if (offerMoveToApplications()) return
