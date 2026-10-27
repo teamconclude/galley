@@ -1,5 +1,6 @@
 import type {
   BranchInfo,
+  Change,
   ChatAnswer,
   ChatItem,
   ChatRequest,
@@ -126,6 +127,10 @@ export interface Api {
     // Moves local commits off a shared branch onto a new branch.
     moveToBranch: (name: string) => Promise<void>
     log: (range: CommitRange) => Promise<Commit[]>
+    // What a commit changed: its files, one file's diff, and a picture before or after.
+    commitFiles: (hash: string) => Promise<Change[]>
+    commitDiff: (hash: string, change: Change) => Promise<string>
+    commitImage: (hash: string, path: string, before: boolean) => Promise<string | null>
     // Makes an entry outside the site part of it, so the next commit takes its files.
     include: (path: string) => Promise<void>
     // The committed version of a file as a data URL, for showing changed images.

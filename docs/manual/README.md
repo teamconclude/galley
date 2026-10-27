@@ -351,7 +351,12 @@ Both send the result to GitHub straight away, so a review link always shows your
 work.
 
 Every count, such as "3 changes on develop not in this branch", opens into the list of
-commits behind it: who made them, when, and which files they touched.
+commits behind it: who made them, when, and which files they touched. Click a commit to
+see its files, and a file to see what the commit changed in it, in the editor's place, with
+the page in the preview.
+
+**History** at the bottom of the Changes tab lists the latest commits on your branch,
+those from develop included; on develop, it is develop's history. They open the same way.
 
 ### When changes conflict
 
@@ -399,7 +404,8 @@ sees what you see. Changes you have not committed are not included; commit them 
 ![The share button's confirmation, with the copied link](images/share.png)
 
 When a colleague clicks the link, Galley opens with a review dialog. It lists the
-commits on the branch and who made them, and only then switches. Your own unfinished
+commits on the branch and who made them, and only then switches. Click a commit to see its
+files, and a file to see what changed in it. Your own unfinished
 changes are committed to your branch first, so nothing gets mixed up. A blue bar at the top
 shows the branch you are reviewing; **Back to** your branch takes you back. You can edit
 during a review: what you commit goes to the branch you are reviewing.

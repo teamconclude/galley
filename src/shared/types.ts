@@ -124,6 +124,8 @@ export interface Change {
   path: string
   kind: ChangeKind
   from?: string
+  // A file a commit changed that is no longer in the checkout.
+  gone?: boolean
   // Why a new file looks out of place, for the editor.
   warning?: string
 }
@@ -166,6 +168,8 @@ export type CommitRange =
   | { kind: 'release'; from: string; to: string }
   // A colleague's branch opened from a review link: what it adds to the base.
   | { kind: 'review'; branch: string }
+  // The branch's commits, its base's included, the newest first.
+  | { kind: 'history' }
 
 export interface Commit {
   hash: string

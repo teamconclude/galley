@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type {
   Change,
+  Commit,
   CommitRange,
   GitStatus,
   Identity,
@@ -30,6 +31,9 @@ interface Props {
   me: Identity | null
   selected: string | null
   onShowDiff: (change: Change) => void
+  // A file a listed commit changed, and the one shown.
+  onShowCommitFile: (commit: Commit, change: Change) => void
+  shownCommitFile: { hash: string; path: string } | null
   onDiscard: (change: Change) => void
   onDiscardAll: (changes: Change[]) => void
   // The commit being prepared, kept by the caller while the panel is out of sight.
@@ -88,6 +92,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
   const { onPush, onPull, onUpdate, onFetch, onNewBranch, onSwitchBranch, onDeleteBranch } = props
   const { onMerge, onMove, onOutside, onRelease, onPublish } = props
   const { onContinue, onCancelRebase, onAskClaude } = props
+  const { onShowCommitFile, shownCommitFile } = props
   const [menuOpen, setMenuOpen] = useState(false)
 
   if (!status) return <div className="pane-empty">Reading the repository…</div>
@@ -119,6 +124,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
 
   // Lists reload when GitHub was checked or a count moved.
   const version = [
+    status.branch,
     status.lastFetch,
     status.ahead,
     status.behind,
@@ -132,7 +138,15 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
     text: string,
     action?: React.ReactNode
   ): React.JSX.Element => (
-    <CountRow range={range} total={total} text={text} me={me} version={version}>
+    <CountRow
+      range={range}
+      total={total}
+      text={text}
+      me={me}
+      version={version}
+      onShowFile={onShowCommitFile}
+      shown={shownCommitFile}
+    >
       {action}
     </CountRow>
   )
@@ -460,6 +474,24 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
         </div>
       )}
 
+      {status.branch && (
+        <div className="history">
+          <div className="changes-head">
+            <span>History</span>
+          </div>
+          <div className="changes-sync">
+            <CountRow
+              range={{ kind: 'history' }}
+              text={`Latest commits on ${status.branch}`}
+              me={me}
+              version={version}
+              onShowFile={onShowCommitFile}
+              shown={shownCommitFile}
+            />
+          </div>
+        </div>
+      )}
+
       {status.releases.length > 0 && (
         <div className="releases">
           <div className="changes-head">
@@ -479,6 +511,8 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                   text={`${plural(step.count, 'change')} on ${step.from} not yet on ${named(step.to, step.site)}.`}
                   me={me}
                   version={version}
+                  onShowFile={onShowCommitFile}
+                  shown={shownCommitFile}
                 >
                   <Tip
                     text={
@@ -569,13 +603,15 @@ function PushButton({ onPush }: { onPush: () => void }): React.JSX.Element {
 // A count that opens into the commits behind it.
 function CountRow(props: {
   range: CommitRange
-  total: number
+  total?: number
   text: string
   me: Identity | null
   version: string
+  onShowFile: (commit: Commit, change: Change) => void
+  shown: { hash: string; path: string } | null
   children?: React.ReactNode
 }): React.JSX.Element {
-  const { range, total, text, me, version, children } = props
+  const { range, total, text, me, version, onShowFile, shown, children } = props
   const [open, setOpen] = useState(false)
   return (
     <div className="count-row">
@@ -593,7 +629,16 @@ function CountRow(props: {
         </button>
         {children}
       </div>
-      {open && <CommitList range={range} total={total} me={me} version={version} />}
+      {open && (
+        <CommitList
+          range={range}
+          total={total}
+          me={me}
+          version={version}
+          onShowFile={onShowFile}
+          shown={shown}
+        />
+      )}
     </div>
   )
 }

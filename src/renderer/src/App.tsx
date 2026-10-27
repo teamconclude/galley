@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type {
   Change,
+  Commit,
   DirEntry,
   GitStatus,
   SetupStatus,
@@ -231,7 +232,12 @@ export default function App(): React.JSX.Element | null {
   const [searchHit, setSearchHit] = useState<SearchHit | null>(null)
   const [select, setSelect] = useState<Target | null>(null)
   const [bodyView, setBodyView] = useState<EditorView | null>(null)
-  const [diff, setDiff] = useState<{ change: Change; text: string | null } | null>(null)
+  // A change in the checkout, or one a commit made.
+  const [diff, setDiff] = useState<{
+    change: Change
+    text: string | null
+    commit?: Commit
+  } | null>(null)
   const [gitDialog, setGitDialog] = useState<
     'new-branch' | 'move' | 'switch-branch' | 'delete-branch' | 'identity' | 'merge' | null
   >(null)
@@ -857,7 +863,22 @@ export default function App(): React.JSX.Element | null {
     setDiff({ change, text: null })
     try {
       const text = await window.api.git.diff(change.path)
-      setDiff((d) => (d && d.change.path === change.path ? { change, text } : d))
+      setDiff((d) => (d && !d.commit && d.change.path === change.path ? { change, text } : d))
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  const showCommitFile = async (commit: Commit, change: Change): Promise<void> => {
+    await save()
+    setDiff({ change, text: null, commit })
+    try {
+      const text = await window.api.git.commitDiff(commit.hash, change)
+      setDiff((d) =>
+        d?.commit?.hash === commit.hash && d.change.path === change.path
+          ? { change, text, commit }
+          : d
+      )
     } catch (e) {
       fail(e)
     }
@@ -1499,8 +1520,12 @@ export default function App(): React.JSX.Element | null {
                 <ChangesPanel
                   status={gitStatus}
                   me={identity}
-                  selected={diff?.change.path ?? null}
+                  selected={diff && !diff.commit ? diff.change.path : null}
                   onShowDiff={(c) => void (inConflict(c.path) ? open(c.path) : showDiff(c))}
+                  onShowCommitFile={(commit, c) => void showCommitFile(commit, c)}
+                  shownCommitFile={
+                    diff?.commit ? { hash: diff.commit.hash, path: diff.change.path } : null
+                  }
                   onDiscard={(c) => void discardChange(c)}
                   onDiscardAll={(cs) => void discardAll(cs)}
                   draft={draft}
@@ -1585,6 +1610,7 @@ export default function App(): React.JSX.Element | null {
                 <DiffView
                   change={diff.change}
                   diff={diff.text}
+                  commit={diff.commit}
                   onOpen={() => void open(diff.change.path)}
                   onDiscard={() => void discardChange(diff.change)}
                   onRevertHunk={(i) => void revertHunk(diff.change, i)}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
-import type { Change } from '../../../shared/types'
+import type { Change, Commit } from '../../../shared/types'
 import { splitDiff } from '../../../shared/diff'
 import { wordDiff, type Segment } from '../lib/wordDiff'
 import Tip from './Tip'
@@ -8,6 +8,8 @@ import Tip from './Tip'
 interface Props {
   change: Change
   diff: string | null
+  // A change a commit made, shown as it is: no discarding or reverting.
+  commit?: Commit
   onOpen: () => void
   onDiscard: () => void
   onRevertHunk: (index: number) => void
@@ -60,22 +62,34 @@ function rows(hunk: string): Row[] {
 
 const imageFile = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i
 
-// An image as committed next to the one in the checkout, whichever of them exist.
-function ImageDiff({ change }: { change: Change }): React.JSX.Element {
+// An image as committed next to the one in the checkout, whichever of them exist; for a
+// commit's change, as it was before the commit and after.
+function ImageDiff({ change, commit }: { change: Change; commit?: string }): React.JSX.Element {
   const [before, setBefore] = useState<string | null>(null)
+  const [after, setAfter] = useState<string | null>(null)
   // The query keeps the browser from showing an earlier load of the same file.
   const [loaded] = useState(() => Date.now())
   const hadBefore = change.kind !== 'untracked' && change.kind !== 'added'
   useEffect(() => {
     if (!hadBefore) return
     let live = true
-    void window.api.git
-      .committedImage(change.from ?? change.path)
-      .then((url) => live && setBefore(url))
+    const was = change.from ?? change.path
+    void (
+      commit ? window.api.git.commitImage(commit, was, true) : window.api.git.committedImage(was)
+    ).then((url) => live && setBefore(url))
     return () => {
       live = false
     }
-  }, [change.path, change.from, hadBefore])
+  }, [change.path, change.from, hadBefore, commit])
+  useEffect(() => {
+    if (!commit || change.kind === 'deleted') return
+    let live = true
+    void window.api.git.commitImage(commit, change.path, false).then((url) => live && setAfter(url))
+    return () => {
+      live = false
+    }
+  }, [change.path, change.kind, commit])
+  const now = commit ? after : `galley://repo/${change.path}?v=${loaded}`
   return (
     <div className="image-diff">
       {hadBefore && (
@@ -86,8 +100,10 @@ function ImageDiff({ change }: { change: Change }): React.JSX.Element {
       )}
       {change.kind !== 'deleted' && (
         <figure>
-          <img src={`galley://repo/${change.path}?v=${loaded}`} alt="" />
-          <figcaption>{hadBefore ? 'Now' : 'New'}</figcaption>
+          {now && <img src={now} alt="" />}
+          <figcaption>
+            {commit ? (hadBefore ? 'After' : 'New') : hadBefore ? 'Now' : 'New'}
+          </figcaption>
         </figure>
       )}
     </div>
@@ -103,58 +119,83 @@ function hunkLabel(header: string): string {
   return count > 1 ? `Lines ${start} to ${start + count - 1}` : `Line ${start}`
 }
 
-export default function DiffView(props: Props): React.JSX.Element {
-  const { change, diff, onOpen, onDiscard, onRevertHunk } = props
+// The changed lines, hunk by hunk, or a picture before and after.
+export function DiffBody(props: {
+  change: Change
+  diff: string | null
+  commit?: string
+  onRevertHunk?: (index: number) => void
+}): React.JSX.Element {
+  const { change, diff, commit, onRevertHunk } = props
   const hunks = diff ? splitDiff(diff).hunks : []
-  const canRevert = change.kind === 'modified' || change.kind === 'renamed'
+  const canRevert = !!onRevertHunk && (change.kind === 'modified' || change.kind === 'renamed')
+  if (imageFile.test(change.path)) {
+    return <ImageDiff key={`${commit}:${change.path}`} change={change} commit={commit} />
+  }
+  if (diff === null) return <div className="pane-empty">Loading…</div>
+  if (hunks.length === 0) return <div className="pane-empty">No differences to show.</div>
+  return (
+    <pre className="diff">
+      {hunks.map((hunk, h) => (
+        <div key={h} className="diff-hunk">
+          <span className="diff-line hunk">
+            <span>{hunkLabel(hunk.split('\n')[0])}</span>
+            {canRevert && (
+              <Tip text="Revert this change">
+                <button aria-label="Revert this change" onClick={() => onRevertHunk(h)}>
+                  <RotateCcw size={14} />
+                </button>
+              </Tip>
+            )}
+          </span>
+          {rows(hunk).map((row, i) => (
+            <span key={i} className={`diff-line ${row.kind}`}>
+              {row.kind === 'add' ? '+' : row.kind === 'del' ? '-' : ' '}
+              {row.segments
+                ? row.segments.map((s, k) =>
+                    s.changed ? (
+                      <mark key={k} className="diff-word">
+                        {s.text}
+                      </mark>
+                    ) : (
+                      s.text
+                    )
+                  )
+                : row.text || ' '}
+            </span>
+          ))}
+        </div>
+      ))}
+    </pre>
+  )
+}
+
+export default function DiffView(props: Props): React.JSX.Element {
+  const { change, diff, commit, onOpen, onDiscard, onRevertHunk } = props
   return (
     <div className="diff-view">
       <div className="pane-bar">
         <span className={`change-kind ${change.kind}`}>{kindLabel[change.kind]}</span>
-        <span className="pane-title">{change.path}</span>
-        {change.kind !== 'deleted' && <button onClick={onOpen}>Edit this file</button>}
-        <button onClick={onDiscard}>Discard changes</button>
+        <span className="pane-title">
+          {change.path}
+          {commit && (
+            <span className="diff-commit" title={`${commit.author}, ${commit.hash.slice(0, 8)}`}>
+              {' '}
+              in “{commit.subject}”
+            </span>
+          )}
+        </span>
+        {change.kind !== 'deleted' && !change.gone && (
+          <button onClick={onOpen}>Edit this file</button>
+        )}
+        {!commit && <button onClick={onDiscard}>Discard changes</button>}
       </div>
-      {imageFile.test(change.path) ? (
-        <ImageDiff key={change.path} change={change} />
-      ) : diff === null ? (
-        <div className="pane-empty">Loading…</div>
-      ) : hunks.length === 0 ? (
-        <div className="pane-empty">No differences to show.</div>
-      ) : (
-        <pre className="diff">
-          {hunks.map((hunk, h) => (
-            <div key={h} className="diff-hunk">
-              <span className="diff-line hunk">
-                <span>{hunkLabel(hunk.split('\n')[0])}</span>
-                {canRevert && (
-                  <Tip text="Revert this change">
-                    <button aria-label="Revert this change" onClick={() => onRevertHunk(h)}>
-                      <RotateCcw size={14} />
-                    </button>
-                  </Tip>
-                )}
-              </span>
-              {rows(hunk).map((row, i) => (
-                <span key={i} className={`diff-line ${row.kind}`}>
-                  {row.kind === 'add' ? '+' : row.kind === 'del' ? '-' : ' '}
-                  {row.segments
-                    ? row.segments.map((s, k) =>
-                        s.changed ? (
-                          <mark key={k} className="diff-word">
-                            {s.text}
-                          </mark>
-                        ) : (
-                          s.text
-                        )
-                      )
-                    : row.text || ' '}
-                </span>
-              ))}
-            </div>
-          ))}
-        </pre>
-      )}
+      <DiffBody
+        change={change}
+        diff={diff}
+        commit={commit?.hash}
+        onRevertHunk={commit ? undefined : onRevertHunk}
+      />
     </div>
   )
 }

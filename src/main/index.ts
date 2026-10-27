@@ -18,6 +18,7 @@ import { pathToFileURL } from 'url'
 import { electronApp } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import type {
+  Change,
   ChatAnswer,
   ClaudeMode,
   CommitRange,
@@ -565,6 +566,13 @@ function registerIpc(): void {
   ipcMain.handle('git:mergeToBase', () => currentGit().mergeToBase())
   ipcMain.handle('git:moveToBranch', (_e, name: string) => currentGit().moveToBranch(name))
   ipcMain.handle('git:log', (_e, range: CommitRange) => currentGit().log(range))
+  ipcMain.handle('git:commitFiles', (_e, hash: string) => currentGit().commitFiles(hash))
+  ipcMain.handle('git:commitDiff', (_e, hash: string, change: Change) =>
+    currentGit().commitDiff(hash, change)
+  )
+  ipcMain.handle('git:commitImage', (_e, hash: string, path: string, before: boolean) =>
+    currentGit().commitImage(hash, path, before)
+  )
   ipcMain.handle('git:repoSlug', () => currentGit().repoSlug())
   ipcMain.handle('git:fetchBranch', (_e, name: string) => currentGit().fetchBranch(name))
   ipcMain.handle('git:startReview', (_e, name: string) => currentGit().startReview(name))

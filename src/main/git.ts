@@ -426,6 +426,8 @@ export class Git {
           return `${baseRef}..HEAD`
         case 'review':
           return reviewable ? `origin/${base}..origin/${range.branch}` : null
+        case 'history':
+          return 'HEAD'
         case 'release': {
           const known = status.releases.some((s) => s.from === range.from && s.to === range.to)
           return known ? `origin/${range.to}..origin/${range.from}` : null
@@ -1123,10 +1125,88 @@ export class Git {
 
   // An image as last committed, for comparing it with the one in the checkout.
   async committedImage(path: string): Promise<string | null> {
+    return this.imageAt('HEAD', path)
+  }
+
+  private async imageAt(rev: string, path: string): Promise<string | null> {
     const type = imageTypes[extname(path).slice(1).toLowerCase()]
     if (!type) return null
-    const data = await runBuffer(this.path, ['show', `HEAD:${path}`]).catch(() => null)
+    const data = await runBuffer(this.path, ['show', `${rev}:${path}`]).catch(() => null)
     return data && `data:${type};base64,${data.toString('base64')}`
+  }
+
+  // A commit the editor names, as its full hash; anything else is refused.
+  private async commitOf(hash: string): Promise<string> {
+    if (!/^[0-9a-f]{7,64}$/.test(hash)) throw new Error(`${hash} is not a commit`)
+    return (await this.git(['rev-parse', '--verify', '--quiet', `${hash}^{commit}`])).trim()
+  }
+
+  // What a commit changed, file by file, against the branch it was made on: a merge counts
+  // as what it brought in.
+  async commitFiles(hash: string): Promise<Change[]> {
+    const commit = await this.commitOf(hash)
+    const out = await this.git([
+      'show',
+      '--format=',
+      '--name-status',
+      '-z',
+      '-M',
+      '--diff-merges=first-parent',
+      commit
+    ])
+    const fields = out.split('\0')
+    const files: Change[] = []
+    for (let i = 0; i < fields.length - 1;) {
+      const status = fields[i++]
+      const kind: ChangeKind | null =
+        status[0] === 'A'
+          ? 'added'
+          : status[0] === 'D'
+            ? 'deleted'
+            : status[0] === 'R'
+              ? 'renamed'
+              : status[0]
+                ? 'modified'
+                : null
+      if (!kind) continue
+      const from = kind === 'renamed' ? fields[i++] : undefined
+      const path = fields[i++]
+      files.push({ path, kind, ...(from ? { from } : {}) })
+    }
+    await Promise.all(
+      files.map(async (f) => {
+        if (
+          await fs.access(join(this.path, f.path)).then(
+            () => false,
+            () => true
+          )
+        )
+          f.gone = true
+      })
+    )
+    return files
+  }
+
+  async commitDiff(hash: string, change: Change): Promise<string> {
+    const commit = await this.commitOf(hash)
+    const paths = change.from ? [change.from, change.path] : [change.path]
+    return this.git([
+      'show',
+      '--format=',
+      '--no-color',
+      '-U3',
+      '-M',
+      '--diff-merges=first-parent',
+      commit,
+      '--',
+      ...paths
+    ])
+  }
+
+  // A picture as a commit left it, or as it was before.
+  async commitImage(hash: string, path: string, before: boolean): Promise<string | null> {
+    const commit = await this.commitOf(hash)
+    return this.imageAt(before ? `${commit}^` : commit, path)
   }
 
   // Null unless both a name and something shaped like an email address are configured.
