@@ -10,6 +10,7 @@ import type {
   PreviewTarget
 } from '../../../shared/types'
 import type { WebviewElement } from '../env'
+import { useToolMoves } from '../lib/toolWindows'
 import {
   dropMarkScript,
   dropSpotScript,
@@ -70,6 +71,8 @@ export default function Preview(props: Props): React.JSX.Element {
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
   const [reloads, setReloads] = useState(0)
+  // The page is made anew in each window the preview moves to, so it takes clicks there.
+  const moves = useToolMoves('preview')
 
   return (
     <div className="preview">
@@ -118,6 +121,7 @@ export default function Preview(props: Props): React.JSX.Element {
         )}
       </div>
       <PreviewContent
+        key={moves}
         url={url}
         mode={mode}
         version={version}

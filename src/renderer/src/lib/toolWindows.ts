@@ -61,3 +61,27 @@ export function toolWindowClosed(tool: ToolId): boolean {
   changed(next)
   return true
 }
+
+// How often each tool window moved to another window's page. A webview takes input only in
+// the page that made it, so the preview makes its anew after each such move.
+const homes = new Map<ToolId, Document>()
+let moves: Partial<Record<ToolId, number>> = {}
+const moveListeners = new Set<() => void>()
+
+// The page the tool window's element is in now, once the docks and windows have moved it.
+export function settleHome(tool: ToolId, home: Document): void {
+  const was = homes.get(tool)
+  homes.set(tool, home)
+  if (!was || was === home) return
+  moves = { ...moves, [tool]: (moves[tool] ?? 0) + 1 }
+  for (const l of moveListeners) l()
+}
+
+export const useToolMoves = (tool: ToolId): number =>
+  useSyncExternalStore(
+    (cb) => {
+      moveListeners.add(cb)
+      return () => moveListeners.delete(cb)
+    },
+    () => moves[tool] ?? 0
+  )

@@ -18,6 +18,7 @@ import {
 import {
   closeToolWindow,
   openToolWindow,
+  settleHome,
   toolWindowClosed,
   useToolWindows
 } from '../lib/toolWindows'
@@ -116,6 +117,10 @@ export default function DockLayout(props: Props): React.JSX.Element {
     return made
   })
   const elementOf = (tool: ToolId): HTMLDivElement => elements.get(tool)!
+  // After the docks and windows below have moved the elements, before the window shows them.
+  useLayoutEffect(() => {
+    for (const [tool, el] of elements) settleHome(tool, el.ownerDocument)
+  })
 
   const available = (tool: ToolId): boolean => !!tools[tool] && !hidden.includes(tool)
   const has = (tool: ToolId): boolean => available(tool) && !isFloating(docks, tool)
