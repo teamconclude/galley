@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs the DMG from dist/ into a fresh macOS virtual machine and starts Galley there,
+# Installs the DMG from dist.noindex/ into a fresh macOS virtual machine and starts Galley there,
 # then brings back a screenshot and Galley's log. Needs tart (https://tart.run) and a VM
 # created with:  tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest galley-test
 # Usage: scripts/vm-test [vm-name]      TART=/path/to/tart overrides the binary.
@@ -7,9 +7,9 @@ set -e
 cd "$(dirname "$0")/.."
 vm=${1:-galley-test}
 tart=${TART:-tart}
-dmg=$(ls dist/Galley-*.dmg 2>/dev/null | head -1)
-[ -n "$dmg" ] || { echo "No DMG in dist/; run npm run build:mac first" >&2; exit 1; }
-out=dist/vm
+dmg=$(ls dist.noindex/Galley-*.dmg 2>/dev/null | head -1)
+[ -n "$dmg" ] || { echo "No DMG in dist.noindex/; run npm run build:mac first" >&2; exit 1; }
+out=dist.noindex/vm
 mkdir -p "$out"
 
 if ! "$tart" list | grep -q "^local *$vm "; then

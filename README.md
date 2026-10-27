@@ -142,8 +142,8 @@ npm install
 npm run dev          # start with live reload
 npm run typecheck
 npm run lint
-npm run build:unpack # packaged app in dist/mac-arm64, for trying the packaged behaviour
-npm run build:mac    # .dmg and .zip in dist/
+npm run build:unpack # packaged app in dist.noindex/mac-arm64, for trying the packaged behaviour
+npm run build:mac    # .dmg and .zip in dist.noindex/
 ```
 
 Galley reads the site's Hugo config, `hugo.*` or `config.*` in YAML, TOML or JSON, for the
@@ -193,7 +193,7 @@ missing, so the downloads run on a machine that has them. The real test is a fre
 virtual machine with [tart](https://tart.run): create one with
 `tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest galley-test`, build the DMG, and
 run `scripts/vm-test`. It installs the DMG in the VM, starts Galley, and copies a screenshot
-and Galley's log (`~/Library/Logs/Galley/galley.log`) back into `dist/vm/`. `tart run
+and Galley's log (`~/Library/Logs/Galley/galley.log`) back into `dist.noindex/vm/`. `tart run
 galley-test` opens the VM's screen to click through the setup by hand.
 
 GitHub sign-in needs the client id of a GitHub OAuth app with the device flow enabled, set

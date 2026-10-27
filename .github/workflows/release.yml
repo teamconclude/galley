@@ -55,8 +55,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp scripts/install.sh dist/install.sh
-          assets=(dist/*.dmg dist/*.zip dist/latest-mac.yml dist/install.sh)
+          cp scripts/install.sh dist.noindex/install.sh
+          assets=(dist.noindex/*.dmg dist.noindex/*.zip dist.noindex/latest-mac.yml dist.noindex/install.sh)
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
           else

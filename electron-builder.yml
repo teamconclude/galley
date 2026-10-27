@@ -2,6 +2,9 @@ appId: io.conclude.galley
 productName: Galley
 directories:
   buildResources: build
+  # Spotlight leaves *.noindex out, so the app built here is not offered beside the
+  # installed one; started, it would offer to replace that.
+  output: dist.noindex
 files:
   - '!**/.vscode/*'
   - '!src/*'

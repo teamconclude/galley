@@ -3,9 +3,21 @@
 # process after that bundle and executable and shows that bundle's icon. Rename them and
 # swap the icon so the menu bar and Dock show Galley. The packaged app gets all of this
 # from electron-builder.
+#
+# The bundle lives in a folder Spotlight leaves out, *.noindex: started from Spotlight it
+# would show Electron's own window, as Galley is not in it, and Launch Services would not
+# offer it beside the installed app.
 dist=node_modules/electron/dist
-[ -d "$dist/Electron.app" ] && mv "$dist/Electron.app" "$dist/Galley.app"
-app=$dist/Galley.app
+home=$dist/dev.noindex
+lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+for old in "$dist/Electron.app" "$dist/Galley.app"; do
+  [ -d "$old" ] || continue
+  "$lsregister" -u "$old" 2>/dev/null
+  rm -rf "$home/Galley.app"
+  mkdir -p "$home"
+  mv "$old" "$home/Galley.app"
+done
+app=$home/Galley.app
 [ -d "$app" ] || exit 0
 [ -f "$app/Contents/MacOS/Electron" ] && mv "$app/Contents/MacOS/Electron" "$app/Contents/MacOS/Galley"
 plist=$app/Contents/Info.plist
@@ -15,7 +27,7 @@ plutil -replace CFBundleExecutable -string Galley "$plist"
 plutil -replace CFBundleIdentifier -string io.conclude.galley.dev "$plist"
 # Review links, galley://open?…, reach a running development build too.
 plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"Galley review link","CFBundleURLSchemes":["galley"]}]' "$plist"
-printf 'Galley.app/Contents/MacOS/Galley' > node_modules/electron/path.txt
+printf 'dev.noindex/Galley.app/Contents/MacOS/Galley' > node_modules/electron/path.txt
 
 [ -f build/icon.icns ] || scripts/make-icns
 cp build/icon.icns "$app/Contents/Resources/electron.icns"
