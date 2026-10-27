@@ -1149,11 +1149,14 @@ body.dragging .terminal-host {
   max-height: 100%;
 }
 
+/* min-height: 0 keeps a long markdown rendition from growing the pane past its tool
+   window; it scrolls instead. */
 .preview {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .webview {
@@ -1299,11 +1302,14 @@ body.dragging .terminal-host {
   border-radius: 0 6px 6px 0;
 }
 
+/* min-height: 0 keeps a long conversation from growing the pane past its tool window,
+   which would push the composer out of sight; the log scrolls instead. */
 .claude {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   position: relative;
 }
 
