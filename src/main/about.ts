@@ -3,6 +3,7 @@ import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
 import license from '../../LICENSE?raw'
 import { isDev } from './env'
+import { pixel } from './pixel'
 import { windowBackground } from './appearance'
 
 let about: BrowserWindow | null = null
@@ -146,8 +147,8 @@ export function showAbout(over: BrowserWindow | null): void {
     const parent = over.getBounds()
     const [width, height] = about.getSize()
     about.setPosition(
-      Math.round(parent.x + (parent.width - width) / 2),
-      Math.round(parent.y + (parent.height - height) / 2)
+      pixel(parent.x + (parent.width - width) / 2),
+      pixel(parent.y + (parent.height - height) / 2)
     )
   }
   about.on('ready-to-show', () => about?.show())

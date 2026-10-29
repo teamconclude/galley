@@ -39,6 +39,7 @@ import { clone, Git, run as runGit } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
 import { dropPlacement } from './placement'
+import { pixel } from './pixel'
 import { parseReviewLink, type ReviewLink } from '../shared/reviewLink'
 import { showAbout } from './about'
 import { installMenu, setMenuState } from './menu'
@@ -296,8 +297,8 @@ function showManual(): void {
     const main = win.getBounds()
     const [width, height] = manualWin.getSize()
     manualWin.setPosition(
-      Math.round(main.x + (main.width - width) / 2),
-      Math.round(main.y + Math.max(0, (main.height - height) / 2))
+      pixel(main.x + (main.width - width) / 2),
+      pixel(main.y + Math.max(0, (main.height - height) / 2))
     )
   }
   manualWin.on('page-title-updated', (e) => e.preventDefault())
@@ -656,15 +657,15 @@ function registerIpc(): void {
   ipcMain.handle('tool:snapshot', async (e, r: Rectangle) => {
     const z = e.sender.getZoomFactor()
     const image = await e.sender.capturePage({
-      x: Math.round(r.x * z),
-      y: Math.round(r.y * z),
-      width: Math.round(r.width * z),
-      height: Math.round(r.height * z)
+      x: pixel(r.x * z),
+      y: pixel(r.y * z),
+      width: pixel(r.width * z),
+      height: pixel(r.height * z)
     })
     return 'data:image/jpeg;base64,' + image.toJPEG(75).toString('base64')
   })
   ipcMain.on('tool:place', (_e, tool: string, x: number, y: number) =>
-    toolWindows.get(tool)?.setPosition(Math.round(x), Math.round(y))
+    toolWindows.get(tool)?.setPosition(pixel(x), pixel(y))
   )
   ipcMain.on('tool:seeThrough', (_e, tool: string, on: boolean) =>
     toolWindows.get(tool)?.setOpacity(on ? 0.55 : 1)
