@@ -146,22 +146,51 @@ export class HugoServer {
     })
     this.proc = proc
     let output = ''
+    let partial = ''
+    // What went wrong in the latest build. Hugo logs it as it builds, and a page that fails
+    // to render only once it is asked for, again on every reload; a new build starts over.
+    let errors: string[] = []
+    let building: string[] | null = null
+    const failure = (): string | undefined => errors.join('\n') || undefined
+    const onLine = (line: string): void => {
+      if (/^(Change detected|Start building sites)/.test(line)) building = []
+      const error = line.match(/^ERROR\s+(.*)/)?.[1].replaceAll(repo + '/', '')
+      const list = building ?? errors
+      if (error && !list.includes(error)) list.push(error)
+      if (/^(Total|Built) in /.test(line) && building) {
+        errors = building
+        building = null
+      }
+      if (!building && failure() !== this.status.buildError) {
+        this.set({ ...this.status, buildError: failure() })
+      }
+    }
     const onOutput = (chunk: Buffer): void => {
       if (this.proc !== proc) return
       output = (output + chunk.toString()).slice(-4000)
       // Hugo prints "//localhost:1313/" when the configured baseURL has no scheme.
       const m = output.match(/available at (?:https?:)?(\/\/[^\s/]+)/)
-      if (m && this.status.state !== 'running') this.set({ state: 'running', url: `http:${m[1]}` })
+      if (m && this.status.state !== 'running') {
+        this.set({ state: 'running', url: `http:${m[1]}`, buildError: failure() })
+      }
       if (/runtime error:|panic:/.test(chunk.toString())) this.recover(proc, repo)
+      const lines = (partial + chunk.toString()).split('\n')
+      partial = lines.pop() ?? ''
+      lines.forEach((line) => onLine(line.trimEnd()))
     }
     proc.stdout?.on('data', onOutput)
     proc.stderr?.on('data', onOutput)
     proc.on('exit', (code) => {
       if (this.proc !== proc) return
       this.proc = null
-      if (this.restartAfterCrash(repo)) return
+      // A site that does not build fails the same way each time; see retry.
+      if (!failure() && this.restartAfterCrash(repo)) return
       const tail = output.trim().split('\n').slice(-3).join('\n')
-      this.set({ state: 'error', message: `Hugo exited (code ${code}).\n${tail}` })
+      this.set({
+        state: 'error',
+        message: `Hugo exited (code ${code}).\n${tail}`,
+        buildError: failure()
+      })
     })
     proc.on('error', (err) => {
       if (this.proc !== proc) return
@@ -195,6 +224,15 @@ export class HugoServer {
       void this.start(repo)
     }, 1500)
     return true
+  }
+
+  // A server that stopped because the site did not build is started again once its files
+  // change, as the mistake is mended; Hugo's own watcher went with it. Hugo's lock file
+  // changes as it starts and is no mending.
+  retry(paths: string[]): void {
+    if (this.proc || !this.repo || !this.status.buildError) return
+    if (paths.every((p) => p === '.hugo_build.lock')) return
+    void this.start(this.repo)
   }
 
   async install(repo: string): Promise<void> {

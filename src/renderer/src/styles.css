@@ -3582,6 +3582,24 @@ button.chat-chip.off:hover {
 }
 
 /* The page, and the layer that takes a picture dragged over it from the file list. */
+.preview-problem {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--yellow1);
+  font-size: 12px;
+}
+
+.preview-problem button {
+  margin-left: auto;
+  padding: 2px 9px;
+  font-size: inherit;
+  white-space: nowrap;
+}
+
 .preview-stage {
   flex: 1;
   min-height: 0;

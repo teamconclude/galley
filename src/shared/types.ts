@@ -37,6 +37,8 @@ export interface HugoStatus {
   url?: string
   message?: string
   missing?: boolean
+  // Hugo's errors from the latest build, which the preview shows in place of the page.
+  buildError?: string
 }
 
 export type FieldType =

@@ -40,6 +40,8 @@ interface Props {
   // The page moved to another address by itself, e.g. through a link followed in it.
   onNavigate?: (url: string) => void
   onScrolled?: (scroll: PreviewScroll) => void
+  // Hands Hugo's error to Claude, for a site that does not build.
+  onFixBuild?: (error: string) => void
 }
 
 export interface PreviewHistory {
@@ -66,7 +68,7 @@ const isPlainFile = (url: string | null): boolean => url?.endsWith('.txt') ?? fa
 
 export default function Preview(props: Props): React.JSX.Element {
   const { status, url, reloadKey, mode, onMode, version, markdownSuffix } = props
-  const { targets, notice, imageDrop, history, onNavigate, onScrolled } = props
+  const { targets, notice, imageDrop, history, onNavigate, onScrolled, onFixBuild } = props
   const plainFile = isPlainFile(url)
   const textMode = plainFile || (mode === 'markdown' && markdownSuffix !== null)
   const shownUrl = url && textMode ? textUrlFor(url, markdownSuffix) : url
@@ -120,6 +122,9 @@ export default function Preview(props: Props): React.JSX.Element {
           <button onClick={() => void window.api.hugo.restart()}>Restart Hugo</button>
         )}
       </div>
+      {status.buildError && onFixBuild && (
+        <BuildProblem error={status.buildError} onFix={onFixBuild} />
+      )}
       <PreviewContent
         key={moves}
         url={url}
@@ -134,6 +139,28 @@ export default function Preview(props: Props): React.JSX.Element {
         onNavigate={onNavigate}
         onScrolled={onScrolled}
       />
+    </div>
+  )
+}
+
+// Hugo's own account of a site that does not build means little to most editors; this
+// says it plainly and lets Claude explain and mend it. Asked once for each error.
+function BuildProblem(props: { error: string; onFix: (error: string) => void }): React.JSX.Element {
+  const { error, onFix } = props
+  const [asked, setAsked] = useState<string | null>(null)
+  return (
+    <div className="preview-problem">
+      <span>The site has a mistake that keeps the preview from showing it.</span>
+      <button
+        className="primary"
+        disabled={asked === error}
+        onClick={() => {
+          setAsked(error)
+          onFix(error)
+        }}
+      >
+        {asked === error ? 'Claude is on it' : 'Ask Claude to fix it'}
+      </button>
     </div>
   )
 }

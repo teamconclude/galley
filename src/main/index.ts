@@ -155,6 +155,7 @@ function openRepo(path: string): void {
   repo = new Repo(path, (paths) => {
     send('repo:changed', paths)
     git?.scheduleRefresh()
+    hugo.retry(paths)
   })
   repo.watch()
   const opened = repo

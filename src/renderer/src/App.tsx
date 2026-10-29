@@ -1038,6 +1038,24 @@ export default function App(): React.JSX.Element | null {
     if (!sent) window.alert('Claude is not running. Open the Claude pane and try again.')
   }
 
+  // Hugo's error is for developers; Claude puts it in plain words and mends the page.
+  const fixBuildWithClaude = (error: string): void => {
+    setDocks((d) => showTool(d, 'claude'))
+    setShowClaude(true)
+    const sent = askClaude(
+      'The preview cannot show the site, because Hugo cannot build it. Hugo says:\n\n' +
+        '```\n' +
+        error +
+        '\n```\n\n' +
+        'I am not a developer, so first tell me in a sentence or two, in plain words, what ' +
+        'is wrong and where. Then fix it, if the mistake is in the text of a page. If the ' +
+        "fix would mean changing the site's templates or configuration instead, tell me " +
+        'what you would change and ask me before doing it. Do not run git commands that ' +
+        'change anything.'
+    )
+    if (!sent) window.alert('Claude is not running. Open the Claude pane and try again.')
+  }
+
   const runRelease = async (step: ReleaseStep): Promise<void> => {
     setReleaseDialog(null)
     if (step.to !== 'production') {
@@ -1585,6 +1603,7 @@ export default function App(): React.JSX.Element | null {
                   }}
                   onNavigate={previewNavigated}
                   onScrolled={previewScrolled}
+                  onFixBuild={claudeOn ? fixBuildWithClaude : undefined}
                 />
               )
             },
