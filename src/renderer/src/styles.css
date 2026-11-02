@@ -367,6 +367,69 @@ button.primary:disabled:hover {
 }
 
 /* A tool window in a window of its own: its tab above the tool window. */
+.crashed {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* The window's title bar, under the traffic lights. */
+.crashed-bar {
+  flex: none;
+  height: 38px;
+  -webkit-app-region: drag;
+}
+
+.crashed-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 32px 32px;
+  box-sizing: border-box;
+}
+
+.crashed-body h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.crashed-body p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.crashed-actions {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.crashed-log {
+  flex: 1;
+  min-height: 160px;
+  resize: none;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-muted);
+  color: var(--text);
+  font: 11px/1.5 var(--mono);
+  white-space: pre;
+}
+
+.crashed-path {
+  color: var(--text-muted);
+  font-size: 11px;
+  user-select: text;
+}
+
 .tool-window-body {
   margin: 0;
   height: 100vh;

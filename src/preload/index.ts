@@ -170,6 +170,10 @@ const api: Api = {
     install: () => ipcRenderer.send('update:install'),
     onStatus: (cb) => on('update:status', cb)
   },
+  log: {
+    error: (text) => ipcRenderer.send('log:error', text),
+    read: () => ipcRenderer.invoke('log:read')
+  },
   onMenu: (cb) => on('menu', cb),
   setMenuState: (state) => ipcRenderer.send('menu:state', state),
   openExternal: (url) => ipcRenderer.send('open-external', url)

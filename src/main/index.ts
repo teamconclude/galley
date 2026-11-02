@@ -31,6 +31,7 @@ import type {
   SetupStepId
 } from '../shared/types'
 import { isDev } from './env'
+import { log, readLog } from './log'
 import { claudeArgs, claudeLaunch, receiveDrops, setContext, type ClaudeLaunch } from './claude'
 import { ClaudeChat, writeCommitMessage } from './chat'
 import { importDocument } from './convert'
@@ -242,6 +243,15 @@ function createWindow(): void {
     attention(false)
   })
   win.on('ready-to-show', () => win?.show())
+  // A page whose process died leaves the window blank, its tool windows too; it gets a
+  // page saying so instead, with the log. Its tool windows open again with the editor.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit' || !win) return
+    for (const child of toolWindows.values()) child.close()
+    loadPage(win, 'crashed')
+  })
+  win.on('unresponsive', () => log('window: not responding'))
+  win.on('responsive', () => log('window: responding again'))
   win.webContents.on('did-finish-load', () => {
     win?.webContents.setZoomLevel(loadSettings().zoom ?? 0)
   })
@@ -268,10 +278,15 @@ function createWindow(): void {
     const tool = toolOf(frameName)
     if (tool) watchToolWindow(child, tool)
   })
+  loadPage(win)
+}
+
+// The editor's page, or another page of the same bundle at its hash.
+function loadPage(window: BrowserWindow, hash?: string): void {
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    void window.loadURL(process.env['ELECTRON_RENDERER_URL'] + (hash ? `#${hash}` : ''))
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
+    void window.loadFile(join(__dirname, '../renderer/index.html'), hash ? { hash } : {})
   }
 }
 
@@ -311,11 +326,7 @@ function showManual(): void {
     void shell.openExternal(details.url)
     return { action: 'deny' }
   })
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    void manualWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#manual')
-  } else {
-    void manualWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'manual' })
-  }
+  loadPage(manualWin, 'manual')
 }
 
 // Tool windows the editor gave windows of their own, by tool. The renderer opens them
@@ -712,6 +723,8 @@ function registerIpc(): void {
   ipcMain.handle('update:download', () => updater.download())
   ipcMain.on('update:install', () => updater.install())
   ipcMain.on('open-external', (_e, url: string) => void shell.openExternal(url))
+  ipcMain.on('log:error', (_e, text: string) => log('window:', text))
+  ipcMain.handle('log:read', () => readLog())
 }
 
 // A copy started from Downloads runs from a read-only location the updater cannot replace.
@@ -812,6 +825,14 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => app.quit())
+
+// What took a page or one of Electron's own processes down, for the log a user sends in.
+app.on('render-process-gone', (_e, contents, details) =>
+  log('page gone:', contents.getURL(), details.reason, `exit ${details.exitCode}`)
+)
+app.on('child-process-gone', (_e, details) =>
+  log('process gone:', details.type, details.name ?? '', details.reason, `exit ${details.exitCode}`)
+)
 
 app.on('before-quit', () => {
   updater.stop()

@@ -51,6 +51,12 @@ export function closeToolWindow(tool: ToolId): void {
   child.close()
 }
 
+// The page failed, and the windows would stay open with nothing in them. Closed this way
+// they stay tool windows of their own, to open again with the page.
+export function closeAllToolWindows(): void {
+  for (const child of windows.values()) child.close()
+}
+
 // The main process reports a tool window's own window closed. True when the editor closed
 // it, which puts the tool window back in its dock.
 export function toolWindowClosed(tool: ToolId): boolean {

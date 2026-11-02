@@ -251,6 +251,11 @@ export interface Api {
     onStatus: (cb: (status: UpdateStatus) => void) => Unsubscribe
   }
   onMenu: (cb: (command: MenuCommand) => void) => Unsubscribe
+  // Galley's log, for support: what went wrong in a window, and the log's end to copy.
+  log: {
+    error: (text: string) => void
+    read: () => Promise<{ path: string; text: string }>
+  }
   // Tells the menu what its items can act on.
   setMenuState: (state: MenuState) => void
   openExternal: (url: string) => void
