@@ -8,6 +8,7 @@ export interface WebviewElement extends HTMLElement {
   reloadIgnoringCache: () => void
   executeJavaScript: (code: string) => Promise<unknown>
   loadURL: (url: string) => Promise<void>
+  getWebContentsId: () => number
 }
 
 declare module 'react' {

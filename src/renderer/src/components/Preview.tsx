@@ -190,15 +190,15 @@ export function PreviewContent(props: ContentProps): React.JSX.Element {
 
   // Pictures too, e.g. one replaced under its own name.
   useEffect(() => {
-    if (reloadKey) view.current?.reloadIgnoringCache()
+    const el = view.current
+    if (reloadKey && el && hasPage(el)) el.reloadIgnoringCache()
   }, [reloadKey])
 
   // A target stays pending until the page has found it, so one asked for while Hugo is
   // still starting or the page is still loading is applied once the page has loaded.
   const pending = useRef<PreviewTarget | null>(null)
   const run = (target: PreviewTarget): void => {
-    void view.current
-      ?.executeJavaScript(previewScript(target))
+    void inPage(view.current, previewScript(target))
       .then((found) => {
         if (found === true && pending.current === target) pending.current = null
       })
@@ -242,6 +242,23 @@ function samePage(a: string | null, b: string | null): boolean {
   return !!a && !!b && a.replace(/#.*$/, '') === b.replace(/#.*$/, '')
 }
 
+// Moving the webview in the DOM, as docking or tearing off the tool window it is in does,
+// gives it a new page, and until that one is there its methods throw rather than fail
+// their promise.
+function hasPage(el: WebviewElement): boolean {
+  try {
+    el.getWebContentsId()
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Runs code in the page, or fails when the webview has none just now.
+function inPage(el: WebviewElement | null | undefined, code: string): Promise<unknown> {
+  return el && hasPage(el) ? el.executeJavaScript(code) : Promise.reject(new Error('no page'))
+}
+
 // The webview, told where to go only when it is not there already: a link followed in
 // the page brings the editor along, which then asks for the page the webview shows.
 function PageView(props: {
@@ -253,17 +270,13 @@ function PageView(props: {
   const { view, url } = props
   const [first] = useState(url)
   const here = useRef(url)
-  const ready = useRef(false)
   const navigated = useEffectEvent((to: string) => props.onNavigate?.(to))
   const scrolled = useEffectEvent((scroll: PreviewScroll) => props.onScrolled?.(scroll))
 
   useEffect(() => {
     const el = view.current
     if (!el) return
-    const onReady = (): void => {
-      ready.current = true
-      void el.executeJavaScript(followScript).catch(() => {})
-    }
+    const onReady = (): void => void inPage(el, followScript).catch(() => {})
     const onNavigate = (e: Event): void => {
       const to = (e as Event & { url: string }).url
       here.current = to
@@ -293,7 +306,8 @@ function PageView(props: {
     const el = view.current
     if (!el || samePage(url, here.current)) return
     here.current = url
-    if (ready.current) void el.loadURL(url).catch(() => {})
+    // Without a page the webview opens what src says once it has one.
+    if (hasPage(el)) void el.loadURL(url).catch(() => {})
     else el.setAttribute('src', url)
   }, [view, url])
 
@@ -319,7 +333,7 @@ function DropLayer(props: {
   })
 
   const mark = (shown: DropSpot | null): void => {
-    void view.current?.executeJavaScript(dropMarkScript(shown)).catch(() => {})
+    void inPage(view.current, dropMarkScript(shown)).catch(() => {})
   }
   const ask = (x: number, y: number): void => {
     if (busy.current) {
@@ -327,8 +341,7 @@ function DropLayer(props: {
       return
     }
     busy.current = true
-    void view.current
-      ?.executeJavaScript(dropSpotScript(x, y))
+    void inPage(view.current, dropSpotScript(x, y))
       .then((found) => {
         const at = found as DropSpot
         const verdict = judge.current(at)
@@ -347,7 +360,7 @@ function DropLayer(props: {
   // The mark goes when the drag ends anywhere else.
   useEffect(() => {
     const page = view.current
-    return () => void page?.executeJavaScript(dropMarkScript(null)).catch(() => {})
+    return () => void inPage(page, dropMarkScript(null)).catch(() => {})
   }, [view])
 
   return (
