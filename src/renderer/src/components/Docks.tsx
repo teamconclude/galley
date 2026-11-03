@@ -370,7 +370,14 @@ export default function DockLayout(props: Props): React.JSX.Element {
         dragged={drag?.tool ?? null}
         elementOf={elementOf}
         onShow={(tool) => onDocks((d) => showTool(d, tool))}
-        onSplit={(split) => onDocks((d) => withDock(d, side, (dock) => ({ ...dock, split })))}
+        onSplit={(by) =>
+          onDocks((d) =>
+            withDock(d, side, (dock) => ({
+              ...dock,
+              split: Math.min(0.85, Math.max(0.15, dock.split + by))
+            }))
+          )
+        }
         onPress={startDrag}
       />
     )
@@ -458,7 +465,9 @@ interface DockViewProps {
   dragged: ToolId | null
   elementOf: (tool: ToolId) => HTMLDivElement
   onShow: (tool: ToolId) => void
-  onSplit: (split: number) => void
+  // Moves the split by a share of the dock's length; the splitter keeps the handler it had
+  // when the drag began, so it works from the arrangement as it is, not as it was then.
+  onSplit: (by: number) => void
   onPress: (tool: ToolId, e: React.PointerEvent) => void
 }
 
@@ -486,7 +495,7 @@ function DockView(props: DockViewProps): React.JSX.Element {
                 direction={vertical ? 'vertical' : 'horizontal'}
                 onDrag={(d) => {
                   const length = vertical ? host.current?.clientHeight : host.current?.clientWidth
-                  if (length) onSplit(Math.min(0.85, Math.max(0.15, dock.split + d / length)))
+                  if (length) onSplit(d / length)
                 }}
               />
             ) : null
