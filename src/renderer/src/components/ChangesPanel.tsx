@@ -522,6 +522,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
                     }
                   >
                     <button
+                      className={step.to === 'production' ? 'primary' : undefined}
                       disabled={busy}
                       onClick={() => (step.to === 'production' ? onPublish(step) : onRelease(step))}
                     >
