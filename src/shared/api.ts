@@ -8,7 +8,7 @@ import type {
   ClaudeMode,
   Commit,
   CommitRange,
-  ComponentLibrary,
+  ComponentSchema,
   DataLists,
   DirEntry,
   GitStatus,
@@ -56,7 +56,7 @@ export interface Api {
     write: (rel: string, text: string) => Promise<void>
     pageUrl: (rel: string) => Promise<string | null>
     site: () => Promise<SiteInfo>
-    components: () => Promise<ComponentLibrary>
+    components: () => Promise<ComponentSchema[]>
     data: () => Promise<DataLists>
     snippets: () => Promise<Snippet[]>
     images: () => Promise<string[]>

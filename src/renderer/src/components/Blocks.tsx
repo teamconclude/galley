@@ -3,10 +3,10 @@ import type { FieldDef } from '../../../shared/types'
 import {
   blankObject,
   blockName,
-  currentListKey,
   fieldsFor,
   isRecord,
   labelsFor,
+  listKey,
   newBlock,
   specFor,
   summaryOf,
@@ -184,7 +184,7 @@ function CardList(props: CardListProps): React.JSX.Element {
   // The preview follows the page's top-level blocks; a nested list belongs to the block
   // its path starts in.
   const topLevel = (index: number): number | null =>
-    path[0] !== currentListKey() ? null : path.length === 1 ? index : Number(path[1])
+    path[0] !== listKey ? null : path.length === 1 ? index : Number(path[1])
   const follow = (index: number): void => {
     const top = topLevel(index)
     if (top !== null && !Number.isNaN(top)) showBlock(top)
@@ -192,7 +192,7 @@ function CardList(props: CardListProps): React.JSX.Element {
   // The page's own blocks mark the one the reader scrolled the preview to, and keep it in
   // view here.
   const inView = useBlockInView()
-  const shown = path.length === 1 && path[0] === currentListKey() ? inView : null
+  const shown = path.length === 1 && path[0] === listKey ? inView : null
   const cards = useRef<(HTMLDivElement | null)[]>([])
   useEffect(() => {
     if (shown !== null)

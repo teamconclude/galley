@@ -129,14 +129,14 @@ export async function siteInfo(root: string): Promise<SiteInfo> {
     staticDir,
     imagesDir: `${staticDir}/images`,
     imagesUrl: '/images',
-    componentsDir: componentsDir(root, config),
+    componentsDir: componentsDir(config),
     markdownSuffix,
     textPreviews
   }
 }
 
-// The folder mounted as the component partials, else the conventional folders.
-function componentsDir(root: string, config: Record<string, unknown>): string {
+// The folder mounted as the component partials, else the conventional one.
+function componentsDir(config: Record<string, unknown>): string {
   const mounts =
     isRecord(config.module) && Array.isArray(config.module.mounts) ? config.module.mounts : []
   for (const m of mounts) {
@@ -144,6 +144,5 @@ function componentsDir(root: string, config: Record<string, unknown>): string {
       return m.source
     }
   }
-  const fallback = ['components', 'component-library/components']
-  return fallback.find((d) => existsSync(join(root, d))) ?? fallback[0]
+  return 'components'
 }

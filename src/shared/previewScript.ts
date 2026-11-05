@@ -68,36 +68,15 @@ function showTextScript(snippet: string, heading: boolean): string {
 }
 
 // The page's top-level blocks, in order. A site marks each one with a <!--galley-block-->
-// comment before it; the block is the next element. Bookshop instead wraps every
-// component in <!--bookshop-live name(…)--> … <!--bookshop-live end--> comments, and the
-// blocks are the components directly inside the page component.
+// comment before it; the block is the next element.
 const blocksScript = `function blocks() {
   var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT)
-  var page = null, marks = [], found = []
+  var found = []
   for (var c = walker.nextNode(); c; c = walker.nextNode()) {
-    var text = c.nodeValue.trim()
-    if (text === 'galley-block') marks.push(c)
-    else if (!page && /^bookshop-live name\\(page\\)/.test(text)) page = c
-  }
-  if (marks.length > 0) {
-    marks.forEach(function (mark) {
-      for (var m = mark.nextSibling; m; m = m.nextSibling) if (m.nodeType === 1) { found.push(m); return }
-      found.push(null)
-    })
-    return found
-  }
-  if (!page) return found
-  for (var e = page.nextSibling; e; e = e.nextSibling) if (e.nodeType === 1) { page = e; break }
-  if (page.nodeType !== 1) return found
-  var depth = 0, inside = false
-  for (var n = page.firstChild; n; n = n.nextSibling) {
-    if (n.nodeType === 8) {
-      var v = n.nodeValue.trim()
-      if (/^bookshop-live name\\(/.test(v)) { if (depth === 0) { found.push(null); inside = true } depth++ }
-      else if (/^bookshop-live end/.test(v)) { depth--; if (depth === 0) inside = false }
-    } else if (inside && n.nodeType === 1 && found[found.length - 1] === null) {
-      found[found.length - 1] = n
-    }
+    if (c.nodeValue.trim() !== 'galley-block') continue
+    var m = c.nextSibling
+    while (m && m.nodeType !== 1) m = m.nextSibling
+    found.push(m)
   }
   return found
 }`

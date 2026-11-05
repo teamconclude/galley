@@ -156,11 +156,3 @@ lists of objects, a `blocks` list included, edit as cards whose fields are typed
 first entry, **Add item** adds an entry with the same keys left empty, and every key is a
 field, `component` too. Adding a schema to the components folder switches the site to the
 block editor.
-
-## Bookshop
-
-Until the conclude.io site has moved off Bookshop, Galley also reads Bookshop's
-`<name>.bookshop.yml` from `component-library/components/`, with the page keys
-`content_blocks` and `_bookshop_name` and its `<!--bookshop-live …-->` comments as preview
-markers. This support goes away once that move is done; new sites should follow the
-contract above.

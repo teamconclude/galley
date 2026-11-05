@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ComponentSchema, DataLists, SiteInfo, Snippet } from '../../../shared/types'
 import { emptyLists, SchemaContext, type Schemas } from '../lib/contexts'
-import { setImagesUrl, setKeys } from '../lib/schema'
+import { setImagesUrl, setPlain } from '../lib/schema'
 import { imageFile, imagePath, imageUrl } from '../lib/site'
 
 interface Props {
@@ -23,10 +23,10 @@ export function SchemaProvider({ repoPath, site, page, children }: Props): React
     let live = true
     setImagesUrl(site.imagesUrl)
     const loadComponents = (): void => {
-      void window.api.repo.components().then((lib) => {
+      void window.api.repo.components().then((list) => {
         if (!live) return
-        setKeys(lib.blockKey, lib.listKey, lib.components.length === 0)
-        setComponents(lib.components)
+        setPlain(list.length === 0)
+        setComponents(list)
       })
     }
     const loadLists = (): void => {

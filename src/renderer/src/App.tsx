@@ -78,7 +78,7 @@ import { setLinkTargets, siteFile } from './lib/linkCheck'
 import { pageAt, pageOfFile, usePages } from './lib/pages'
 import { placeInBody, resizeTag, swapInBody, swapInSettings } from './lib/previewDrop'
 import { pageAddress, reviewLink as makeReviewLink, type ReviewLink } from '../../shared/reviewLink'
-import { currentListKey } from './lib/schema'
+import { listKey } from './lib/schema'
 
 interface OpenFile {
   path: string
@@ -1446,7 +1446,7 @@ export default function App(): React.JSX.Element | null {
   // Pages built from components have no prose, so the settings form gets the whole column.
   const blocksPage =
     parts?.frontmatter != null &&
-    new RegExp(`^${currentListKey()}:`, 'm').test(parts.frontmatter) &&
+    new RegExp(`^${listKey}:`, 'm').test(parts.frontmatter) &&
     parts.body.trim() === ''
   const showBody = !blocksPage || bodyShownFor === file?.path
   const newPageDir = pageDir()

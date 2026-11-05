@@ -48,11 +48,16 @@ Done on Galley develop after 0.5.0, unreleased:
   fetch, counts and branches against the local base, Merge fast-forwards `main` on the
   Mac, and the Changes tab says the site is only on this Mac instead of offering Push.
 
+Done on Galley develop (2026-11-05), after the web repo dropped CloudCannon and Bookshop:
+
+- Phase 3.4. Galley no longer reads Bookshop sites: the `.bookshop.yml` reader, the
+  `_bookshop_name` and `content_blocks` keys, the `component-library` fallback and the
+  Bookshop preview comments are gone, and the page keys are always `component` and
+  `blocks`.
+
 Open:
 
-- Phase 3: the pointer from the web repo's CLAUDE.md to the contract (3.1), and the
-  Bookshop removal (3.4), which waits for `lars/galley` to merge into the web repo's
-  develop. That can happen as soon as CloudCannon is no longer needed.
+- Phase 3: the pointer from the web repo's CLAUDE.md to the contract (3.1).
 - Phase 4 follow-up: putting a local site on GitHub from Galley. Until then the user
   creates the repository and adds `origin` by hand.
 - Phase 5: the Claude preference and the Welcome screen's wording are done; the rest is
@@ -259,7 +264,7 @@ Verify: a TOML-frontmatter page opens raw with the badge; a YAML page is unchang
 3. Done: plain mode. With no component schemas, `lib/schema.ts` infers no blocks, so a
    `blocks` list renders as an objects list with Add item, and nothing asks for a schema.
    `BlockList` also hides Add block when it has no components to offer.
-4. Once `lars/galley` has merged: delete `fromBookshop`, the `_bookshop_name` and
+4. Done (2026-11-05): delete `fromBookshop`, the `_bookshop_name` and
    `content_blocks` keys, the `component-library` fallback, the Bookshop marker fallback
    and the `.bookshop.yml` mention in the README.
 

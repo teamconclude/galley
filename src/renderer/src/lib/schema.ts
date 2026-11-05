@@ -1,4 +1,4 @@
-import type { BlockKey, ListKey, ComponentSchema, DataLists, FieldDef } from '../../../shared/types'
+import type { ComponentSchema, DataLists, FieldDef } from '../../../shared/types'
 import { inferField, isRecord } from '../../../shared/fields'
 
 export { humanize, isRecord } from '../../../shared/fields'
@@ -16,16 +16,16 @@ export type FieldSpec =
   | { kind: 'objects'; fields: FieldDef[] }
   | { kind: 'fields'; fields: FieldDef[] }
 
-let blockKey: BlockKey = 'component'
-let listKey: ListKey = 'blocks'
+// The key naming a block's component and the page key holding the block list.
+const blockKey = 'component'
+export const listKey = 'blocks'
+
 let plain = false
 let imagesUrl = '/images'
 
 // Plain mode is a site without component schemas: nothing on its pages is a block, so
 // lists edit as lists of objects and every key, the component key too, is a field.
-export function setKeys(block: BlockKey, list: ListKey, noComponents: boolean): void {
-  blockKey = block
-  listKey = list
+export function setPlain(noComponents: boolean): void {
   plain = noComponents
 }
 
@@ -35,9 +35,6 @@ const inferKey = (): string => (plain ? '' : blockKey)
 export function setImagesUrl(url: string): void {
   imagesUrl = url
 }
-
-export const currentBlockKey = (): BlockKey => blockKey
-export const currentListKey = (): ListKey => listKey
 
 // The component a block names, or null when the value is not a block.
 export function blockName(v: unknown): string | null {

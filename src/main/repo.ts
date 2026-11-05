@@ -4,7 +4,6 @@ import { FSWatcher, existsSync, promises as fs, watch } from 'fs'
 import { basename, dirname, extname, join, resolve, sep } from 'path'
 import { parse as parseYaml } from 'yaml'
 import type {
-  ComponentLibrary,
   ComponentSchema,
   DataLists,
   DirEntry,
@@ -15,7 +14,7 @@ import type {
   SiteInfo,
   Snippet
 } from '../shared/types'
-import { fieldTypes, humanize, inferField, isRecord } from '../shared/fields'
+import { fieldTypes, humanize, isRecord } from '../shared/fields'
 import { findHugo, listPages } from './hugo'
 import { findConfig, parse, siteInfo } from './hugoConfig'
 import { snippets } from './snippets'
@@ -35,7 +34,7 @@ export class Repo {
   private pending = new Set<string>()
   private structureChanged = false
   private timer: NodeJS.Timeout | null = null
-  private componentCache: ComponentLibrary | null = null
+  private componentCache: ComponentSchema[] | null = null
   private siteCache: Promise<SiteInfo> | null = null
   // The folders in use, for the watcher and cache invalidation.
   private folders = defaultSiteInfo
@@ -120,11 +119,9 @@ export class Repo {
     return this.pages.get(rel) ?? guessUrl(rel.slice(contentDir.length + 1))
   }
 
-  // A checkout has either <name>.yml files under components/ or, while the site still
-  // uses Bookshop, <name>.bookshop.yml files under component-library/components/; the
-  // latter are normalised to the same shape. A site with neither gets the contract's keys
-  // and no components, which the editor takes as plain mode.
-  async components(): Promise<ComponentLibrary> {
+  // The <name>.yml schemas in the components folder. A site without any has no
+  // components, which the editor takes as plain mode.
+  async components(): Promise<ComponentSchema[]> {
     if (this.componentCache) return this.componentCache
     const dir = join(this.path, (await this.site()).componentsDir)
     const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
@@ -132,25 +129,13 @@ export class Repo {
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort()
-    const load = async (suffix: string): Promise<RawComponent[]> => {
-      const out: RawComponent[] = []
-      for (const name of names) {
-        const raw = await readYaml(join(dir, name, `${name}${suffix}`))
-        if (raw) out.push({ name, raw })
-      }
-      return out
+    const out: ComponentSchema[] = []
+    for (const name of names) {
+      const raw = await readYaml(join(dir, name, `${name}.yml`))
+      if (raw) out.push(fromSchema({ name, raw }))
     }
-    const own = await load('.yml')
-    const bookshop = own.length > 0 ? [] : await load('.bookshop.yml')
-    this.componentCache =
-      bookshop.length > 0
-        ? {
-            blockKey: '_bookshop_name',
-            listKey: 'content_blocks',
-            components: fromBookshop(bookshop)
-          }
-        : { blockKey: 'component', listKey: 'blocks', components: own.map(fromSchema) }
-    return this.componentCache
+    this.componentCache = out
+    return out
   }
 
   // Every data file that is a list of maps with a `name` field fills the picker of the
@@ -482,96 +467,4 @@ function parseFields(v: unknown): FieldDef[] {
     if (Array.isArray(d.components)) out.components = d.components.map(String)
     return out
   })
-}
-
-// Bookshop blueprints reference components as `bookshop:<name>` (one nested block),
-// `[bookshop:<name>]` (a list of that component) or `[bookshop:structure:<structure>]`
-// (a list of every component declaring that structure in spec.structures). Field types
-// come from the CloudCannon `_inputs` hints, matched by key at any depth, else from the
-// blueprint value, which also serves as the default and placeholder.
-function fromBookshop(entries: RawComponent[]): ComponentSchema[] {
-  const spec = (raw: Record<string, unknown>): Record<string, unknown> =>
-    isRecord(raw.spec) ? raw.spec : {}
-  const structuresOf = (raw: Record<string, unknown>): string[] => {
-    const list = spec(raw).structures
-    return Array.isArray(list) ? list.map(String) : []
-  }
-  const members = new Map<string, string[]>()
-  for (const { name, raw } of entries) {
-    for (const s of structuresOf(raw)) members.set(s, [...(members.get(s) ?? []), name])
-  }
-  const ref = (v: unknown): string | null =>
-    typeof v === 'string' && v.startsWith('bookshop:') ? v.slice('bookshop:'.length) : null
-  const blockList = (v: unknown): string[] | null | undefined => {
-    const listed = Array.isArray(v) && v.length === 1 ? ref(v[0]) : null
-    if (listed === null) return undefined
-    if (!listed.startsWith('structure:')) return [listed]
-    const structure = listed.slice('structure:'.length)
-    return structure === 'content_blocks' ? null : (members.get(structure) ?? [])
-  }
-  const convert = (
-    inputs: Record<string, unknown>
-  ): ((obj: Record<string, unknown>) => FieldDef[]) => {
-    const field = (key: string, value: unknown): FieldDef => {
-      const hint = isRecord(inputs[key]) ? inputs[key] : {}
-      const base = { key, label: str(hint.label, humanize(key)) }
-      if (typeof hint.comment === 'string') Object.assign(base, { help: hint.comment })
-      const single = ref(value)
-      if (single !== null) return { ...base, type: 'block', component: single }
-      const allowed = blockList(value)
-      if (allowed !== undefined) {
-        return allowed
-          ? { ...base, type: 'blocks', components: allowed }
-          : { ...base, type: 'blocks' }
-      }
-      const withDefault = (def: FieldDef): FieldDef => {
-        if (typeof value === 'string' && value)
-          return { ...def, default: value, placeholder: value }
-        if (typeof value === 'boolean' || typeof value === 'number')
-          return { ...def, default: value }
-        return def
-      }
-      switch (hint.type) {
-        case 'text':
-        case 'url':
-        case 'color':
-          return withDefault({ ...base, type: 'text' })
-        case 'markdown':
-          return withDefault({ ...base, type: 'markdown' })
-        case 'image':
-          return withDefault({ ...base, type: 'image' })
-        case 'checkbox':
-        case 'switch':
-          return withDefault({ ...base, type: 'boolean' })
-        case 'number':
-          return withDefault({ ...base, type: 'number' })
-        case 'array':
-          return { ...base, type: 'list' }
-        case 'select': {
-          const options = isRecord(hint.options) ? hint.options : {}
-          const values = Array.isArray(options.values) ? options.values.map(String) : []
-          const def: FieldDef = { ...base, type: 'select', options: values }
-          if (options.allow_empty !== true) def.required = true
-          return withDefault(def)
-        }
-      }
-      if (Array.isArray(value) && isRecord(value[0])) {
-        return { ...base, type: 'list', fields: fields(value[0]) }
-      }
-      if (isRecord(value)) return { ...base, type: 'object', fields: fields(value) }
-      return withDefault(inferField(key, value, '_bookshop_name'))
-    }
-    const fields = (obj: Record<string, unknown>): FieldDef[] =>
-      Object.entries(obj).map(([k, v]) => field(k, v))
-    return fields
-  }
-  return entries.map(({ name, raw }) => ({
-    name,
-    label: str(spec(raw).label, name),
-    description: str(spec(raw).description, ''),
-    standalone: structuresOf(raw).includes('content_blocks'),
-    fields: convert(isRecord(raw._inputs) ? raw._inputs : {})(
-      isRecord(raw.blueprint) ? raw.blueprint : {}
-    )
-  }))
 }
