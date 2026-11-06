@@ -242,7 +242,10 @@ function createWindow(): void {
     rang = false
     attention(false)
   })
-  win.on('ready-to-show', () => win?.show())
+  // Once: Electron passes on the preview webview's ready-to-show with every page it loads,
+  // and showing the window again would bring Galley to the front while it is in the
+  // background.
+  win.once('ready-to-show', () => win?.show())
   // A page whose process died leaves the window blank, its tool windows too; it gets a
   // page saying so instead, with the log. Its tool windows open again with the editor.
   win.webContents.on('render-process-gone', (_e, details) => {
@@ -318,7 +321,7 @@ function showManual(): void {
     )
   }
   manualWin.on('page-title-updated', (e) => e.preventDefault())
-  manualWin.on('ready-to-show', () => manualWin?.show())
+  manualWin.once('ready-to-show', () => manualWin?.show())
   manualWin.on('closed', () => {
     manualWin = null
   })

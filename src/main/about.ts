@@ -151,7 +151,7 @@ export function showAbout(over: BrowserWindow | null): void {
       pixel(parent.y + (parent.height - height) / 2)
     )
   }
-  about.on('ready-to-show', () => about?.show())
+  about.once('ready-to-show', () => about?.show())
   about.on('closed', () => {
     about = null
   })
