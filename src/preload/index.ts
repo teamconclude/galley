@@ -132,7 +132,8 @@ const api: Api = {
     onRequest: (cb) => on('chat:request', cb),
     onSettled: (cb) => on('chat:settled', cb),
     onCommit: (cb) => on('chat:commit', cb),
-    committed: (id, answer) => ipcRenderer.send('chat:committed', id, answer),
+    onSwitchBranch: (cb) => on('chat:switchBranch', cb),
+    answered: (id, answer) => ipcRenderer.send('chat:answered', id, answer),
     commitMessage: (files) => ipcRenderer.invoke('chat:commitMessage', files)
   },
   files: {

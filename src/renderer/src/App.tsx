@@ -958,6 +958,30 @@ export default function App(): React.JSX.Element | null {
       : `Committed ${count}.`
   }
 
+  const switchForClaude = async (name: string): Promise<string> => {
+    const status = gitStatus
+    if (!status) return 'Galley has not read the repository yet; try again in a moment.'
+    if (status.rebase) {
+      return 'Bringing in changes stopped on a conflict. The editor settles it in the Changes panel first.'
+    }
+    if (name === status.branch) return `The checkout is on ${name} already.`
+    const known = await window.api.git.branches().catch(() => [] as string[])
+    if (!known.includes(name)) {
+      return `There is no branch ${name}, here or on GitHub. The branches are: ${known.join(', ')}.`
+    }
+    await save()
+    try {
+      await window.api.git.switchBranch(name)
+    } catch (e) {
+      return `Switching failed: ${e instanceof Error ? e.message : String(e)}`
+    }
+    setDiff(null)
+    if (file) await reopen(file.path)
+    return status.changes.length > 0
+      ? `Switched to ${name}; the uncommitted changes came along.`
+      : `Switched to ${name}.`
+  }
+
   const saveIdentity = async (id: Identity): Promise<void> => {
     setGitDialog(null)
     try {
@@ -1419,9 +1443,14 @@ export default function App(): React.JSX.Element | null {
 
   const commitAsked = useEffectEvent(
     (id: string, message: string, files: string[] | null) =>
-      void commitForClaude(message, files).then((answer) => window.api.chat.committed(id, answer))
+      void commitForClaude(message, files).then((answer) => window.api.chat.answered(id, answer))
   )
   useEffect(() => window.api.chat.onCommit(commitAsked), [])
+  const switchAsked = useEffectEvent(
+    (id: string, name: string) =>
+      void switchForClaude(name).then((answer) => window.api.chat.answered(id, answer))
+  )
+  useEffect(() => window.api.chat.onSwitchBranch(switchAsked), [])
 
   // A mouse's own back and forward buttons step too.
   const stepBy = useEffectEvent((by: -1 | 1) => void step(by))

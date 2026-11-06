@@ -29,8 +29,10 @@ export interface ChatEvents {
   request: (request: ChatRequest) => void
   // A request that no longer needs an answer, answered or not.
   settled: (id: string) => void
-  // Claude asks Galley to commit, as the Commit button would; the answer is for Claude.
+  // Claude asks Galley to commit, as the Commit button would, or to switch branches, as
+  // Switch branch… would; the answer is for Claude.
   commit: (message: string, files: string[] | null) => Promise<string>
+  switchBranch: (name: string) => Promise<string>
 }
 
 // How a commit message reads, for the message Galley asks for and for commits Claude
@@ -41,13 +43,15 @@ imperative ("Add the pricing FAQ", "Fix the broken link on the about page"), and
 change is more than one thing or the reason is not obvious, a blank line and a few short \
 lines on what and why. No file paths unless they help, no technical terms, no emoji.`
 
-// Galley commits for Claude, so that the branch on GitHub follows as it does after the
-// Commit button, and the editor's checks apply.
+// Galley commits and switches branches for Claude, so that the branch on GitHub follows as
+// it does after the Changes panel's buttons, and the editor's checks apply.
 const commitPrompt = `
 - In this chat you can also commit for the editor: when they ask you to, use the commit \
 tool of the galley server, never git. Without files it commits the changes ticked in the Changes panel; name files only \
 when the editor wants just some of them. Look at the changes first (git status, git diff, \
-and read new files) to write the message. ${commitStyle}`
+and read new files) to write the message. ${commitStyle}
+- When the editor asks to go to another branch, use the switch_branch tool of the galley \
+server, never git. Uncommitted changes come along to the other branch.`
 
 // The SDK is an ES module; the main process loads it when the chat first starts.
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -116,6 +120,7 @@ function fileOf(input: Record<string, unknown>, cwd: string): string {
 }
 
 const commitTool = 'mcp__galley__commit'
+const switchTool = 'mcp__galley__switch_branch'
 const firstLine = (input: Record<string, unknown>): string => str(input['message']).split('\n')[0]
 const committed = (input: Record<string, unknown>): string => {
   const files = Array.isArray(input['files']) ? input['files'].length : 0
@@ -138,6 +143,8 @@ function asking(tool: string, input: Record<string, unknown>, cwd: string): stri
     }
     case commitTool:
       return `commit ${committed(input)} with the message “${firstLine(input)}”`
+    case switchTool:
+      return `switch to the branch ${str(input['name'])}`
     case 'WebFetch':
       return `open ${str(input['url'])}`
     case 'WebSearch':
@@ -192,6 +199,8 @@ function describe(
         summary: `Asked Galley to commit ${committed(input)}`,
         detail: str(input['message'])
       }
+    case switchTool:
+      return { summary: `Asked Galley to switch to ${str(input['name'])}` }
     case 'TodoWrite': {
       const todos = Array.isArray(input['todos'])
         ? (input['todos'] as Record<string, unknown>[])
@@ -277,6 +286,16 @@ export class ClaudeChat {
               content: [{ type: 'text', text: await this.events.commit(message, files ?? null) }]
             }),
             // Offered from the start, rather than found through a tool search first.
+            { alwaysLoad: true }
+          ),
+          tool(
+            'switch_branch',
+            'Switches the checkout to another branch in Galley, here or on GitHub, as the ' +
+              'Changes panel does. Uncommitted changes come along.',
+            { name: z.string().describe('The branch name') },
+            async ({ name }) => ({
+              content: [{ type: 'text', text: await this.events.switchBranch(name) }]
+            }),
             { alwaysLoad: true }
           )
         ]

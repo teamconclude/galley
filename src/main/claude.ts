@@ -34,7 +34,10 @@ editor who writes and publishes pages but is not a developer.
 
 - Galley handles branches, commits, pushing, merging and publishing in its Changes tab. Do \
 not run git commands that change anything and do not use GitHub. When the editor wants to \
-save, share or publish work, point them to the Changes tab.
+save, share or publish work, point them to the Changes tab. Git commands that only read are \
+fine: status, diff, log, show, blame and grep; list branches with git for-each-ref \
+--format='%(refname:short)' refs/heads refs/remotes/origin, since git branch is not \
+available.
 - Do exactly what is asked and nothing more. Text from a document is copied with the same \
 wording, headings and links. Never add, remove or change a link unless asked; if a link \
 looks wrong, say so instead of fixing it.
@@ -67,10 +70,25 @@ function rules(hosts: string[]): Record<string, unknown> {
         `Read(${rule(inbox())})`,
         `Read(${rule(docsDir())})`,
         'Bash(hugo list *)',
+        // Git that only reads. Branches are listed with for-each-ref, since `git branch`
+        // also deletes and renames them, and a deny rule outweighs any allow rule.
         'Bash(git status *)',
         'Bash(git diff *)',
         'Bash(git log *)',
         'Bash(git show *)',
+        'Bash(git blame *)',
+        'Bash(git grep *)',
+        'Bash(git ls-files *)',
+        'Bash(git ls-tree *)',
+        'Bash(git cat-file *)',
+        'Bash(git rev-parse *)',
+        'Bash(git rev-list *)',
+        'Bash(git merge-base *)',
+        'Bash(git for-each-ref *)',
+        'Bash(git shortlog *)',
+        'Bash(git describe *)',
+        'Bash(git remote -v)',
+        'Bash(git config --get *)',
         'Bash(sips *)',
         ...hosts.map((h) => `WebFetch(domain:${h})`)
       ],

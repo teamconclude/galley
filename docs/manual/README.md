@@ -429,7 +429,9 @@ shows as a line of its own; click a change to see it. Every change also appears 
 Changes tab, where you commit or discard it as usual. You can also ask Claude to commit,
 such as "Commit my changes": Galley then commits the ticked files with a note Claude
 writes, and sends them to your branch on GitHub, just as the Commit button does. Claude
-does not commit on `develop` or another shared branch, and never publishes.
+does not commit on `develop` or another shared branch, and never publishes. In the same way
+it can switch to another branch, such as "Go to my pricing branch", as **Switch branch…**
+does, taking changes you have not committed along.
 
 **The open page.** The row below the text field shows the page you have open, and Claude
 is told about it with each message, so "this page" works. Its × leaves it out; it is back

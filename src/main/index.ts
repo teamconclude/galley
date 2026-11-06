@@ -86,8 +86,18 @@ function attention(news: boolean): void {
   app.dock?.setBadge(waiting.size > 0 ? String(waiting.size) : rang ? '•' : '')
 }
 
-// Commits Claude asked for, waiting on the main window to make them.
-const commits = new Map<string, (answer: string) => void>()
+// What Claude asked the main window to do, commits and branch switches, waiting on its
+// answer.
+const asks = new Map<string, (answer: string) => void>()
+
+function askWindow(none: string, channel: string, ...args: unknown[]): Promise<string> {
+  return new Promise((resolve) => {
+    if (!win) return resolve(none)
+    const id = randomUUID()
+    asks.set(id, resolve)
+    send(channel, id, ...args)
+  })
+}
 
 const chat = new ClaudeChat({
   status: (status) => send('chat:status', status),
@@ -103,12 +113,14 @@ const chat = new ClaudeChat({
     send('chat:settled', id)
   },
   commit: (message, files) =>
-    new Promise((resolve) => {
-      if (!win) return resolve('Galley has no window open, so nothing was committed.')
-      const id = randomUUID()
-      commits.set(id, resolve)
-      send('chat:commit', id, message, files)
-    })
+    askWindow(
+      'Galley has no window open, so nothing was committed.',
+      'chat:commit',
+      message,
+      files
+    ),
+  switchBranch: (name) =>
+    askWindow('Galley has no window open, so the branch stays as it is.', 'chat:switchBranch', name)
 })
 
 // What the Claude pane starts with in the site that is open.
@@ -690,9 +702,9 @@ function registerIpc(): void {
     rang = true
     attention(true)
   })
-  ipcMain.on('chat:committed', (_e, id: string, answer: string) => {
-    commits.get(id)?.(answer)
-    commits.delete(id)
+  ipcMain.on('chat:answered', (_e, id: string, answer: string) => {
+    asks.get(id)?.(answer)
+    asks.delete(id)
   })
   ipcMain.handle('chat:commitMessage', async (_e, files: string[]) =>
     writeCommitMessage(current().path, files, await launch(current()))
