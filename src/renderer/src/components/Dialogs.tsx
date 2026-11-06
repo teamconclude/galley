@@ -66,6 +66,33 @@ export function Dialog(props: DialogProps): React.JSX.Element {
   )
 }
 
+interface CheckFailedProps {
+  output: string
+  onCommit: () => void
+  onCancel: () => void
+}
+
+// The site's own check failed before a commit: what it said, and the choice to commit all
+// the same.
+export function CheckFailedDialog(props: CheckFailedProps): React.JSX.Element {
+  const { output, onCommit, onCancel } = props
+  return (
+    <Dialog
+      title="The site check found problems"
+      submitLabel="Commit anyway"
+      canSubmit
+      onSubmit={onCommit}
+      onCancel={onCancel}
+    >
+      <p className="dialog-note">
+        Nothing was committed. This is the end of what the site’s check reported. Fix it and commit
+        again, ask Claude to fix it, or commit as it is.
+      </p>
+      <pre className="check-output">{output}</pre>
+    </Dialog>
+  )
+}
+
 interface PromptProps {
   title: string
   label: string

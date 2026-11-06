@@ -51,6 +51,21 @@ editing `data/llms.yaml` previews `/llms.txt`.
   protected base branch takes pull requests too. A checkout without an `origin` remote,
   such as a new site, works against its local `main`: merging moves `main` forward on
   this Mac, and nothing is pushed until a remote is added.
+- **Checks before a commit.** When the checkout has an executable `scripts/check`,
+  Galley runs it from the checkout's root before each commit, from the Commit button and
+  from Claude alike. Exit 0 lets the commit go ahead; anything else stops it and shows
+  the end of what the script printed, the last 60 lines of stdout and stderr together,
+  with the choice to commit anyway. Claude reads the same output and can fix what it
+  names. The script runs without a terminal, with the login shell's `PATH` and the Hugo
+  and git Galley uses, and is stopped after five minutes. It checks the whole checkout,
+  not only the ticked files. Editors' Macs often lack `make` and Python, which come with
+  developer tools, so `#!/bin/sh` is the safe start for the script itself.
+- **Node.** A checkout with a `package.json` gets Node for its tools, such as the steps
+  of `scripts/check`: the one the login shell finds, else the current LTS release, which
+  Galley downloads from nodejs.org when the site opens. Its packages are installed with
+  `npm ci --ignore-scripts` whenever `node_modules` is missing or older than
+  `package-lock.json`, so `node_modules` has to be in `.gitignore`. Node and npm are on
+  the check's `PATH`, ahead of the rest.
 
 ## Components
 

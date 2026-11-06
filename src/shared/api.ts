@@ -30,6 +30,7 @@ import type {
   SearchResults,
   SetupStatus,
   SetupStepId,
+  SiteCheck,
   SiteInfo,
   Snippet,
   UpdateStatus,
@@ -115,6 +116,8 @@ export interface Api {
     ownBranches: () => Promise<string[]>
     branchInfo: (name: string) => Promise<BranchInfo>
     deleteBranch: (name: string, onGitHub: boolean) => Promise<void>
+    // The site's scripts/check, run before a commit; null when the site has none.
+    check: () => Promise<SiteCheck | null>
     commit: (message: string, paths: string[]) => Promise<void>
     push: () => Promise<void>
     pull: () => Promise<void>

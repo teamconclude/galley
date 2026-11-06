@@ -185,6 +185,9 @@ export interface RebaseState {
   edits: boolean
 }
 
+// How the site's own check went before a commit, with the end of its output when it failed.
+export type SiteCheck = { ok: true } | { ok: false; output: string }
+
 export interface GitStatus {
   branch: string
   base: string

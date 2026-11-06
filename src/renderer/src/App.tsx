@@ -27,7 +27,7 @@ import { emptyDraft, newDraft, type CommitDraft } from './lib/commitDraft'
 import ClaudePane from './components/ClaudePane'
 import ConflictEditor from './components/ConflictEditor'
 import ContextMenu, { type MenuItem } from './components/ContextMenu'
-import { NewPageDialog, PromptDialog, type NewPage } from './components/Dialogs'
+import { CheckFailedDialog, NewPageDialog, PromptDialog, type NewPage } from './components/Dialogs'
 import CommitList from './components/CommitList'
 import DiffView from './components/DiffView'
 import Editor, { type Selection } from './components/Editor'
@@ -272,6 +272,12 @@ export default function App(): React.JSX.Element | null {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
   const [branches, setBranches] = useState<string[]>([])
+  // A commit the site's check stopped, with what the check said.
+  const [checkFailed, setCheckFailed] = useState<{
+    message: string
+    paths: string[]
+    output: string
+  } | null>(null)
   const [pendingCommit, setPendingCommit] = useState<{ message: string; paths: string[] } | null>(
     null
   )
@@ -896,6 +902,16 @@ export default function App(): React.JSX.Element | null {
       }
       setIdentity(found)
     }
+    const check = await window.api.git.check().catch(() => null)
+    if (check && !check.ok) {
+      setCheckFailed({ message, paths, output: check.output })
+      return false
+    }
+    return commitNow(message, paths)
+  }
+
+  // A commit whose check passed, or which the editor makes despite it.
+  const commitNow = async (message: string, paths: string[]): Promise<boolean> => {
     try {
       await window.api.git.commit(message, paths)
       setDiff(null)
@@ -944,6 +960,10 @@ export default function App(): React.JSX.Element | null {
     if (!identity && !(await window.api.git.identity())) {
       setGitDialog('identity')
       return 'Commits carry a name and email, which Galley has now asked the editor for. Nothing was committed yet; try again once they are filled in.'
+    }
+    const check = await window.api.git.check().catch(() => null)
+    if (check && !check.ok) {
+      return `The site's check (scripts/check) failed, so nothing was committed. The end of its output:\n\n${check.output}\n\nFix what it reports and commit again, or tell the editor what is wrong; they can still commit with the Commit button, which offers to commit anyway.`
     }
     try {
       await window.api.git.commit(message, paths)
@@ -1855,6 +1875,19 @@ export default function App(): React.JSX.Element | null {
             onSubmit={(name) => {
               setGitDialog(null)
               void save().then(() => gitAction(() => window.api.git.moveToBranch(name)))
+            }}
+          />
+        )}
+        {checkFailed && (
+          <CheckFailedDialog
+            output={checkFailed.output}
+            onCancel={() => setCheckFailed(null)}
+            onCommit={() => {
+              const { message, paths } = checkFailed
+              setCheckFailed(null)
+              void commitNow(message, paths).then(
+                (ok) => ok && setDraft((d) => ({ ...d, message: '' }))
+              )
             }}
           />
         )}

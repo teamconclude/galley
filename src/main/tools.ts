@@ -199,13 +199,13 @@ export function installClaude(onLine: (line: string) => void): Promise<string> {
   })
 }
 
-async function json(url: string): Promise<unknown> {
+export async function json(url: string): Promise<unknown> {
   const res = await net.fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error(`${url}: ${res.status}`)
   return res.json()
 }
 
-async function text(url: string): Promise<string> {
+export async function text(url: string): Promise<string> {
   const res = await net.fetch(url)
   if (!res.ok) throw new Error(`${url}: ${res.status}`)
   return res.text()

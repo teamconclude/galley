@@ -14,6 +14,7 @@ import type {
   OutsideEntry,
   PublishResult,
   ReleaseStep,
+  SiteCheck,
   SiteInfo
 } from '../shared/types'
 import { splitDiff } from '../shared/diff'
@@ -24,6 +25,7 @@ import { environmentSite } from './hugoConfig'
 import { placementWarning } from './placement'
 import { defaultSiteInfo } from '../shared/siteInfo'
 import { loadSettings, prefs, saveSettings } from './settings'
+import { hasCheck, runCheck } from './check'
 import { findGit, gitEnv } from './tools'
 
 const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'develop'])
@@ -617,6 +619,12 @@ export class Git {
       throw new Error('Bringing in changes stopped on a conflict; continue or cancel it first')
     }
     return status
+  }
+
+  // The site's own check, which the window runs before a commit; null when it has none.
+  async check(): Promise<SiteCheck | null> {
+    if (!hasCheck(this.path)) return null
+    return this.op('Checking the site…', () => runCheck(this.path))
   }
 
   async commit(msg: string, paths: string[]): Promise<void> {

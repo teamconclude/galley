@@ -39,6 +39,7 @@ import { imageUses, planReplacement, renameImage, replaceImage } from './images'
 import { clone, Git, run as runGit } from './git'
 import { environmentSites } from './hugoConfig'
 import { HugoServer } from './hugo'
+import { prepareNode } from './node'
 import { dropPlacement } from './placement'
 import { pixel } from './pixel'
 import { parseReviewLink, type ReviewLink } from '../shared/reviewLink'
@@ -183,6 +184,8 @@ function openRepo(path: string): void {
   saveSettings({ ...settings, repoPath: path, recent })
   refreshMenu()
   void hugo.start(path).then(() => hugo.refresh())
+  // Ready before the first commit needs it for the site's check.
+  void prepareNode(path)
   setup.siteOpened()
   send('repo:opened')
 }
@@ -583,6 +586,7 @@ function registerIpc(): void {
   ipcMain.handle('git:deleteBranch', (_e, name: string, onGitHub: boolean) =>
     currentGit().deleteBranch(name, onGitHub)
   )
+  ipcMain.handle('git:check', () => currentGit().check())
   ipcMain.handle('git:commit', (_e, msg: string, paths: string[]) =>
     currentGit().commit(msg, paths)
   )

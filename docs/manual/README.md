@@ -318,6 +318,11 @@ too unless colleagues' work is on it. If you are on the branch, Galley moves you
    click **Commit**, or press ⌘Return. **Write with Claude** has Claude look at the ticked
    files and write the note for you; read it, change it if you like, then commit.
 
+If your site checks itself (its developers decide that), Galley runs the check first and
+the Changes tab says **Checking the site…**. When the check finds problems, nothing is
+committed: Galley shows what it found, such as a link to a page that does not exist. Fix
+it and commit again, ask Claude to fix it, or click **Commit anyway**.
+
 Galley sends the commit to your branch on GitHub straight away. To undo changes you do not
 want, use the arrow next to a file, or **Discard all**. New files go to the Trash, so you
 can still get them back.

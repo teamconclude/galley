@@ -67,6 +67,7 @@ const api: Api = {
     ownBranches: () => ipcRenderer.invoke('git:ownBranches'),
     branchInfo: (name) => ipcRenderer.invoke('git:branchInfo', name),
     deleteBranch: (name, onGitHub) => ipcRenderer.invoke('git:deleteBranch', name, onGitHub),
+    check: () => ipcRenderer.invoke('git:check'),
     commit: (message, paths) => ipcRenderer.invoke('git:commit', message, paths),
     push: () => ipcRenderer.invoke('git:push'),
     pull: () => ipcRenderer.invoke('git:pull'),
