@@ -87,8 +87,13 @@ Each component has a folder in the components folder, holding:
 
 - `<name>.yml`, the schema, which drives the editor and nothing else;
 - `<name>.html`, the Hugo partial that renders it, reading the block's keys directly;
-- optionally its styles, `<name>.scss` or `<name>.css` as the site builds them, and
-  `<name>.md` for its Markdown rendition.
+- optionally its styles, `<name>.scss` or `<name>.css` as the site builds them, a
+  script, `<name>.js`, and `<name>.md` for its Markdown rendition.
+
+Galley reads only the schema; the rest is the site's business. The template site
+bundles every component's styles and scripts by itself and keeps components apart:
+top-level selectors name the component (`c-<name>…`), and each script runs in a scope
+of its own. Its `scripts/check-components` checks that, and its README describes it.
 
 ### The schema
 
