@@ -73,6 +73,29 @@ const kindMark: Record<Change['kind'], string> = {
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
+// Why checking GitHub failed, in words; git's own message is in the row's tooltip and in
+// the log.
+function fetchProblem(error: string): string {
+  if (/Permission denied \(publickey\)|Host key verification failed/i.test(error)) {
+    return 'GitHub did not accept the SSH key on this Mac.'
+  }
+  if (
+    /Authentication failed|could not read (Username|Password)|terminal prompts disabled|Invalid username or password|Repository not found|error: 40[13]/i.test(
+      error
+    )
+  ) {
+    return 'GitHub did not accept the sign-in. Sign in again from Setup… in the Galley menu.'
+  }
+  if (
+    /Could not resolve host|Failed to connect|timed out|Network is unreachable|Connection refused|Connection reset|connect to host/i.test(
+      error
+    )
+  ) {
+    return 'Could not reach GitHub. Check the internet connection.'
+  }
+  return 'Could not get updates from GitHub.'
+}
+
 // A shared branch with the address it is built for, e.g. "staging (conclude.dev)".
 const named = (branch: string, site: string | null): string =>
   site ? `${branch} (${site})` : branch
@@ -233,7 +256,8 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
           <>
             {status.fetchError && (
               <div className="sync-row error" title={status.fetchError}>
-                Could not reach GitHub. Checked {ago(status.lastFetch)}.
+                {fetchProblem(status.fetchError)}
+                {status.lastFetch && ` Last checked ${ago(status.lastFetch)}.`}
               </div>
             )}
             {status.protected && (
@@ -308,7 +332,7 @@ export default function ChangesPanel(props: Props): React.JSX.Element {
               ) : (
                 <div className="sync-row muted">Everything on this branch is in {status.base}.</div>
               ))}
-            {status.upstream && status.ahead === 0 && status.behind === 0 && (
+            {status.upstream && !status.fetchError && status.ahead === 0 && status.behind === 0 && (
               <div className="sync-row muted">
                 In sync with GitHub. Checked {ago(status.lastFetch)}.
                 {prUrl && changes.length === 0 && (

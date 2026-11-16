@@ -27,6 +27,7 @@ import { defaultSiteInfo } from '../shared/siteInfo'
 import { loadSettings, prefs, saveSettings } from './settings'
 import { hasCheck, runCheck } from './check'
 import { findGit, gitEnv } from './tools'
+import { log } from './log'
 
 const protectedBranches = new Set(['staging', 'production', 'main', 'master', 'develop'])
 // Work flows from personal branches into the first of these, then on to the next.
@@ -490,15 +491,102 @@ export class Git {
       return this.refresh()
     }
     return this.op('Checking for updates…', async () => {
+      const before = await this.gitHubTips()
+      let fetched = false
       try {
         await this.git(['fetch', '--prune', 'origin'])
+        if (this.fetchError !== null) log('fetch works again', this.path)
         this.lastFetch = Date.now()
         this.fetchError = null
+        fetched = true
       } catch (e) {
+        // Logged once per new error, not on every timer tick.
+        if (message(e) !== this.fetchError) log('fetch failed', this.path, message(e))
         this.fetchError = message(e)
       }
       await this.followGitHub()
+      if (fetched) await this.dropGoneBranches(before)
     })
+  }
+
+  // Each branch on GitHub with its commit, as last fetched.
+  private async gitHubTips(): Promise<Map<string, string>> {
+    const lines = await this.lines([
+      'for-each-ref',
+      '--format=%(refname:lstrip=3) %(objectname)',
+      'refs/remotes/origin'
+    ])
+    const tips = new Map<string, string>()
+    for (const line of lines) {
+      const [name, sha] = line.split(' ')
+      if (name !== 'HEAD') tips.set(name, sha)
+    }
+    return tips
+  }
+
+  // Where GitHub's copy of each branch stood when it went from GitHub while the branch
+  // was checked out, by branch.
+  private async goneNotes(): Promise<Map<string, string>> {
+    const lines = await this.lines(['config', '--get-regexp', '^branch\\..*\\.galleygoneat$'])
+    const notes = new Map<string, string>()
+    for (const line of lines) {
+      const [key, sha] = line.split(' ')
+      notes.set(key.slice('branch.'.length, -'.galleygoneat'.length), sha)
+    }
+    return notes
+  }
+
+  // Local copies of branches that are gone from GitHub go as well, as long as nothing
+  // would be lost: the branch holds no commit beyond what GitHub's copy had when it went,
+  // or it is contained in a branch still on GitHub. Branches with commits only this Mac
+  // has stay, e.g. from work outside Galley. A checked-out branch waits until the editor
+  // leaves it, with a note of where GitHub's copy stood. `before` holds GitHub's branches
+  // as they were before a fetch that may have pruned some.
+  private async dropGoneBranches(before?: Map<string, string>): Promise<void> {
+    const onGitHub = await this.gitHubTips()
+    // Without branches on GitHub to compare with, there is nothing to judge by.
+    if (onGitHub.size === 0) return
+    const base = await this.base([...onGitHub.keys()].map((b) => `origin/${b}`))
+    const current = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim()
+    const checkedOut = await this.checkedOut()
+    const notes = await this.goneNotes()
+    for (const branch of await this.lines(['branch', '--format=%(refname:short)'])) {
+      if (onGitHub.has(branch)) {
+        if (notes.has(branch)) {
+          await this.git(['config', '--unset', `branch.${branch}.galleyGoneAt`]).catch(
+            () => undefined
+          )
+        }
+        continue
+      }
+      if (branch === base) continue
+      const pruned = before?.get(branch)
+      if (branch === current || checkedOut.has(branch)) {
+        if (pruned) await this.git(['config', `branch.${branch}.galleyGoneAt`, pruned])
+        continue
+      }
+      const tip = await this.sha(`refs/heads/${branch}`)
+      const gone = pruned ?? notes.get(branch)
+      const safe =
+        (gone !== undefined && (await this.isAncestor(tip, gone))) || (await this.onGitHub(tip))
+      if (!safe) continue
+      await this.git(['branch', '-D', branch])
+        .then(() => log('deleted branch gone from GitHub', this.path, branch, 'at', tip))
+        .catch((e) => log('could not delete branch', this.path, branch, message(e)))
+    }
+  }
+
+  // Whether some branch on GitHub contains the commit.
+  private async onGitHub(commit: string): Promise<boolean> {
+    const refs = await this.lines([
+      'for-each-ref',
+      '--count=1',
+      '--format=%(refname)',
+      '--contains',
+      commit,
+      'refs/remotes/origin'
+    ])
+    return refs.length > 0
   }
 
   async branches(): Promise<string[]> {
@@ -522,6 +610,7 @@ export class Git {
       }
       await this.git(['fetch', 'origin', base]).catch(() => undefined)
       await this.git(['switch', '-c', name, await this.baseRef(base), '--no-track'])
+      await this.dropGoneBranches()
     })
   }
 
@@ -529,6 +618,7 @@ export class Git {
     return this.op('Switching branch…', async () => {
       await this.git(['switch', name])
       await this.followGitHub()
+      await this.dropGoneBranches()
     })
   }
 
@@ -1095,11 +1185,15 @@ export class Git {
     if (!(await this.validBranch(name))) throw new Error(`${name} is not a branch name`)
     return this.op(`Getting ${name}…`, async () => {
       const ref = `+refs/heads/${name}:refs/remotes/origin/${name}`
+      // A branch GitHub does not have is an answer; not reaching GitHub is an error.
       const found = await this.git(['fetch', 'origin', ref]).then(
         () => true,
-        () => false
+        (e) => {
+          if (/couldn't find remote ref/i.test(message(e))) return false
+          throw new Error(`Could not get ${name} from GitHub. ${message(e)}`)
+        }
       )
-      this.lastFetch = Date.now()
+      if (found) this.lastFetch = Date.now()
       return found
     })
   }
@@ -1113,6 +1207,7 @@ export class Git {
     await this.op(`Opening ${name}…`, async () => {
       await this.git(['switch', name])
       await this.git(['merge', '--ff-only', `origin/${name}`]).catch(() => undefined)
+      await this.dropGoneBranches()
     })
     if (from && from !== name) {
       saveSettings({ ...loadSettings(), review: { repo: this.path, branch: name, from } })
@@ -1120,11 +1215,15 @@ export class Git {
     await this.refresh()
   }
 
-  // Back to the branch the review started from.
+  // Back to the branch the review started from, or to the base branch when that one has
+  // gone in the meantime.
   async endReview(): Promise<void> {
     const review = loadSettings().review
     if (!review || review.repo !== this.path) return
-    await this.switchBranch(review.from)
+    const back = (await this.branches()).includes(review.from)
+      ? review.from
+      : (await this.status()).base
+    await this.switchBranch(back)
     const settings = loadSettings()
     delete settings.review
     saveSettings(settings)
