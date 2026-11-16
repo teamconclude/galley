@@ -308,6 +308,9 @@ deleted. Galley says first how many commits would be lost, and deletes the branc
 too unless colleagues' work is on it. If you are on the branch, Galley moves you to
 `develop` first.
 
+A branch someone deleted on GitHub disappears from your list by itself, once you are not
+on it. Galley keeps it only if it has commits that are on your Mac and nowhere on GitHub.
+
 ### Committing
 
 1. Click a file to see what changed: removed text in red, added text in green, pictures
@@ -515,7 +518,12 @@ usually names the file. Fix it and click **Restart Hugo**.
 Sass, which Hugo needs Dart Sass for. Click **Install Dart Sass** above the preview.
 
 **"Could not reach GitHub."** Check your internet connection. Galley tries again by itself
-every few minutes; the ⋯ menu in the Changes tab has **Check for updates now**.
+every few minutes; the ⋯ menu in the Changes tab has **Check for updates now**. While
+Galley cannot reach GitHub, colleagues' new branches do not show up in your list.
+
+**"GitHub did not accept the sign-in."** Open **Galley ▸ Setup…** and sign in to GitHub
+again. Hovering over the red line shows git's own message, which helps a developer if
+signing in again does not.
 
 **Galley says it is not signed in to GitHub.** Open **Galley ▸ Setup…** and sign in again.
 
