@@ -103,6 +103,7 @@ export interface Api {
     status: () => Promise<HugoStatus>
     restart: () => Promise<void>
     install: () => Promise<void>
+    installSass: () => Promise<void>
     onStatus: (cb: (status: HugoStatus) => void) => Unsubscribe
   }
   git: {

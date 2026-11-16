@@ -39,6 +39,8 @@ export interface HugoStatus {
   missing?: boolean
   // Hugo's errors from the latest build, which the preview shows in place of the page.
   buildError?: string
+  // The build failed for want of Dart Sass, which Galley can download.
+  sassMissing?: boolean
 }
 
 export type FieldType =

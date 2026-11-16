@@ -511,6 +511,9 @@ browser.
 when the preview stays stopped, a page probably has an error in its settings; the message
 usually names the file. Fix it and click **Restart Hugo**.
 
+**The preview says "You need to install Dart Sass".** The site's styles are written in
+Sass, which Hugo needs Dart Sass for. Click **Install Dart Sass** above the preview.
+
 **"Could not reach GitHub."** Check your internet connection. Galley tries again by itself
 every few minutes; the ⋯ menu in the Changes tab has **Check for updates now**.
 

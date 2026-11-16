@@ -4,8 +4,9 @@ import { existsSync, promises as fs } from 'fs'
 import { join } from 'path'
 import type { HugoStatus, PageInfo } from '../shared/types'
 import { loadSettings, saveSettings } from './settings'
-import { resolveCommand } from './shell'
-import { pretendMissing } from './tools'
+import { log } from './log'
+import { loginPath, resolveCommand } from './shell'
+import { downloadSass, findSass, ownSass, pretendMissing, refreshSass } from './tools'
 import { isNewer } from './updater'
 
 const week = 7 * 24 * 60 * 60 * 1000
@@ -61,12 +62,14 @@ async function latestHugo(): Promise<string> {
   return tag.replace(/^v/, '')
 }
 
-// Hugo ships macOS builds only as a .pkg; pkgutil unpacks it without installing.
+// Hugo ships macOS builds only as a .pkg; pkgutil unpacks it without installing. Since
+// 0.170 there is one edition, without the LibSass of the former extended one; Sass is
+// compiled by Dart Sass, see sassPath.
 async function downloadHugo(
   hugoVersion: string,
   progress: (percent: number) => void
 ): Promise<string> {
-  const asset = `hugo_extended_${hugoVersion}_darwin-universal.pkg`
+  const asset = `hugo_${hugoVersion}_darwin-universal.pkg`
   const url = `https://github.com/gohugoio/hugo/releases/download/v${hugoVersion}/${asset}`
   const tmp = await fs.mkdtemp(join(app.getPath('temp'), 'galley-hugo-'))
   try {
@@ -102,6 +105,35 @@ async function downloadHugo(
   }
 }
 
+// Top-level folders whose Sass is not the site's own: packages and Hugo's output. Content
+// and static, which hold the pictures, are skipped too, to keep the walk quick.
+const notStyles = new Set(['node_modules', 'public', 'resources', 'content', 'static'])
+
+// Whether the site has Sass of its own, which Hugo needs Dart Sass to compile.
+export async function usesSass(dir: string, depth = 0): Promise<boolean> {
+  if (depth > 8) return false
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+  for (const e of entries) {
+    if (e.isFile() && /\.s[ac]ss$/.test(e.name)) return true
+  }
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name.startsWith('.')) continue
+    if (depth === 0 && notStyles.has(e.name)) continue
+    if (await usesSass(join(dir, e.name), depth + 1)) return true
+  }
+  return false
+}
+
+// The PATH Hugo runs with: Galley's own Dart Sass ahead of the login shell's, which a GUI
+// app does not inherit and which holds a Homebrew sass, git and node.
+export async function sassPath(): Promise<string> {
+  const [own, path] = await Promise.all([ownSass(), loginPath()])
+  return own ? `${own.dir}:${path}` : path
+}
+
+// Hugo's message when a site's Sass needs Dart Sass and none is on its PATH.
+const sassMissing = /You need to install Dart Sass/
+
 function run(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, { maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -118,20 +150,32 @@ export class HugoServer {
   private recovering = false
   private restarts: number[] = []
   private restartTimer: NodeJS.Timeout | null = null
+  // Counts stops, so a start that waited on a download sees whether it is still wanted.
+  private stops = 0
+  private sassDownload: Promise<void> | null = null
   status: HugoStatus = { state: 'stopped' }
 
   constructor(private onStatus: (status: HugoStatus) => void) {}
 
   async start(repo: string): Promise<void> {
     this.stop()
+    const stops = this.stops
     this.repo = repo
     const bin = await findHugo(repo)
+    if (stops !== this.stops) return
     this.bin = bin
     if (!bin) {
       this.set({ state: 'error', message: 'Hugo is not installed.', missing: true })
       return
     }
     this.set({ state: 'starting' })
+    // A site with Sass gets Dart Sass the first time it is opened on a Mac without one. If
+    // that fails, Hugo starts all the same and its error offers the download again.
+    if ((await usesSass(repo)) && !(await findSass())) {
+      await this.fetchSass().catch((err) => log('dart-sass download failed', String(err)))
+    }
+    const path = await sassPath()
+    if (stops !== this.stops) return
     // The server serves files found in its publish directory in preference to its own
     // render, so a `hugo` build into public/ by another tool would hijack the preview.
     // Pointing the server at an empty directory of Galley's own keeps the preview on what
@@ -142,7 +186,11 @@ export class HugoServer {
     // Last-Modified, from which the preview would keep a replaced picture for days.
     const proc = spawn(bin, ['server', '-D', '-F', '-E', '--renderToMemory', '--noHTTPCache'], {
       cwd: repo,
-      env: { ...process.env, HUGO_PUBLISHDIR: join(app.getPath('temp'), 'galley-preview') }
+      env: {
+        ...process.env,
+        PATH: path,
+        HUGO_PUBLISHDIR: join(app.getPath('temp'), 'galley-preview')
+      }
     })
     this.proc = proc
     let output = ''
@@ -251,23 +299,53 @@ export class HugoServer {
     await this.start(repo)
   }
 
-  // Once a week, when the preview runs on Galley's own download, fetch a newer Hugo and
-  // restart on it. Other installations are left to whoever manages them.
+  // Downloads Dart Sass, even when one is installed: one Hugo cannot use, such as the
+  // JavaScript sass from npm, is then passed over for Galley's own.
+  async installSass(repo: string): Promise<void> {
+    this.stop()
+    try {
+      await this.fetchSass()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.set({ state: 'error', message: `Dart Sass could not be downloaded: ${message}` })
+      return
+    }
+    await this.start(repo)
+  }
+
+  private fetchSass(): Promise<void> {
+    this.sassDownload ??= downloadSass((percent) =>
+      this.set({ state: 'starting', message: `Downloading Dart Sass… ${percent}%` })
+    ).finally(() => (this.sassDownload = null))
+    return this.sassDownload
+  }
+
+  // Once a week, fetch a newer Hugo when the preview runs on Galley's own download, and a
+  // newer Dart Sass when Galley has its own, and restart on them. Other installations are
+  // left to whoever manages them.
   async refresh(): Promise<void> {
+    if (!this.repo) return
+    const [hugo, sass] = await Promise.all([this.refreshHugo(), refreshSass()])
+    if ((hugo || sass) && this.repo) await this.start(this.repo)
+  }
+
+  private async refreshHugo(): Promise<boolean> {
     const own = await ownHugo()
-    if (!own || this.bin !== own.path || !this.repo) return
-    if (Date.now() - (loadSettings().hugoChecked ?? 0) < week) return
+    if (!own || this.bin !== own.path) return false
+    if (Date.now() - (loadSettings().hugoChecked ?? 0) < week) return false
     try {
       const latest = await latestHugo()
-      if (!isNewer(latest, own.version)) return
+      if (!isNewer(latest, own.version)) return false
       await downloadHugo(latest, () => {})
-      await this.start(this.repo)
+      return true
     } catch {
       // Offline or GitHub unavailable; the installed copy keeps working.
+      return false
     }
   }
 
   stop(): void {
+    this.stops++
     if (this.restartTimer) clearTimeout(this.restartTimer)
     this.restartTimer = null
     const proc = this.proc
@@ -277,8 +355,9 @@ export class HugoServer {
   }
 
   private set(status: HugoStatus): void {
-    this.status = status
-    this.onStatus(status)
+    const needsSass = sassMissing.test(status.buildError ?? '') || undefined
+    this.status = { ...status, sassMissing: needsSass }
+    this.onStatus(this.status)
   }
 }
 

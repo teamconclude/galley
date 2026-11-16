@@ -6,6 +6,7 @@ import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { token as githubToken } from './github'
 import { log } from './log'
+import { loadSettings, saveSettings } from './settings'
 import { resolveCommand } from './shell'
 import { isNewer } from './updater'
 
@@ -166,9 +167,96 @@ export async function claudeProcess(): Promise<ClaudeProcess> {
   env.LANG ||= 'en_US.UTF-8'
   // Git without Galley's GitHub token: Claude reads history but never pushes.
   Object.assign(env, await gitToolEnv())
-  const [git, bin] = await Promise.all([findGit(), findClaude()])
-  const path = [bin && dirname(bin), git && dirname(git.bin)].filter((p): p is string => !!p)
+  const [git, bin, sass] = await Promise.all([findGit(), findClaude(), ownSass()])
+  const path = [bin && dirname(bin), git && dirname(git.bin), sass?.dir].filter(
+    (p): p is string => !!p
+  )
   return { bin, env, path }
+}
+
+// Hugo compiles Sass with Dart Sass, a program of its own that Hugo looks for on its PATH
+// as `sass` or `dart-sass`. Its DART_SASS_BINARY could name a full path instead, but
+// Hugo's security.exec.allow accepts only those two names, so Galley's copy goes on the
+// PATH of whatever runs Hugo.
+const sassBin = (version: string): string => join(ownDir('dart-sass'), version, 'dart-sass', 'sass')
+
+// The Dart Sass Galley downloaded itself, if any, and the folder holding its `sass`.
+export async function ownSass(): Promise<{ version: string; dir: string } | null> {
+  const version = await newestVersion(ownDir('dart-sass'), sassBin)
+  return version ? { version, dir: dirname(sassBin(version)) } : null
+}
+
+// The Dart Sass Hugo would find: Galley's own, which goes first on Hugo's PATH, then the
+// login shell's (Homebrew).
+export async function findSass(): Promise<string | null> {
+  const own = await ownSass()
+  if (own) return join(own.dir, 'sass')
+  if (pretendMissing('sass')) return null
+  return (await resolveCommand('sass')) ?? (await resolveCommand('dart-sass'))
+}
+
+interface SassRelease {
+  version: string
+  url: string
+}
+
+async function latestSass(): Promise<SassRelease> {
+  const release = (await json('https://api.github.com/repos/sass/dart-sass/releases/latest')) as {
+    tag_name: string
+    assets: { name: string; browser_download_url: string }[]
+  }
+  const version = release.tag_name.replace(/^v/, '')
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
+  const asset = release.assets.find((a) => a.name === `dart-sass-${version}-macos-${arch}.tar.gz`)
+  if (!asset) throw new Error('No Dart Sass build for this Mac')
+  saveSettings({ ...loadSettings(), sassChecked: Date.now() })
+  return { version, url: asset.browser_download_url }
+}
+
+async function installSass(
+  release: SassRelease,
+  progress: (percent: number) => void
+): Promise<void> {
+  const dest = join(ownDir('dart-sass'), release.version)
+  const tmp = await fs.mkdtemp(join(app.getPath('temp'), 'galley-sass-'))
+  try {
+    const archive = join(tmp, 'dart-sass.tar.gz')
+    await download(release.url, archive, progress)
+    await fs.rm(dest, { recursive: true, force: true })
+    await fs.mkdir(dest, { recursive: true })
+    await run('/usr/bin/tar', ['-xzf', archive, '-C', dest])
+    if (!existsSync(sassBin(release.version)))
+      throw new Error('The Dart Sass download is missing its sass')
+    for (const old of await fs.readdir(ownDir('dart-sass'))) {
+      if (old !== release.version)
+        await fs.rm(join(ownDir('dart-sass'), old), { recursive: true, force: true })
+    }
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true })
+  }
+  log('installed dart-sass', release.version)
+}
+
+// The latest Dart Sass, from its GitHub releases, which hold a self-contained build per
+// architecture: a `sass` script with the Dart runtime and Sass beside it.
+export async function downloadSass(progress: (percent: number) => void): Promise<void> {
+  await installSass(await latestSass(), progress)
+}
+
+// Once a week a newer Dart Sass replaces Galley's own; true when it did. Other
+// installations are left to whoever manages them.
+export async function refreshSass(): Promise<boolean> {
+  const own = await ownSass()
+  if (!own || Date.now() - (loadSettings().sassChecked ?? 0) < 7 * 24 * 60 * 60 * 1000) return false
+  try {
+    const latest = await latestSass()
+    if (!isNewer(latest.version, own.version)) return false
+    await installSass(latest, () => {})
+    return true
+  } catch {
+    // Offline or GitHub unavailable; the installed copy keeps working.
+    return false
+  }
 }
 
 // The official installer puts a native binary under ~/.local/bin without admin rights.

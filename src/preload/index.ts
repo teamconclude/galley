@@ -56,6 +56,7 @@ const api: Api = {
     status: () => ipcRenderer.invoke('hugo:status'),
     restart: () => ipcRenderer.invoke('hugo:restart'),
     install: () => ipcRenderer.invoke('hugo:install'),
+    installSass: () => ipcRenderer.invoke('hugo:installSass'),
     onStatus: (cb) => on('hugo:status', cb)
   },
   git: {

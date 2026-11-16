@@ -572,6 +572,7 @@ function registerIpc(): void {
   ipcMain.handle('hugo:status', () => hugo.status)
   ipcMain.handle('hugo:restart', () => (repo ? hugo.start(repo.path) : undefined))
   ipcMain.handle('hugo:install', () => (repo ? hugo.install(repo.path) : undefined))
+  ipcMain.handle('hugo:installSass', () => (repo ? hugo.installSass(repo.path) : undefined))
   const currentGit = (): Git => {
     if (!git) throw new Error('No repository open')
     return git

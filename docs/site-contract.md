@@ -56,8 +56,8 @@ editing `data/llms.yaml` previews `/llms.txt`.
   from Claude alike. Exit 0 lets the commit go ahead; anything else stops it and shows
   the end of what the script printed, the last 60 lines of stdout and stderr together,
   with the choice to commit anyway. Claude reads the same output and can fix what it
-  names. The script runs without a terminal, with the login shell's `PATH` and the Hugo
-  and git Galley uses, and is stopped after five minutes. It checks the whole checkout,
+  names. The script runs without a terminal, with the login shell's `PATH` and the Hugo,
+  Dart Sass and git Galley uses, and is stopped after five minutes. It checks the whole checkout,
   not only the ticked files. Editors' Macs often lack `make` and Python, which come with
   developer tools, so `#!/bin/sh` is the safe start for the script itself.
 - **Node.** A checkout with a `package.json` gets Node for its tools, such as the steps

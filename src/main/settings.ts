@@ -9,6 +9,7 @@ export interface Settings {
   recent?: string[]
   declinedMove?: boolean
   hugoChecked?: number
+  sassChecked?: number
   // Window bounds: the main window's, and each tool window's own window's as tool:<id>.
   windows?: Partial<Record<string, Rectangle>>
   layout?: Layout

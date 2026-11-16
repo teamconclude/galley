@@ -118,6 +118,11 @@ export default function Preview(props: Props): React.JSX.Element {
             Install Hugo
           </button>
         )}
+        {status.sassMissing && (
+          <button className="primary" onClick={() => void window.api.hugo.installSass()}>
+            Install Dart Sass
+          </button>
+        )}
         {status.state === 'error' && !status.missing && (
           <button onClick={() => void window.api.hugo.restart()}>Restart Hugo</button>
         )}

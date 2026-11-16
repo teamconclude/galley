@@ -2,17 +2,16 @@ import { spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { dirname, join } from 'path'
 import type { SiteCheck } from '../shared/types'
-import { findHugo } from './hugo'
+import { findHugo, sassPath } from './hugo'
 import { log } from './log'
 import { prepareNode } from './node'
-import { loginPath } from './shell'
 import { findGit } from './tools'
 
 // A site checks itself before each commit with an executable scripts/check in its checkout.
-// Galley runs it from the checkout's root, with the Hugo and git it uses on the PATH, and
-// anything but success stops the commit, with the end of the output to read. Every Mac has
-// /bin/sh, unlike make, which comes with the Command Line Tools; a site with a package.json
-// gets Node and its packages too.
+// Galley runs it from the checkout's root, with the Hugo, Dart Sass and git it uses on the
+// PATH, and anything but success stops the commit, with the end of the output to read.
+// Every Mac has /bin/sh, unlike make, which comes with the Command Line Tools; a site with
+// a package.json gets Node and its packages too.
 const script = join('scripts', 'check')
 const timeout = 5 * 60_000
 const shownLines = 60
@@ -26,7 +25,7 @@ export async function runCheck(repo: string): Promise<SiteCheck | null> {
     prepareNode(repo),
     findHugo(repo),
     findGit(),
-    loginPath()
+    sassPath()
   ])
   const dirs = [node && dirname(node), hugo && dirname(hugo), git && dirname(git.bin), path]
   // Plain output, which tools give when they see no colour terminal.

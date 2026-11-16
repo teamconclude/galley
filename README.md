@@ -28,7 +28,8 @@ You need a Mac running macOS 12 or later and access to the `teamconclude` organi
    asks for the two things only you can do:
    - **git** and **Hugo**, the site generator, are used from the Mac when installed, from
      Homebrew for example, and otherwise downloaded into Galley's own folder. Galley's own
-     Hugo is refreshed weekly.
+     Hugo is refreshed weekly. A site with Sass also gets **Dart Sass**, which Hugo
+     compiles it with, the same way, the first time it is opened.
    - **Claude Code** is installed with its official installer. The first time the Claude
      pane opens it asks you to sign in.
    - **GitHub sign-in** shows a short code and opens github.com; enter the code there. That
@@ -187,7 +188,7 @@ installed there.
 
 ### Testing on a fresh Mac
 
-`GALLEY_FRESH=git,hugo,claude` makes a development build behave as if those tools were
+`GALLEY_FRESH=git,hugo,sass,claude` makes a development build behave as if those tools were
 missing, so the downloads run on a machine that has them. The real test is a fresh macOS
 virtual machine with [tart](https://tart.run): create one with
 `tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest galley-test`, build the DMG, and
